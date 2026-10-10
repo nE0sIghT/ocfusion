@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <base href="/" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>OCFusion - ASUSWRT extensions</title>
+    <link rel="icon" href="/user/ocfusion-icon.png" />
+    <link rel="stylesheet" href="/index_style.css" />
+    <link rel="stylesheet" href="/form_style.css" />
+    <script src="/js/jquery.js"></script>
+    <script src="/js/httpApi.js"></script>
+    <script src="/state.js"></script>
+    <script src="/popup.js"></script>
+    <script src="/general.js"></script>
+    <script src="/help.js"></script>
+    <link rel="stylesheet" href="/user/extensions-panel.css" />
+    <script src="/user/ocfusion.js"></script>
+  </head>
+  <body class="bg">
+    <div id="TopBanner">
+      <div class="ext-header-fallback">
+        <a
+          href="https://github.com/nE0sIghT/ocfusion"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="OCFusion on GitHub"
+          ><img src="/user/ocfusion-logo.png" alt="OCFusion" /></a
+        ><strong data-router-model>ASUSWRT</strong><a href="/">ASUS</a>
+      </div>
+    </div>
+    <div id="Loading" class="popup_bg"></div>
+    <iframe name="hidden_frame" id="hidden_frame" hidden title="ASUS"></iframe>
+    <form name="form" hidden>
+      <input name="preferred_lang" value="RU" /><input
+        name="current_page"
+        value="/user/extensions.html"
+      /><input name="next_page" value="/user/extensions.html" />
+    </form>
+    <div class="ext-shell">
+      <div class="ext-context">
+        <span>OCFusion</span><small>ASUSWRT extensions</small
+        ><small id="platform-version"></small><a href="/">Back to ASUS ↗</a>
+      </div>
+      <div class="ext-layout">
+        <nav class="ext-menu" aria-label="OCFusion">
+          <div class="ext-menu-title">OCFusion</div>
+          <a href="#overview" data-page="overview" class="active">Overview</a>
+          <div id="module-menu"></div>
+          <a href="#modules" data-page="modules">Modules</a
+          ><a href="#system" data-page="system">System</a>
+          <div class="ext-menu-title">ASUS</div>
+          <a href="/Advanced_VPNClient_Content.asp">VPN Fusion ↗</a
+          ><a href="/Guest_network.asp">Wi-Fi / VLAN ↗</a
+          ><a
+            class="ext-project-link"
+            href="https://github.com/nE0sIghT/ocfusion"
+            target="_blank"
+            rel="noopener noreferrer"
+            >GitHub ↗</a
+          >
+        </nav>
+        <main class="ext-content">
+          <section data-section="overview">
+            <h1>Overview</h1>
+            <p class="ext-description">
+              Additional router services and their status.
+            </p>
+            <div id="module-overview"></div>
+          </section>
+
+          <section data-section="modules" hidden>
+            <h1>Modules</h1>
+            <div id="module-list"></div>
+            <article class="ext-card">
+              <h2>Installation and updates</h2>
+              <p>
+                Install packages through SSH. Updating preserves your profile and network bindings.
+              </p>
+              <pre>./install.sh</pre>
+              <p class="ext-description">
+                Install a module: /jffs/ocfusion-platform/extctl install /tmp/module.tar.gz
+              </p>
+            </article>
+          </section>
+          <section data-section="system" hidden>
+            <h1>System</h1>
+            <article class="ext-card">
+              <h2>Platform</h2>
+              <dl>
+                <dt>Router</dt>
+                <dd data-router-model>ASUSWRT</dd>
+                <dt>Extension version</dt>
+                <dd id="system-version"></dd>
+                <dt>Panel</dt>
+                <dd>ASUS web server</dd>
+              </dl>
+              <p>Keep the USB drive connected for the service to run.</p>
+            </article>
+
+            <article class="ext-card" id="about-project">
+              <h2>About</h2>
+              <p>
+                <strong>OCFusion</strong> · <span id="about-version"></span>
+              </p>
+              <p class="ext-project-links">
+                <a
+                  href="https://github.com/nE0sIghT/ocfusion"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >GitHub ↗</a
+                ><a
+                  href="https://github.com/nE0sIghT/ocfusion/issues"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >Report an issue ↗</a
+                ><a
+                  href="https://github.com/nE0sIghT/ocfusion/releases"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >Releases ↗</a
+                >
+              </p>
+              <h3>Support the project</h3>
+              <p>If you want to support the work or say thanks:</p>
+              <dl class="ext-support">
+                <dt>BTC</dt>
+                <dd><code>bc1q3qmyy5wx8antx2e44lrr4fv9h3z8hs4x7jlnat</code></dd>
+                <dt>EVM</dt>
+                <dd><code>0x6b513f6853003726502ec258351fcf6b82336d49</code></dd>
+                <dt>Boosty</dt>
+                <dd>
+                  <a
+                    href="https://boosty.to/ne0sight/donate"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    >Boosty ↗</a
+                  >
+                </dd>
+              </dl>
+            </article>
+          </section>
+          <section data-section="module" hidden>
+            <h1 id="module-title">Module</h1>
+            <iframe
+              id="module-frame"
+              title="Module settings"
+              style="width: 100%; min-height: 600px; border: 0"
+            ></iframe>
+          </section>
+          <p id="api-error" role="alert" hidden></p>
+        </main>
+      </div>
+    </div>
+    <script src="/user/extensions-panel.js"></script>
+    <script src="/user/ocfusion-i18n.js"></script>
+  </body>
+</html>

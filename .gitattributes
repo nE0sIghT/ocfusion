@@ -1,0 +1,5 @@
+* text=auto eol=lf
+*.png binary
+# Preserve upstream patch context and unmodified third-party notices.
+patches/** -whitespace
+third_party/notices/** -whitespace

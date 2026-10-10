@@ -1,0 +1,43 @@
+platform_go = files(
+    'go.mod',
+    'bundled.go',
+    'cli.go',
+    'daemon.go',
+    'dependencies.go',
+    'install_state.go',
+    'ipc.go',
+    'mailbox.go',
+    'main.go',
+    'manager.go',
+    'manifest.go',
+    'migration.go',
+    'package.go',
+    'paths.go',
+    'process.go',
+    'registry.go',
+    'stock.go',
+    'stock_mailbox.go',
+    'stock_web.go',
+    'transport.go',
+    'web.go',
+)
+
+manager = custom_target(
+    'extd',
+    input: platform_go,
+    output: 'extd',
+    depend_files: go_builder,
+    command: [
+        python,
+        go_builder,
+        '--go',
+        go.full_path(),
+        '--module',
+        source_root / 'platform',
+        '--output',
+        '@OUTPUT@',
+        '--version',
+        version,
+    ],
+)
+

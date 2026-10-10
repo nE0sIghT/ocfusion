@@ -1,0 +1,23 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
+# ASUS app entrypoint. get_apps_name S95ocfusion -> ocfusion.
+export PATH=/usr/bin:/bin:/usr/sbin:/sbin
+CTL=/jffs/ocfusion-platform/extctl
+
+case "$1" in
+    start)
+        "$CTL" start || exit 1
+        cru a ocfusion '* * * * * /jffs/ocfusion-platform/extctl start' || exit 1
+        ;;
+    stop)
+        cru d ocfusion
+        "$CTL" stop
+        ;;
+    firewall-start)
+        "$CTL" start
+        ;;
+    *)
+        echo 'Usage: S95ocfusion start|stop|firewall-start' >&2
+        exit 1
+        ;;
+esac

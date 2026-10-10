@@ -1,0 +1,26 @@
+option(
+    'runtime',
+    type: 'boolean',
+    value: true,
+    description: 'Build the ARM64 router distribution',
+)
+option(
+    'browser_tests',
+    type: 'boolean',
+    value: false,
+    description: 'Enable Playwright browser tests',
+)
+option(
+    'external_jobs',
+    type: 'integer',
+    value: 8,
+    min: 1,
+    description: 'Parallel make jobs per upstream C project',
+)
+
+option(
+    'release_version',
+    type: 'string',
+    value: '',
+    description: 'Override the Git tag version for local or source-archive builds',
+)

@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "id": "openconnect",
+  "name": "OpenConnect VPN",
+  "version": "@VERSION@",
+  "module_api": 1,
+  "entrypoint": "scripts/module.sh",
+  "ui": "ui/index.html",
+  "capabilities": [
+    "network.tun",
+    "network.policy",
+    "network.firewall",
+    "asus.fusion.sdn"
+  ],
+  "actions": [
+    "reconnect",
+    "settings",
+    "update-settings",
+    "connect",
+    "disconnect"
+  ],
+  "dependencies": [
+    {
+      "id": "vpn",
+      "api": 1
+    }
+  ],
+  "install": true,
+  "state_paths": [
+    "/jffs/ocfusion"
+  ]
+}

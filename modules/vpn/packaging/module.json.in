@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "vpn",
+  "name": "VPN integration",
+  "version": "@VERSION@",
+  "module_api": 1,
+  "provides_api": 1,
+  "entrypoint": "bin/ocfusion-vpn",
+  "install": true,
+  "state_paths": [
+    "/jffs/ocfusion-vpn"
+  ],
+  "stock_pages": [
+    {
+      "path": "/VPN/vpnc.html",
+      "script": "ui/fusion.js"
+    }
+  ],
+  "capabilities": [
+    "network.tun",
+    "network.policy",
+    "network.firewall",
+    "asus.fusion.sdn"
+  ],
+  "resources": {
+    "tun": "ocvpn0",
+    "route_table": "51998",
+    "rule_priority": "90"
+  }
+}

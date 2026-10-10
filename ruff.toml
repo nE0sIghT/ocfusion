@@ -1,0 +1,16 @@
+target-version = "py312"
+extend-exclude = ["contrib", "build", "dist", "node_modules"]
+
+[lint]
+select = [
+    "E",   # pycodestyle
+    "F",   # Pyflakes
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "SIM", # flake8-simplify
+    "I",   # isort
+]
+ignore = [
+    "SIM103", # Keep explicit branches rather than forcing boolean returns.
+    "UP015",  # Keep explicit open modes.
+]

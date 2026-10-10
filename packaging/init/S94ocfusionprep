@@ -1,0 +1,17 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
+# ASUS Apps package name: ocfusionprep. The stock runner copies this to /opt.
+export PATH=/usr/bin:/bin:/usr/sbin:/sbin
+case "${1:-}" in
+    start)
+        /bin/sh /tmp/opt/ocfusion-installer/install.sh >/tmp/ocfusion-install.log 2>&1 || exit 1
+        # Keep the preparation entry for retries after a failed install, not after success.
+        rm -f /tmp/opt/etc/init.d/S94ocfusionprep /tmp/opt/lib/ipkg/info/ocfusionprep.control
+        ;;
+    stop | firewall-start)
+        :
+        ;;
+    *)
+        exit 1
+        ;;
+esac

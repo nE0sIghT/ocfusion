@@ -1,0 +1,17 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
+export PATH=/usr/bin:/bin:/usr/sbin:/sbin
+case "$1" in
+    validate | prepare | reload | remove | diagnose)
+        printf '%s\n' '{"ok":true}'
+        ;;
+    run)
+        trap 'exit 0' TERM INT
+        while :; do
+            sleep 10
+        done
+        ;;
+    *)
+        exit 1
+        ;;
+esac

@@ -1,0 +1,31 @@
+runtime_go = files(
+    'daemon/go.mod',
+    'daemon/client_output.go',
+    'daemon/config.go',
+    'daemon/daemon.go',
+    'daemon/install.go',
+    'daemon/main.go',
+    'daemon/profile_settings.go',
+    'daemon/router.go',
+    'daemon/status.go',
+    'daemon/vpn.go',
+)
+
+supervisor = custom_target(
+    'ocfusion-openconnect',
+    input: runtime_go,
+    output: 'ocfusion-openconnect',
+    depend_files: go_builder,
+    command: [
+        python,
+        go_builder,
+        '--go',
+        go.full_path(),
+        '--module',
+        source_root / 'modules/openconnect/daemon',
+        '--output',
+        '@OUTPUT@',
+        '--version',
+        version,
+    ],
+)

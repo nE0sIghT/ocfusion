@@ -1,0 +1,31 @@
+--- a/script.c
++++ b/script.c
+@@ -648,7 +648,20 @@
+ {
+ 	struct oc_vpn_option *p;
+ 
++	/* OCFUSION_MANAGED_ENV_V1 */
++	const char *managed = getenv("OCF_MANAGED_ROUTES");
+ 	for (p = envs; p; p = p->next) {
++		/* Avoid execve E2BIG from CSTP_OPTIONS and thousands of split routes.
++		 * The ocfusion hook consumes only these fields. Default behavior is unchanged. */
++		if (managed && !strcmp(managed, "1") &&
++		    strcmp(p->option, "TUNDEV") &&
++		    strcmp(p->option, "INTERNAL_IP4_ADDRESS") &&
++		    strcmp(p->option, "INTERNAL_IP4_NETMASK") &&
++		    strcmp(p->option, "INTERNAL_IP4_MTU") &&
++		    strcmp(p->option, "INTERNAL_IP4_DNS")) {
++			unsetenv(p->option);
++			continue;
++		}
+ 		if (p->value)
+ 			setenv(p->option, p->value, 1);
+ 		else
+@@ -678,6 +691,7 @@
+ 		setenv("reason", reason, 1);
+ 
+ 		execl("/bin/sh", "/bin/sh", "-c", script, NULL);
++		perror("ocfusion hook exec");
+ 		exit(127);
+ 	}
+ 	if (pid == -1 || waitpid(pid, &ret, 0) == -1) {

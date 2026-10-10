@@ -1,0 +1,100 @@
+runtime_assets = files(
+    '../LICENSE',
+    '../README.md',
+    'install.sh',
+    'scripts/prepare-usb.sh',
+    'init/S94ocfusionprep',
+    'init/S95ocfusion',
+    '../modules/openconnect/packaging/scripts/module.sh',
+    '../modules/vpn/packaging/module.json.in',
+    '../modules/vpn/ui/fusion.js',
+    '../modules/openconnect/packaging/module.json.in',
+    '../modules/openconnect/packaging/scripts/vpnc-script',
+    '../modules/openconnect/packaging/examples/profile.occonf',
+    '../web/import.html',
+    '../web/panel.js',
+    '../web/panel.css',
+    '../web/i18n.js',
+    '../modules/openconnect/ui/settings.js',
+    '../modules/openconnect/ui/index.html',
+    '../modules/openconnect/ui/app.js',
+    '../modules/openconnect/ui/connection.js',
+    '../modules/openconnect/ui/translations.js',
+    '../web/logo.png',
+    '../web/icon.png',
+    '../INSTALLATION.md',
+    '../third_party/notices/GCC-runtime-copyright.txt',
+    '../third_party/notices/Go-BSD.txt',
+    '../third_party/notices/Mozilla-MPL-2.0.txt',
+)
+
+stage_tool = files('../tools/stage.py')
+stage = custom_target(
+    'runtime-stage',
+    output: 'runtime-stage.stamp',
+    input: [
+        openconnect,
+        supervisor,
+        manager,
+        vpn_service,
+        downloads['cacert-2026-09-25.pem'],
+    ],
+    depend_files: [stage_tool, runtime_assets, lock],
+    command: [
+        python,
+        stage_tool,
+        '--version',
+        version,
+        '--build-dir',
+        build_root,
+        '--client',
+        '@INPUT0@',
+        '--supervisor',
+        '@INPUT1@',
+        '--manager',
+        '@INPUT2@',
+        '--ca',
+        '@INPUT4@',
+        '--vpn-service',
+        '@INPUT3@',
+        '--output',
+        '@OUTPUT@',
+    ],
+)
+
+verification_tool = files('../tools/verify-runtime.py')
+runtime = custom_target(
+    'runtime',
+    output: 'runtime.stamp',
+    depends: stage,
+    depend_files: [verification_tool, lock],
+    build_by_default: true,
+    command: [
+        python,
+        verification_tool,
+        '--version',
+        version,
+        '--build-dir',
+        build_root,
+        '--output',
+        '@OUTPUT@',
+    ],
+)
+
+alias_target('build', runtime)
+bundle = run_target(
+    'bundle',
+    depends: runtime,
+    command: [
+        python,
+        files('../tools/package.py'),
+        '--version',
+        version,
+        '--build-dir',
+        build_root,
+        '--output-dir',
+        source_root / 'dist',
+    ],
+)
+
+alias_target('package', bundle)

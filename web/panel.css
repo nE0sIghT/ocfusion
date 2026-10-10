@@ -1,0 +1,357 @@
+/* Stock styles/assets are loaded from the running firmware, never bundled. */
+:root {
+  --ext-accent: #ef922f;
+  --ext-line: #75512f;
+  --ext-panel: rgba(13, 13, 15, 0.94);
+}
+body.bg {
+  margin: 0;
+  color: #ddd;
+  font:
+    14px Arial,
+    Helvetica,
+    sans-serif;
+}
+.ext-shell {
+  width: 1050px;
+  max-width: calc(100% - 40px);
+  margin: 12px auto 40px;
+}
+.ext-shell.ext-module {
+  width: auto;
+  max-width: none;
+  margin: 0;
+}
+.ext-context {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 13px 16px;
+  border-top: 2px solid var(--ext-accent);
+  background: linear-gradient(90deg, #44250c, #141414);
+  margin-bottom: 16px;
+}
+.ext-context span {
+  font-size: 18px;
+  color: var(--ext-accent);
+  font-weight: bold;
+}
+.ext-context small {
+  color: #aaa;
+}
+.ext-context a {
+  margin-left: auto;
+}
+.ext-layout {
+  display: grid;
+  grid-template-columns: 210px minmax(0, 1fr);
+  gap: 18px;
+}
+.ext-menu {
+  display: flex;
+  flex-direction: column;
+  align-self: start;
+  gap: 4px;
+}
+.ext-menu-title {
+  font-size: 18px;
+  background: linear-gradient(90deg, #472507, #151515);
+  padding: 10px 12px;
+  margin: 0 0 6px;
+}
+.ext-menu-title:not(:first-child) {
+  margin-top: 24px;
+}
+.ext-menu a {
+  display: block;
+  padding: 14px 16px;
+  border-left: 3px solid transparent;
+  background: rgba(15, 15, 17, 0.8);
+  color: #c6c6c6;
+  text-decoration: none;
+  font-weight: bold;
+}
+.ext-menu a:hover {
+  background: #28201a;
+}
+.ext-menu a.active {
+  border-left-color: var(--ext-accent);
+  background: linear-gradient(90deg, #522a0c, #191817);
+  color: var(--ext-accent);
+}
+.ext-content {
+  background: var(--ext-panel);
+  padding: 22px 28px;
+  border: 1px solid #2b2b2b;
+  min-height: 430px;
+}
+.ext-content h1 {
+  margin: 0 0 12px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--ext-line);
+  font-size: 22px;
+  font-weight: normal;
+}
+.ext-content h2 {
+  font-size: 17px;
+  font-weight: normal;
+  margin: 0 0 16px;
+}
+.ext-description {
+  color: #aaa;
+  line-height: 1.6;
+}
+.ext-card {
+  background: rgba(30, 30, 32, 0.8);
+  padding: 20px;
+  margin-top: 18px;
+  border: 1px solid #3a3430;
+}
+.ext-card-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.ext-card-heading h2 {
+  margin: 0;
+}
+.ext-badge {
+  padding: 5px 10px;
+  border: 1px solid #77624a;
+  color: var(--ext-accent);
+  font-size: 12px;
+}
+.ext-badge.up {
+  color: #8cd19c;
+  border-color: #4b7b54;
+}
+.ext-badge.error {
+  color: #ee8c89;
+  border-color: #8c4444;
+}
+.ext-shell a {
+  color: var(--ext-accent);
+}
+.ext-shell button {
+  font: inherit;
+  background: linear-gradient(#c97a29, #87490f);
+  color: #fff;
+  padding: 9px 16px;
+  border: 1px solid #d18a42;
+  cursor: pointer;
+  margin: 6px 4px 6px 0;
+  border-radius: 4px;
+}
+.ext-shell button.ext-secondary {
+  background: linear-gradient(#3b3b3b, #202020);
+  border-color: #656565;
+}
+.ext-shell button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.ext-shell input {
+  max-width: 100%;
+  font: inherit;
+}
+.ext-shell pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: #121212;
+  padding: 14px;
+  font: 12px/1.6 monospace;
+  color: #ccc;
+}
+.ext-shell dl {
+  display: grid;
+  grid-template-columns: 170px 1fr;
+  gap: 12px;
+}
+.ext-shell dd {
+  margin: 0;
+}
+.ext-shell dt {
+  color: #aaa;
+}
+.ext-shell summary {
+  cursor: pointer;
+  color: var(--ext-accent);
+}
+.ext-shell [hidden] {
+  display: none !important;
+}
+#api-error {
+  color: #efa78f;
+  line-height: 1.6;
+}
+.ext-header-fallback {
+  width: 1050px;
+  max-width: 100%;
+  margin: 20px auto;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+.ext-header-fallback img {
+  width: 250px;
+}
+.ext-header-fallback strong {
+  font-size: 24px;
+}
+.ext-header-fallback a {
+  margin-left: auto;
+  color: #ddd;
+}
+@media (max-width: 750px) {
+  .ext-shell {
+    max-width: calc(100% - 20px);
+  }
+  .ext-layout {
+    grid-template-columns: 1fr;
+  }
+  .ext-menu {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .ext-menu-title {
+    grid-column: 1/-1;
+  }
+  .ext-content {
+    padding: 20px 15px;
+  }
+  .ext-context {
+    flex-wrap: wrap;
+  }
+  .ext-context a {
+    margin-left: 0;
+  }
+  .ext-card-heading {
+    flex-wrap: wrap;
+  }
+}
+/* ASUS reserves 179px below its banner for the stock menu/table layout. */
+#TopBanner .statusBar > div {
+  height: auto !important;
+  min-height: 50px;
+  padding-bottom: 12px;
+}
+
+.ext-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  margin: 18px 0;
+}
+.ext-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ext-field.ext-wide {
+  grid-column: 1/-1;
+}
+.ext-field label {
+  color: #ddd;
+}
+.ext-field small {
+  color: #aaa;
+  line-height: 1.5;
+}
+.ext-field input:not([type="checkbox"]):not([type="file"]),
+.ext-field select {
+  box-sizing: border-box;
+  width: 100%;
+  font: inherit;
+  background: #101010;
+  color: #eee;
+  border: 1px solid #65513d;
+  border-radius: 3px;
+  padding: 10px;
+}
+.ext-field input:focus,
+.ext-field select:focus {
+  outline: 1px solid var(--ext-accent);
+}
+.ext-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: normal;
+}
+.ext-check input {
+  accent-color: var(--ext-accent);
+}
+.ext-certificates {
+  border-top: 1px solid #514332;
+  padding-top: 16px;
+  margin-bottom: 16px;
+}
+#settings-fields {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+#settings-fields:disabled {
+  opacity: 0.55;
+}
+#settings-result {
+  line-height: 1.5;
+  color: #bbb;
+}
+@media (max-width: 750px) {
+  .ext-fields {
+    grid-template-columns: 1fr;
+  }
+}
+
+#TopBanner .banner1 > img.ocfusion-header-logo {
+  width: 250px !important;
+  height: 70px !important;
+  object-fit: contain;
+}
+.ext-header-fallback img {
+  height: 70px;
+  object-fit: contain;
+}
+body.bg {
+  background-color: #101012 !important;
+}
+#TopBanner {
+  background-color: #101012;
+  color: #ddd;
+}
+.ext-managed-notice {
+  border-left: 3px solid var(--ext-accent);
+  padding: 10px 12px;
+  background: #32220f;
+  line-height: 1.5;
+  color: #ffb65a;
+}
+
+.ext-menu .ext-project-link {
+  margin-top: 20px;
+  border-top: 1px solid var(--ext-line);
+}
+.ext-project-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.ext-support dd {
+  margin: 6px 0 16px;
+}
+.ext-support code {
+  overflow-wrap: anywhere;
+  user-select: all;
+  color: #ddd;
+}
+#TopBanner .banner1 .ocfusion-header-logo {
+  width: 250px !important;
+  height: 70px !important;
+  object-fit: contain;
+}
+.ext-header-fallback > a:first-child {
+  margin-left: 0;
+}

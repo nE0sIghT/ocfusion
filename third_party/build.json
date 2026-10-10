@@ -1,0 +1,136 @@
+{
+  "schema": 1,
+  "environment": {
+    "CFLAGS": "{c_flags}",
+    "AR": "aarch64-linux-gnu-ar",
+    "RANLIB": "aarch64-linux-gnu-ranlib"
+  },
+  "static_environment": {
+    "CC": "{prefix}/bin/musl-gcc",
+    "PKG_CONFIG_LIBDIR": "{prefix}/lib/pkgconfig",
+    "PKG_CONFIG_PATH": "{prefix}/lib/pkgconfig",
+    "CPPFLAGS": "-I{prefix}/include",
+    "LDFLAGS": "-L{prefix}/lib -static"
+  },
+  "components": {
+    "musl": {
+      "configure": [
+        "./configure",
+        "--target=aarch64-linux-musl",
+        "--prefix={prefix}",
+        "--disable-shared"
+      ],
+      "uses_musl": false,
+      "license_file": "COPYRIGHT",
+      "notice_file": "musl-COPYRIGHT.txt",
+      "install_target": "install",
+      "environment": {
+        "CC": "aarch64-linux-gnu-gcc"
+      },
+      "kernel_headers": [
+        "linux",
+        "asm",
+        "asm-generic"
+      ]
+    },
+    "zlib": {
+      "configure": [
+        "./configure",
+        "--static",
+        "--prefix={prefix}"
+      ],
+      "uses_musl": true,
+      "license_file": "README",
+      "notice_file": "zlib-README.txt",
+      "install_target": "install"
+    },
+    "openssl": {
+      "configure": [
+        "./Configure",
+        "linux-aarch64",
+        "no-shared",
+        "no-module",
+        "no-tests",
+        "no-legacy",
+        "no-engine",
+        "--prefix={prefix}",
+        "--libdir=lib",
+        "--openssldir=/jffs/ocfusion/ssl"
+      ],
+      "uses_musl": true,
+      "license_file": "LICENSE.txt",
+      "notice_file": "OpenSSL-Apache-2.0.txt",
+      "install_target": "install_sw"
+    },
+    "libxml2": {
+      "configure": [
+        "./configure",
+        "--host=aarch64-linux-musl",
+        "--prefix={prefix}",
+        "--disable-shared",
+        "--enable-static",
+        "--without-python",
+        "--without-lzma",
+        "--without-iconv",
+        "--without-icu",
+        "--without-readline",
+        "--without-http",
+        "--without-ftp",
+        "--without-modules"
+      ],
+      "uses_musl": true,
+      "license_file": "Copyright",
+      "notice_file": "libxml2-Copyright.txt",
+      "install_target": "install"
+    },
+    "openconnect": {
+      "configure": [
+        "./configure",
+        "--host=aarch64-linux-musl",
+        "--prefix=/jffs/ocfusion",
+        "--disable-shared",
+        "--enable-static",
+        "--disable-nls",
+        "--without-gnutls",
+        "--with-openssl",
+        "--without-libproxy",
+        "--without-stoken",
+        "--without-libpcsclite",
+        "--without-libpskc",
+        "--without-gssapi",
+        "--without-lz4",
+        "--without-libp11",
+        "--with-vpnc-script=/jffs/ocfusion/vpnc-script"
+      ],
+      "uses_musl": true,
+      "license_file": "COPYING.LGPL",
+      "notice_file": "OpenConnect-LGPL-2.1.txt",
+      "install_target": null,
+      "environment": {
+        "LIBS": "-lxml2 -lz -lm -lpthread -ldl",
+        "LIBXML2_CFLAGS": "-I{prefix}/include/libxml2",
+        "LIBXML2_LIBS": "{prefix}/lib/libxml2.a -lz -lm",
+        "OPENSSL_CFLAGS": "-I{prefix}/include",
+        "OPENSSL_LIBS": "{prefix}/lib/libssl.a {prefix}/lib/libcrypto.a -ldl -pthread",
+        "RPM_PACKAGE_VERSION": "{source_version}",
+        "RPM_PACKAGE_RELEASE": "ocfusion1"
+      },
+      "patches": [
+        "modules/openconnect/patches/0001-managed-hook-environment.patch"
+      ],
+      "remove_before_make": [
+        "version.c",
+        "openconnect",
+        "tests/serverhash",
+        "tests/bad_dtls_test",
+        "tests/lzstest",
+        "tests/seqtest",
+        "tests/buftest"
+      ],
+      "make_arguments": [
+        "LDFLAGS=-L{prefix}/lib -all-static"
+      ],
+      "executable": "openconnect"
+    }
+  }
+}

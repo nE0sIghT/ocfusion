@@ -1,0 +1,11 @@
+{
+  "name": "ocfusion-development",
+  "private": true,
+  "license": "GPL-3.0-or-later",
+  "scripts": {
+    "test": "node tests/test-i18n.cjs"
+  },
+  "devDependencies": {
+    "playwright": "1.64.0"
+  }
+}

@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="/index_style.css" />
+    <link rel="stylesheet" href="/form_style.css" />
+    <link rel="stylesheet" href="/user/extensions-panel.css" />
+  </head>
+  <body class="bg">
+    <main class="ext-shell ext-module">
+      <article class="ext-card">
+        <h2 id="title">Module example</h2>
+        <p id="description">A standalone process and module page.</p>
+        <button id="enable">Enable</button><button id="disable">Disable</button>
+        <p id="result" role="status"></p>
+      </article>
+    </main>
+    <script>
+      const ru = parent.OCF_I18N && parent.OCF_I18N.language === "ru";
+
+      if (ru) {
+        document.documentElement.lang = "ru";
+        document.getElementById("title").textContent = "Пример модуля";
+        document.getElementById("description").textContent =
+          "Отдельный процесс и страница модуля.";
+        document.getElementById("enable").textContent = "Включить";
+        document.getElementById("disable").textContent = "Выключить";
+      }
+
+      for (const action of ["enable", "disable"]) {
+        document.getElementById(action).onclick = async () => {
+          try {
+            await parent.EXTENSIONS.action("heartbeat", action);
+            document.getElementById("result").textContent = ru
+              ? "Команда принята"
+              : "Command accepted";
+          } catch (e) {
+            document.getElementById("result").textContent = e.message;
+          }
+        };
+      }
+    </script>
+  </body>
+</html>

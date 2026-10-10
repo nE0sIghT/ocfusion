@@ -1,0 +1,66 @@
+name: Checks and build
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_call:
+permissions:
+  contents: read
+jobs:
+  checks:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.27.2'
+          cache: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24.21.0'
+          cache: npm
+      - name: Install pinned Python tools
+        run: |
+          python3 -m venv /tmp/ocfusion-build-tools
+          /tmp/ocfusion-build-tools/bin/pip install --require-hashes --only-binary=:all: -r build-env/requirements.txt
+          echo /tmp/ocfusion-build-tools/bin >> "$GITHUB_PATH"
+      - name: Check Python with Ruff
+        run: |
+          ruff check .
+          ruff format --check .
+      - run: meson setup build/tests -Druntime=false -Dbrowser_tests=true
+      - run: meson test -C build/tests --suite unit --suite example --print-errorlogs
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: meson test -C build/tests --suite browser --print-errorlogs
+  build:
+    needs: checks
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Build pinned environment
+        run: docker build -t ocfusion-build -f build-env/Dockerfile .
+      - name: Test and build from sources
+        run: |
+          export SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)
+          export OCFUSION_BUILD_VERSION=$(python3 tools/version.py)
+          docker run --rm -e SOURCE_DATE_EPOCH -e OCFUSION_BUILD_VERSION -v "$PWD:/work" -w /work ocfusion-build bash -ec '
+            git config --global --add safe.directory /work
+            meson setup build/meson --cross-file build-env/armv8-a-crypto-crc.ini -Drelease_version="$OCFUSION_BUILD_VERSION"
+            meson compile -C build/meson bundle
+            meson test -C build/meson --suite unit --suite example --suite client --print-errorlogs
+          '
+          docker run --rm -v "$PWD:/work" -w /work ocfusion-build python3 tests/test-build-graph.py --build-dir build/meson
+      - name: Verify archives
+        run: cd dist && sha256sum -c SHA256SUMS
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ocfusion-release
+          path: dist/*
+          if-no-files-found: error

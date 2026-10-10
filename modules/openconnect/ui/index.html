@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>OpenConnect - OCFusion</title>
+    <link rel="stylesheet" href="/index_style.css" />
+    <link rel="stylesheet" href="/form_style.css" />
+    <link rel="stylesheet" href="/user/extensions-panel.css" />
+  </head>
+  <body class="bg">
+    <main class="ext-shell ext-module">
+      <article class="ext-card">
+        <div class="ext-card-heading">
+          <h2>OpenConnect</h2>
+          <span id="state-badge" class="ext-badge">Loading…</span>
+        </div>
+        <p id="state-message" role="status"></p>
+        <div id="network-summary"></div>
+      </article>
+      <section>
+        <h1>OpenConnect</h1>
+        <p class="ext-description">VPN settings and assigned networks.</p>
+        <article class="ext-card">
+          <h2>Connection</h2>
+          <p id="connection-state">Loading…</p>
+          <button data-action="enable">Connect</button>
+          <button data-action="disable" class="ext-secondary">
+            Disconnect
+          </button>
+          <button data-action="reconnect" class="ext-secondary">
+            Reconnect
+          </button>
+          <p id="action-result" role="status"></p>
+        </article>
+        <article class="ext-card">
+          <div class="ext-card-heading">
+            <h2>VPN settings</h2>
+            <button id="settings-reload" class="ext-secondary" type="button">
+              Reload
+            </button>
+          </div>
+          <p id="settings-result" role="status">
+            Open settings to load the current profile.
+          </p>
+          <form id="vpn-settings" autocomplete="off">
+            <fieldset id="settings-fields" disabled>
+              <div class="ext-fields">
+                <div class="ext-field ext-wide">
+                  <label for="vpn-server">Server address</label
+                  ><input
+                    id="vpn-server"
+                    type="url"
+                    required
+                    placeholder="https://vpn.example.org/?secret"
+                  /><small
+                    >Full HTTPS URL including port, path and query
+                    parameters.</small
+                  >
+                </div>
+                <div class="ext-field">
+                  <label for="vpn-protocol">Protocol</label
+                  ><select id="vpn-protocol">
+                    <option value="anyconnect">AnyConnect / ocserv</option>
+                    <option value="nc">Juniper Network Connect</option>
+                    <option value="pulse">Pulse / Ivanti</option>
+                    <option value="gp">GlobalProtect</option>
+                    <option value="f5">F5</option>
+                    <option value="fortinet">Fortinet</option>
+                    <option value="array">Array</option>
+                  </select>
+                </div>
+                <div class="ext-field">
+                  <label for="vpn-auth">Authentication</label
+                  ><select id="vpn-auth">
+                    <option value="password">Username and password</option>
+                    <option value="certificate">Client certificate</option>
+                  </select>
+                </div>
+                <div class="ext-field">
+                  <label for="vpn-username">Username</label
+                  ><input
+                    id="vpn-username"
+                    type="text"
+                    autocomplete="off"
+                  /><small
+                    >Usually not required for certificate authentication.</small
+                  >
+                </div>
+                <div class="ext-field">
+                  <label for="vpn-authgroup">Authentication group</label
+                  ><input
+                    id="vpn-authgroup"
+                    type="text"
+                    placeholder="Default"
+                  />
+                </div>
+                <div class="ext-field ext-wide">
+                  <label for="vpn-password">New password</label
+                  ><input
+                    id="vpn-password"
+                    type="password"
+                    autocomplete="new-password"
+                  /><small id="password-state">Password not configured.</small
+                  ><label class="ext-check"
+                    ><input id="clear-password" type="checkbox" />Remove saved
+                    password</label
+                  >
+                </div>
+                <div class="ext-field">
+                  <label for="vpn-dns">VPN DNS</label
+                  ><input
+                    id="vpn-dns"
+                    type="text"
+                    placeholder="Provided by server"
+                  /><small>IPv4 addresses separated by commas or spaces.</small>
+                </div>
+                <div class="ext-field">
+                  <label for="vpn-mtu">MTU</label
+                  ><input
+                    id="vpn-mtu"
+                    type="number"
+                    min="576"
+                    max="1500"
+                    placeholder="Automatic"
+                  />
+                </div>
+                <div class="ext-field ext-wide">
+                  <label class="ext-check"
+                    ><input id="vpn-dtls" type="checkbox" checked />Use
+                    DTLS</label
+                  ><label class="ext-check"
+                    ><input id="vpn-enabled" type="checkbox" checked />Connect
+                    automatically</label
+                  >
+                </div>
+              </div>
+              <details class="ext-certificates" id="certificate-settings">
+                <summary>Certificates and server verification</summary>
+                <p class="ext-description">
+                  Select a PEM file to replace a saved credential. Existing
+                  certificates and key are kept for future connections.
+                </p>
+                <div class="ext-fields">
+                  <div class="ext-field ext-wide">
+                    <label for="vpn-ca"
+                      >Additional CA for server verification</label
+                    ><input
+                      id="vpn-ca"
+                      type="file"
+                      accept=".pem,.crt,.cer"
+                    /><small id="ca-state"></small
+                    ><label class="ext-check"
+                      ><input id="clear-ca" type="checkbox" />Remove additional
+                      CA</label
+                    >
+                  </div>
+                  <div class="ext-field">
+                    <label for="vpn-certificate">Client certificate PEM</label
+                    ><input
+                      id="vpn-certificate"
+                      type="file"
+                      accept=".pem,.crt,.cer"
+                    /><small id="certificate-state"></small>
+                  </div>
+                  <div class="ext-field">
+                    <label for="vpn-private-key">Private key PEM</label
+                    ><input
+                      id="vpn-private-key"
+                      type="file"
+                      accept=".pem,.key"
+                    /><small id="private-key-state"></small>
+                  </div>
+                  <div class="ext-field ext-wide">
+                    <label class="ext-check"
+                      ><input id="clear-client" type="checkbox" />Remove saved
+                      client certificate and key</label
+                    >
+                  </div>
+                  <div class="ext-field ext-wide">
+                    <label for="vpn-servercert"
+                      >Server certificate pin (optional)</label
+                    ><input
+                      id="vpn-servercert"
+                      type="text"
+                      placeholder="pin-sha256:…"
+                    /><small
+                      >Server verification uses public CAs and your additional
+                      CA by default.</small
+                    >
+                  </div>
+                </div>
+              </details>
+              <button id="settings-save" type="submit">Save settings</button>
+            </fieldset>
+          </form>
+        </article>
+        <details class="ext-card">
+          <summary>Import full JSON profile</summary>
+          <label for="file">Profile .occonf / JSON (up to 16 KiB)</label>
+          <p>
+            <input
+              id="file"
+              type="file"
+              accept=".occonf,.json,application/json"
+            />
+          </p>
+          <button id="import" disabled>Import</button>
+          <p id="result" role="status"></p>
+          <p class="ext-description">
+            Import replaces the connection profile. Wi-Fi/VLAN bindings are
+            preserved.
+          </p>
+        </details>
+        <article class="ext-card">
+          <p class="ext-managed-notice">
+            Managed by OCFusion. Do not enable, edit or delete this profile;
+            configure the VPN in the OCFusion panel.
+          </p>
+          <h2>Wi-Fi / VLAN</h2>
+          <div id="networks"></div>
+          <p>
+            Configure network bindings in the
+            <a href="/Guest_network.asp">ASUS interface</a>. Keep the “OCFusion
+            (managed)” profile switched OFF in Fusion.
+          </p>
+        </article>
+        <details class="ext-card">
+          <summary>Diagnostics</summary>
+          <pre id="status">Loading…</pre>
+        </details>
+      </section>
+      <article class="ext-card">
+        <h2>SSH diagnostics</h2>
+        <pre>/jffs/ocfusion/ocfusion doctor</pre>
+      </article>
+      <p id="api-error" role="alert" hidden></p>
+    </main>
+    <script src="app.js"></script>
+    <script src="settings.js"></script>
+    <script src="connection.js"></script>
+    <script src="translations.js"></script>
+    <script src="/user/ocfusion-i18n.js"></script>
+  </body>
+</html>

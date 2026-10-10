@@ -1,0 +1,4 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
+export PATH=/usr/bin:/bin:/usr/sbin:/sbin
+exec /jffs/ocfusion/ocfusion event

@@ -1,0 +1,9 @@
+{
+  "schema": 1,
+  "id": "heartbeat",
+  "name": "Heartbeat example",
+  "version": "1.0.0",
+  "module_api": 1,
+  "entrypoint": "bin/module",
+  "ui": "ui/index.html"
+}

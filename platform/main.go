@@ -1,0 +1,8 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+package main
+
+var version = "dev"
+
+func main() {
+	runCLI()
+}

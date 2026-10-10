@@ -1,0 +1,185 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+"use strict";
+
+const OCF_TRANSLATIONS = {
+  "VPN integration": "Интеграция VPN",
+  "ASUSWRT extensions": "Расширения ASUSWRT",
+  "Back to ASUS ↗": "Вернуться в ASUS ↗",
+  Overview: "Обзор",
+  Modules: "Модули",
+  System: "Система",
+  "Additional router services and their status.":
+    "Дополнительные службы роутера и их состояние.",
+  Diagnostics: "Диагностика",
+  "Open settings →": "Открыть настройки →",
+  "Installation and updates": "Установка и обновление",
+  Platform: "Платформа",
+  Router: "Роутер",
+  "Extension version": "Версия расширения",
+  Panel: "Панель",
+  "ASUS web server": "Штатный веб-сервер ASUS",
+  "Keep the USB drive connected for the service to run.":
+    "Для работы службы USB-накопитель должен оставаться подключённым.",
+  "SSH diagnostics": "Диагностика через SSH",
+  Module: "Модуль",
+  "Module settings": "Настройки модуля",
+  "Panel parameters missing. Reinstall the distribution.":
+    "Нет параметров панели. Переустановите дистрибутив.",
+  "Configuration field unavailable": "Поле конфигурации недоступно",
+  "Request exceeds the ASUS field size": "Запрос превышает размер поля ASUS",
+  "Service rejected the request": "Служба отклонила запрос",
+  "Service did not acknowledge the request. Check its status through SSH.":
+    "Служба не подтвердила запрос. Проверьте её состояние через SSH.",
+  "Configuration exceeds 16 KiB": "Конфигурация больше 16 КиБ",
+  "Wait for the current action to finish":
+    "Дождитесь завершения текущего действия",
+  "Uploading configuration: ": "Загрузка конфигурации: ",
+  "Unable to read status: ": "Не удалось получить статус: ",
+  "Open the panel over HTTPS to upload configuration.":
+    "Откройте панель по HTTPS для загрузки конфигурации.",
+  About: "О проекте",
+  "Report an issue ↗": "Сообщить об ошибке ↗",
+  "Releases ↗": "Релизы ↗",
+  "Support the project": "Поддержать проект",
+  "If you want to support the work or say thanks:":
+    "Если хотите поддержать работу или сказать спасибо:",
+  ". Check your ASUS session.": ". Проверьте сессию ASUS.",
+  "Install packages through SSH. Updating preserves your profile and network bindings.":
+    "Пакеты устанавливаются через SSH. Обновление текущего дистрибутива сохраняет профиль и привязки сетей.",
+  "Install a module: /jffs/ocfusion-platform/extctl install /tmp/module.tar.gz":
+    "Для установки отдельного модуля: /jffs/ocfusion-platform/extctl install /tmp/module.tar.gz",
+  ...window.OCF_MODULE_TRANSLATIONS,
+};
+
+(() => {
+  const cfg = window.OCF_SETTINGS || {};
+  const parentLanguage =
+    window.parent !== window && window.parent.OCF_I18N
+      ? window.parent.OCF_I18N.language
+      : null;
+  // state.js is rendered by ASUS on each request; the published config may predate a language change.
+  const asusLanguage =
+    parentLanguage ||
+    (typeof ui_lang !== "undefined" ? ui_lang : cfg.language || "EN");
+  const lang = String(asusLanguage).toUpperCase() === "RU" ? "ru" : "en";
+  const texts = new WeakMap();
+  const attrs = new WeakMap();
+  const pairs = Object.entries(OCF_TRANSLATIONS).sort(
+    (a, b) => b[0].length - a[0].length,
+  );
+
+  function translate(text, to) {
+    let trimmed = text.trim();
+
+    for (const [en, ru] of pairs) {
+      const from = to === "en" ? ru : en;
+      const dest = to === "en" ? en : ru;
+
+      if (trimmed === from.trim()) {
+        return text.replace(trimmed, dest.trim());
+      }
+    }
+
+    for (const [en, ru] of pairs) {
+      const from = to === "en" ? ru : en;
+      const dest = to === "en" ? en : ru;
+
+      if (from.length > 10 && text.includes(from)) {
+        text = text.split(from).join(dest);
+      }
+    }
+
+    return text;
+  }
+
+  function apply() {
+    document.documentElement.lang = lang;
+    document.title =
+      lang === "ru"
+        ? "OCFusion - расширения ASUSWRT"
+        : "OCFusion - ASUSWRT extensions";
+
+    const walker = document.createTreeWalker(
+      document.body,
+      NodeFilter.SHOW_TEXT,
+    );
+    let node;
+
+    while ((node = walker.nextNode())) {
+      if (node.parentElement.closest("script,style,pre,#TopBanner")) {
+        continue;
+      }
+
+      const old = texts.get(node);
+      const base =
+        old && node.nodeValue === old.rendered
+          ? old.base
+          : translate(node.nodeValue, "en");
+      const rendered = translate(base, lang);
+
+      texts.set(node, { base, rendered });
+
+      if (node.nodeValue !== rendered) {
+        node.nodeValue = rendered;
+      }
+    }
+
+    document.querySelectorAll("[placeholder],[title]").forEach((n) => {
+      if (n.closest("#TopBanner")) {
+        return;
+      }
+
+      const old = attrs.get(n) || {};
+
+      for (const key of ["placeholder", "title"]) {
+        if (!n.hasAttribute(key)) {
+          continue;
+        }
+
+        const value = n.getAttribute(key);
+        const previous = old[key];
+        const base =
+          previous && value === previous.rendered
+            ? previous.base
+            : translate(value, "en");
+        const rendered = translate(base, lang);
+
+        old[key] = { base, rendered };
+
+        if (value !== rendered) {
+          n.setAttribute(key, rendered);
+        }
+      }
+
+      attrs.set(n, old);
+    });
+  }
+
+  let queued = false;
+  const observer = new MutationObserver(() => {
+    if (queued) {
+      return;
+    }
+
+    queued = true;
+    Promise.resolve().then(() => {
+      queued = false;
+      apply();
+    });
+  });
+
+  apply();
+  observer.observe(document.body, {
+    subtree: true,
+    childList: true,
+    characterData: true,
+    attributes: true,
+    attributeFilter: ["placeholder", "title"],
+  });
+  window.OCF_I18N = {
+    get language() {
+      return lang;
+    },
+    translate,
+  };
+})();
