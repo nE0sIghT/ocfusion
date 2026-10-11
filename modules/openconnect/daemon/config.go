@@ -195,8 +195,8 @@ func loadProfile() (Profile, error) {
 }
 
 func versionCommit() string {
-	if len(revision) > 12 {
-		return revision[:12]
+	if len(revision) > 7 {
+		return revision[:7]
 	}
 
 	return revision
