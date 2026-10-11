@@ -82,7 +82,7 @@ Keep a build directory associated with its compiler environment; use a separate 
 
 ## Outputs, reproducibility and CI
 
-Release versions come from Git tags such as `v0.3`. Untagged commits use a development suffix. For a local test build or an extracted source archive without Git metadata, pass `-Drelease_version=0.3` to `meson setup`. The full source commit is embedded in owned executable version output and shown in the panel System section. Source archives retain it in generated `.git-revision` metadata so rebuilding without Git preserves this identifier.
+Release versions come from Git tags such as `v0.3`. Untagged commits use a development suffix. For a local test build or an extracted source archive without Git metadata, pass `-Drelease_version=0.3` to `meson setup`. The full source commit is embedded in owned executables and shown in the panel System section. Executable version output uses its first 12 hexadecimal characters. Source archives retain it in generated `.git-revision` metadata so rebuilding without Git preserves this identifier.
 
 The resolved version supplies all executables and archive names; no tracked version file needs updating. Runtime staging is under `build/meson/runtime/ocfusion`; source templates remain unchanged. The `bundle` target creates in `dist/`:
 

@@ -24,7 +24,7 @@ func runCLI() {
 	}
 
 	if len(os.Args) < 2 {
-		fmt.Println("extctl", version, "("+revision+")", "start stop list status MODULE register DIR install FILE config MODULE FILE call MODULE ACTION [FILE] enable|disable|diagnose|remove MODULE")
+		fmt.Println("extctl", version, "("+versionCommit()+")", "start stop list status MODULE register DIR install FILE config MODULE FILE call MODULE ACTION [FILE] enable|disable|diagnose|remove MODULE")
 
 		return
 	}
@@ -95,7 +95,7 @@ func runCLI() {
 
 		return
 	case "version":
-		fmt.Println("extensions", version, "("+revision+")")
+		fmt.Println("extensions", version, "("+versionCommit()+")")
 
 		return
 	case "daemon":

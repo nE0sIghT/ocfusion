@@ -193,3 +193,11 @@ func loadProfile() (Profile, error) {
 
 	return parseProfile(b)
 }
+
+func versionCommit() string {
+	if len(revision) > 12 {
+		return revision[:12]
+	}
+
+	return revision
+}

@@ -150,3 +150,11 @@ func parseNetwork(s, sub []string) (Network, error) {
 
 	return n, nil
 }
+
+func versionCommit() string {
+	if len(revision) > 12 {
+		return revision[:12]
+	}
+
+	return revision
+}
