@@ -129,9 +129,3 @@ After removal, safely eject USB and reboot. Other ASUS Apps files are left in pl
 Report problems through [GitHub Issues](https://github.com/nE0sIghT/ocfusion/issues). Include the router model, firmware, OCFusion version, installation output and sanitized status/doctor output. Do not include private keys, passwords, profile files, cookies or secret query parameters.
 
 See [architecture](architecture.md) for implementation details and [module development](modules.md) for the module interfaces.
-
-## Upload channel diagnostics
-
-Open the OCFusion panel using its icon in the ASUS header, then select System and Run diagnostics. The test sends synthetic data through the native ASUS uploader and checks a complete RAM echo with a matching request ID. It tries 1, 8, 32 and 64 KiB payloads, reports integrity and timing for each size, and identifies the largest passing size. This range is a practical test limit, not the firmware's absolute maximum.
-
-The probe does not modify VPN or captive portal settings and accepts no module commands or credentials. Copy the report to share the result. The active module command channel remains unchanged.

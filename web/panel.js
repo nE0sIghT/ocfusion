@@ -66,7 +66,7 @@ async function request(action, data = {}) {
   }
 
   const configResponse = await fetch(
-    "/user/extensions-upload-probe.json?_=" + Date.now(),
+    "/user/extensions-command.json?_=" + Date.now(),
     {
       credentials: "same-origin",
       cache: "no-store",
@@ -524,10 +524,3 @@ if (nativeBrand) {
 if (document.forms.form && typeof ui_lang !== "undefined") {
   document.forms.form.elements.preferred_lang.value = ui_lang;
 }
-
-// Fetch the current diagnostic code even after a same-version installation.
-// The disabled button and fallback message remain if loading/evaluation fails.
-const diagnosticsScript = document.createElement("script");
-
-diagnosticsScript.src = "/user/extensions-diagnostics.js?_=" + Date.now();
-document.head.appendChild(diagnosticsScript);

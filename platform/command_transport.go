@@ -3,7 +3,6 @@ package main
 
 import (
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
@@ -18,42 +17,36 @@ import (
 	"time"
 )
 
-const uploadProbeLimit = 65536
-const uploadProbePattern = "OCF0123456789abcdef"
+const commandWireLimit = 65536
 
 var splashDirectory = "/jffs/customized_splash"
 
-type uploadProbe struct {
+type commandTransport struct {
 	Resource string `json:"resource"`
 	Target   string `json:"target"`
 	Instance string `json:"instance"`
 	mailbox  *webMailbox
 }
 
-type uploadProbeRequest struct {
+type commandEnvelope struct {
 	Protocol string `json:"protocol"`
 	Instance string `json:"instance"`
 	ID       string `json:"id"`
-	Size     int    `json:"size"`
 	Payload  string `json:"payload"`
 	CRC32    string `json:"crc32"`
 	Expires  int64  `json:"expires_at"`
 }
 
-func uploadProbePayload(size int) string {
-	return strings.Repeat(uploadProbePattern, size/len(uploadProbePattern)+1)[:size]
-}
-
-func (p uploadProbe) publish(state string) error {
+func (p commandTransport) publish(state string) error {
 	data, _ := json.Marshal(map[string]any{
 		"state": state, "instance": p.Instance, "resource": p.Resource,
-		"max_payload_bytes": uploadProbeLimit, "updated_at": time.Now().UnixMilli(),
+		"max_payload_bytes": commandWireLimit, "updated_at": time.Now().UnixMilli(),
 	})
 
-	return atomicWrite(filepath.Join(webRoot, "extensions-upload-probe.json"), data, 0644)
+	return atomicWrite(filepath.Join(webRoot, "extensions-command.json"), data, 0644)
 }
 
-func (p uploadProbe) removeLink() {
+func (p commandTransport) removeLink() {
 	if !strings.HasPrefix(p.Resource, "ocf_probe_") || len(p.Resource) != 26 {
 		return
 	}
@@ -68,10 +61,10 @@ func (p uploadProbe) removeLink() {
 	}
 }
 
-func prepareUploadProbe() (uploadProbe, int, error) {
-	p := uploadProbe{Target: filepath.Join(ram, "upload-probe", "inbox"), mailbox: &webMailbox{}}
+func prepareCommandTransport() (commandTransport, int, error) {
+	p := commandTransport{Target: filepath.Join(ram, "upload-probe", "inbox"), mailbox: &webMailbox{}}
 	ownerPath := filepath.Join(base, "upload-probe.json")
-	var previous uploadProbe
+	var previous commandTransport
 	if data, err := os.ReadFile(ownerPath); err == nil && json.Unmarshal(data, &previous) == nil {
 		previous.removeLink()
 	}
@@ -126,7 +119,6 @@ func prepareUploadProbe() (uploadProbe, int, error) {
 		return p, -1, err
 	}
 
-	os.Remove(filepath.Join(webRoot, "extensions-upload-reply.json"))
 	os.Remove(filepath.Join(webRoot, "extensions-command-reply.json"))
 	if err = p.publish("READY"); err != nil {
 		syscall.Close(fd)
@@ -138,13 +130,11 @@ func prepareUploadProbe() (uploadProbe, int, error) {
 	return p, fd, nil
 }
 
-// Diagnostic echoes stay synthetic. Commands use a separate checked envelope
-// and only fixed, declared module operations.
 func payloadCRC(payload string) string {
 	return fmt.Sprintf("%08x", crc32.ChecksumIEEE([]byte(payload)))
 }
 
-func (p uploadProbe) command(request uploadProbeRequest) {
+func (p commandTransport) command(request commandEnvelope) {
 	if len(request.Payload) > 24576 || request.CRC32 != payloadCRC(request.Payload) {
 		return
 	}
@@ -175,7 +165,7 @@ func (p uploadProbe) command(request uploadProbeRequest) {
 	atomicWrite(filepath.Join(webRoot, "extensions-command-reply.json"), response, 0644)
 }
 
-func (p uploadProbe) consume() {
+func (p commandTransport) consume() {
 	info, err := os.Lstat(p.Target)
 	if err != nil || !info.Mode().IsRegular() || info.Size() == 0 {
 		return
@@ -186,12 +176,12 @@ func (p uploadProbe) consume() {
 		return
 	}
 
-	raw, err := io.ReadAll(io.LimitReader(file, uploadProbeLimit+1025))
+	raw, err := io.ReadAll(io.LimitReader(file, commandWireLimit+1025))
 	file.Close()
 	os.Truncate(p.Target, 0)
 
-	var request uploadProbeRequest
-	if err != nil || len(raw) > uploadProbeLimit+1024 || json.Unmarshal(raw, &request) != nil {
+	var request commandEnvelope
+	if err != nil || len(raw) > commandWireLimit+1024 || json.Unmarshal(raw, &request) != nil {
 		return
 	}
 
@@ -199,32 +189,15 @@ func (p uploadProbe) consume() {
 		return
 	}
 
-	if request.Protocol == "ocfusion-command-v1" {
-		p.command(request)
-
+	if request.Protocol != "ocfusion-command-v1" {
 		return
 	}
 
-	if request.Protocol != "ocfusion-upload-probe-v1" || request.Size < 1 || request.Size > uploadProbeLimit {
-		return
-	}
-
-	if request.Payload != uploadProbePayload(request.Size) {
-		return
-	}
-
-	digest := sha256.Sum256([]byte(request.Payload))
-	data, _ := json.Marshal(map[string]any{
-		"instance": p.Instance, "id": request.ID, "result": "PASS",
-		"received_bytes": request.Size, "request_bytes": len(raw),
-		"payload": request.Payload, "sha256": hex.EncodeToString(digest[:]),
-		"response_storage": "RAM", "updated_at": time.Now().UnixMilli(),
-	})
-	atomicWrite(filepath.Join(webRoot, "extensions-upload-reply.json"), data, 0644)
+	p.command(request)
 }
 
-func startUploadProbe() func() {
-	p, fd, err := prepareUploadProbe()
+func startCommandTransport() func() {
+	p, fd, err := prepareCommandTransport()
 	if err != nil {
 		p.publish("UNAVAILABLE")
 
@@ -273,7 +246,6 @@ func startUploadProbe() func() {
 		p.removeLink()
 		os.Truncate(p.Target, 0)
 		p.publish("STOPPED")
-		os.Remove(filepath.Join(webRoot, "extensions-upload-reply.json"))
 		os.Remove(filepath.Join(webRoot, "extensions-command-reply.json"))
 	}
 }

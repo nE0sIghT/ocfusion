@@ -58,8 +58,8 @@ func daemon() error {
 		publishWeb()
 	}
 
-	stopUploadProbe := startUploadProbe()
-	defer stopUploadProbe()
+	stopCommandTransport := startCommandTransport()
+	defer stopCommandTransport()
 
 	os.WriteFile(ram+"/pid", []byte(fmt.Sprint(os.Getpid())), 0600)
 	defer os.Remove(ram + "/pid")

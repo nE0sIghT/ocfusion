@@ -13,7 +13,6 @@ runtime_assets = files(
     '../modules/openconnect/packaging/examples/profile.occonf',
     '../web/import.html',
     '../web/panel.js',
-    '../web/diagnostics.js',
     '../web/panel.css',
     '../web/i18n.js',
     '../modules/openconnect/ui/settings.js',

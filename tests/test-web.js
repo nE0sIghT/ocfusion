@@ -6,12 +6,7 @@ const crypto = require("crypto");
 const fs = require("fs");
 const vm = require("vm");
 
-for (const filename of [
-  "import.html",
-  "panel.js",
-  "i18n.js",
-  "diagnostics.js",
-]) {
+for (const filename of ["import.html", "panel.js", "i18n.js"]) {
   const shared = fs.readFileSync(__dirname + "/../web/" + filename, "utf8");
 
   assert(
@@ -116,7 +111,7 @@ function createMailbox(acknowledge) {
       };
     }
 
-    if (url.startsWith("/user/extensions-upload-probe.json")) {
+    if (url.startsWith("/user/extensions-command.json")) {
       return {
         ok: true,
         json: async () => ({

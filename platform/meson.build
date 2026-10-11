@@ -18,7 +18,7 @@ platform_go = files(
     'stock.go',
     'stock_web.go',
     'transport.go',
-    'upload_probe.go',
+    'command_transport.go',
     'web.go',
 )
 

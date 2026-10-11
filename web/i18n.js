@@ -2,24 +2,7 @@
 "use strict";
 
 const OCF_TRANSLATIONS = {
-  "Upload diagnostics unavailable. Reload the page.":
-    "Диагностика загрузки недоступна. Перезагрузите страницу.",
   "Public status unavailable": "Публичный статус пока недоступен",
-  "Upload channel diagnostics": "Диагностика канала загрузки",
-  "Test a round trip through the ASUS uploader and RAM replies with 1, 8, 32 and 64 KiB payloads. VPN and captive portal settings are unchanged.":
-    "Проверка двунаправленного обмена через загрузчик ASUS и ответы в RAM с данными размером 1, 8, 32 и 64 КиБ. Настройки VPN и captive portal не меняются.",
-  "Run diagnostics": "Запустить диагностику",
-  "Testing upload round trips...":
-    "Проверяем двунаправленный обмен через загрузчик...",
-  "Upload receiver unavailable. Reinstall the current distribution and reload the page.":
-    "Приёмник загрузки недоступен. Переустановите текущий дистрибутив и перезагрузите страницу.",
-  "Copy report": "Копировать отчёт",
-  "Diagnostic report": "Отчёт диагностики",
-  "Diagnostics complete. Copy the report to share it.":
-    "Диагностика завершена. Скопируйте отчёт для передачи.",
-  "Report copied.": "Отчёт скопирован.",
-  "Report selected. Copy it with Ctrl+C.":
-    "Отчёт выделен. Скопируйте его с помощью Ctrl+C.",
   "OCFusion is stopping. Please wait.": "OCFusion останавливается. Подождите.",
   "Checking platform availability...": "Проверяем доступность платформы...",
   "Installation or update in progress. Please wait.":

@@ -49,7 +49,6 @@ function crc32(payload) {
 
 function createFixtureServer() {
   const profiles = ["default"];
-  let uploadReply = null;
   let commandReply = null;
   return http.createServer(async (request, response) => {
     const url = new URL(request.url, "http://localhost");
@@ -93,7 +92,7 @@ function createFixtureServer() {
       );
     }
 
-    if (url.pathname === "/user/extensions-upload-probe.json") {
+    if (url.pathname === "/user/extensions-command.json") {
       return send(
         JSON.stringify({
           state: "READY",
@@ -181,37 +180,8 @@ function createFixtureServer() {
         return send("{}", "text/html");
       }
 
-      const expected = "OCF0123456789abcdef"
-        .repeat(Math.ceil(packet.size / 18))
-        .slice(0, packet.size);
-      assert.equal(packet.protocol, "ocfusion-upload-probe-v1");
-      assert.equal(packet.payload, expected);
-
-      uploadReply = {
-        instance: packet.instance,
-        id: packet.id,
-        result: "PASS",
-        received_bytes: packet.size,
-        payload: packet.payload,
-        sha256: require("crypto")
-          .createHash("sha256")
-          .update(packet.payload)
-          .digest("hex"),
-        response_storage: "RAM",
-      };
-
-      return send(
-        "<script>parent.call_back_to_save_config(1);</script>",
-        "text/html",
-      );
-    }
-
-    if (url.pathname === "/user/extensions-upload-reply.json") {
-      if (!uploadReply) {
-        response.statusCode = 404;
-      }
-
-      return send(JSON.stringify(uploadReply), "application/json");
+      response.statusCode = 400;
+      return send("{}", "application/json");
     }
 
     if (url.pathname === "/user/extensions-command-reply.json") {
@@ -239,7 +209,6 @@ function createFixtureServer() {
     const files = {
       "/user/extensions.html": "web/import.html",
       "/user/extensions-panel.js": "web/panel.js",
-      "/user/extensions-diagnostics.js": "web/diagnostics.js",
       "/user/ocfusion-i18n.js": "web/i18n.js",
       "/user/extensions-panel.css": "web/panel.css",
     };
@@ -387,36 +356,7 @@ async function testModuleUI(browser, address, language) {
   );
 
   await page.locator('a[data-page="system"]').click();
-  if (language === "RU") {
-    assert.equal(
-      (await page.locator("#transport-test").textContent()).trim(),
-      "Запустить диагностику",
-    );
-  }
-
-  if (language === "EN") {
-    await page.locator("#transport-test").click();
-    await page
-      .locator("#transport-result")
-      .filter({ hasText: "Diagnostics complete" })
-      .waitFor();
-
-    const report = JSON.parse(
-      await page.locator("#transport-report").inputValue(),
-    );
-
-    assert.equal(report.channel, "stock_multipart_to_ram");
-    assert.deepEqual(
-      report.tests.map((test) => test.payload_bytes),
-      [1024, 8192, 32768, 65536],
-    );
-    assert(
-      report.tests.every((test) => test.result === "PASS" && test.echo_matches),
-    );
-    assert.equal(report.largest_passed_payload_bytes, 65536);
-    assert.equal(report.absolute_maximum_tested, false);
-    assert(!requests.some((request) => request.action === "platform.ping"));
-  }
+  assert.equal(await page.locator("#transport-test").count(), 0);
 
   // External and shipped modules use the same generated menu and iframe route.
   await page.locator('#module-menu a[href="#module-heartbeat"]').click();
@@ -447,85 +387,6 @@ async function testModuleUI(browser, address, language) {
 
   await page.evaluate(() => loadModules());
   await frame.locator("#title").waitFor();
-  await page.close();
-}
-
-async function testDiagnosticScriptFailure(browser, address) {
-  const page = await browser.newPage();
-
-  await page.addInitScript(() => {
-    window.TEST_LANGUAGE = "EN";
-  });
-  await page.route("**/user/extensions-diagnostics.js?*", (route) =>
-    route.fulfill({
-      contentType: "text/javascript",
-      body: "(() => {",
-    }),
-  );
-
-  const failure = page.waitForEvent("pageerror");
-
-  await page.goto(address + "/user/extensions.html#system");
-  await failure;
-  assert.equal(await page.locator("#transport-test").isDisabled(), true);
-  assert(
-    (await page.locator("#transport-result").textContent()).includes(
-      "Upload diagnostics unavailable",
-    ),
-  );
-  await page.close();
-}
-
-async function testUploadDiagnosticFailures(browser, address) {
-  const page = await browser.newPage();
-
-  await page.addInitScript(() => {
-    window.TEST_LANGUAGE = "EN";
-  });
-  await page.route("**/user/extensions-upload-probe.json?*", (route) =>
-    route.fulfill({
-      contentType: "application/json",
-      body: '{"state":"STOPPED"}',
-    }),
-  );
-  await page.goto(address + "/user/extensions.html#system");
-  await page.locator("#transport-test").click();
-  await page
-    .locator("#transport-result")
-    .filter({ hasText: "Upload receiver unavailable" })
-    .waitFor();
-  assert.equal(
-    JSON.parse(await page.locator("#transport-report").inputValue()).receiver,
-    "UNAVAILABLE",
-  );
-  await page.unroute("**/user/extensions-upload-probe.json?*");
-
-  let staleReplies = 0;
-  await page.route("**/user/extensions-upload-reply.json?*", async (route) => {
-    const response = await route.fetch();
-    const data = await response.json();
-
-    if (staleReplies++ === 0) {
-      data.id = "00000000000000000000000000000000";
-    } else {
-      data.payload = "corrupt echo";
-    }
-
-    await route.fulfill({ response, json: data });
-  });
-  await page.locator("#transport-test").click();
-  await page
-    .locator("#transport-result")
-    .filter({ hasText: "Diagnostics complete" })
-    .waitFor();
-
-  const report = JSON.parse(
-    await page.locator("#transport-report").inputValue(),
-  );
-
-  assert(report.tests.every((test) => test.result === "INTEGRITY_FAILED"));
-  assert(staleReplies > report.tests.length, "Stale nonce was accepted");
-  assert.equal(report.largest_passed_payload_bytes, 0);
   await page.close();
 }
 
@@ -572,9 +433,6 @@ async function main() {
     for (const language of ["EN", "RU", "DE"]) {
       await testModuleUI(browser, address, language);
     }
-
-    await testDiagnosticScriptFailure(browser, address);
-    await testUploadDiagnosticFailures(browser, address);
 
     for (const language of ["EN", "RU"]) {
       await testFusion(browser, address, language);

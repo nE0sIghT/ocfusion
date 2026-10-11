@@ -112,7 +112,7 @@ func publishWeb() error {
 		return e
 	}
 
-	for src, dst := range map[string]string{"web/import.html": "extensions.html", "web/panel.js": "extensions-panel.js", "web/panel.css": "extensions-panel.css", "web/logo.png": "ocfusion-logo.png", "web/icon.png": "ocfusion-icon.png", "web/i18n.js": "ocfusion-i18n.js", "web/diagnostics.js": "extensions-diagnostics.js"} {
+	for src, dst := range map[string]string{"web/import.html": "extensions.html", "web/panel.js": "extensions-panel.js", "web/panel.css": "extensions-panel.css", "web/logo.png": "ocfusion-logo.png", "web/icon.png": "ocfusion-icon.png", "web/i18n.js": "ocfusion-i18n.js"} {
 		b, err := os.ReadFile(filepath.Join(m.Bundle, src))
 		if err != nil {
 			return err
@@ -130,7 +130,7 @@ func publishWeb() error {
 		}
 	}
 
-	for _, name := range []string{"ocfusion-probe.cgi", "ocfusion-probe.asp"} {
+	for _, name := range []string{"ocfusion-probe.cgi", "ocfusion-probe.asp", "extensions-diagnostics.js", "extensions-upload-probe.json", "extensions-upload-reply.json"} {
 		os.Remove(filepath.Join(dir, name))
 	}
 
