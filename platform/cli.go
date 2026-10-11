@@ -12,7 +12,7 @@ import (
 
 func fatal(e error) {
 	if e != nil {
-		fmt.Fprintln(os.Stderr, "extensions:", e)
+		fmt.Fprintln(os.Stderr, "OCFusion:", e)
 		os.Exit(1)
 	}
 }
@@ -95,7 +95,7 @@ func runCLI() {
 
 		return
 	case "version":
-		fmt.Println("extensions", version, "("+versionCommit()+")")
+		fmt.Println("OCFusion", version, "("+versionCommit()+")")
 
 		return
 	case "daemon":
