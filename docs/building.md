@@ -25,7 +25,7 @@ meson compile -C build/meson bundle
 meson test -C build/meson --suite unit --suite example --suite client --print-errorlogs
 ```
 
-The root `meson.build` configures the project and includes component build files from `third_party/`, `platform/`, `modules/openconnect/`, `packaging/` and `tests/`. Upstream configure options, compiler environment and install targets are in [third_party/build.json](../third_party/build.json); pinned downloads remain in `sources.lock.json`.
+The root `meson.build` configures the project and includes component build files from `third_party/`, `platform/`, `modules/vpn/`, `modules/openconnect/`, `packaging/` and `tests/`. Upstream configure options, compiler environment and install targets are in [third_party/build.json](../third_party/build.json); pinned downloads remain in `sources.lock.json`.
 
 Meson owns the dependency graph. Separate targets build musl, zlib, OpenSSL, libxml2, OpenConnect, the supervisor and the module manager. A small adapter invokes the original upstream configure/make commands for one C project at a time. It does not orchestrate other projects. The OpenConnect target applies the tracked patch before compilation. Upstream build logs are in `build/meson/logs/`.
 

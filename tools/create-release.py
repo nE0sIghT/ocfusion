@@ -26,7 +26,7 @@ def post(url, data, headers, content_type="application/json"):
 def main():
     tag = os.environ["RELEASE_TAG"]
     repository = os.environ["RELEASE_REPOSITORY"]
-    assert re.fullmatch(r"v[0-9]+\.[0-9]+\.[0-9]+(?:-[A-Za-z0-9.-]+)?", tag), (
+    assert re.fullmatch(r"v[0-9]+\.[0-9]+(?:\.[0-9]+)?(?:-[A-Za-z0-9.-]+)?", tag), (
         "invalid release tag"
     )
     version = tag[1:]
