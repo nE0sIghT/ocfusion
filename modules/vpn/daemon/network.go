@@ -339,8 +339,6 @@ func prepareKernel() error {
 	return ensureComment(os.ReadFile)
 }
 
-const fusionName = "OCFusion (managed)"
-
 func tunnelInterface(m Manifest) string {
 	return m.Interface
 }

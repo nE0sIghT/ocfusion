@@ -38,22 +38,19 @@ type Profile struct {
 	Enabled     bool     `json:"enabled"`
 }
 type Manifest struct {
-	ID             string            `json:"id,omitempty"`
-	Client         string            `json:"client,omitempty"`
-	Profile        string            `json:"profile,omitempty"`
-	Interface      string            `json:"interface,omitempty"`
-	Name           string            `json:"name,omitempty"`
-	Shared         bool              `json:"shared_transport,omitempty"`
-	Schema         int               `json:"schema"`
-	Unit           int               `json:"unit"`
-	Index          int               `json:"vpnc_idx"`
-	Table          int               `json:"table"`
-	Priority       int               `json:"priority"`
-	Firmware       string            `json:"firmware"`
-	Bundle         string            `json:"bundle"`
-	BundleSHA      map[string]string `json:"bundle_sha256"`
-	OriginalCustom string            `json:"original_custom"`
-	OriginalEAS    string            `json:"original_eas"`
+	ID        string            `json:"id,omitempty"`
+	Client    string            `json:"client,omitempty"`
+	Profile   string            `json:"profile,omitempty"`
+	Interface string            `json:"interface,omitempty"`
+	Name      string            `json:"name,omitempty"`
+	Schema    int               `json:"schema"`
+	Unit      int               `json:"unit"`
+	Index     int               `json:"vpnc_idx"`
+	Table     int               `json:"table"`
+	Priority  int               `json:"priority"`
+	Firmware  string            `json:"firmware"`
+	Bundle    string            `json:"bundle"`
+	BundleSHA map[string]string `json:"bundle_sha256"`
 }
 type Network struct {
 	Index      string `json:"sdn_idx"`

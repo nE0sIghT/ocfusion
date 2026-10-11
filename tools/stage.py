@@ -36,6 +36,10 @@ def copy_documentation(runtime_tree):
                 f"(docs/{topic}.md)",
                 f"(https://github.com/nE0sIghT/ocfusion/blob/main/docs/{topic}.md)",
             )
+        document = document.replace(
+            'src="docs/screenshots/',
+            'src="https://raw.githubusercontent.com/nE0sIghT/ocfusion/main/docs/screenshots/',
+        )
         (runtime_tree / name).write_text(document)
 
 

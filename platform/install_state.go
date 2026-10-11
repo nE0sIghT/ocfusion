@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 )
 
@@ -96,10 +95,6 @@ func restoreState(backup string) error {
 		return err
 	}
 
-	if transport, err := loadTransport(); err == nil && snapshot.Native && transport.Key != "" {
-		nvset(transport.Key, snapshot.Custom[transport.Key])
-	}
-
 	for path, existed := range snapshot.Paths {
 		if !ownedStatePath(path) && path != base {
 			return errors.New("invalid backup state path")
@@ -115,6 +110,12 @@ func restoreState(backup string) error {
 	}
 
 	if snapshot.Native {
+		for key, value := range snapshot.Custom {
+			if err := nvset(key, value); err != nil {
+				return err
+			}
+		}
+
 		if err := nvset("vpnc_clientlist", snapshot.ClientList); err != nil {
 			return err
 		}
@@ -127,39 +128,9 @@ func restoreState(backup string) error {
 }
 
 func removePlatformTransport() error {
-	transport, err := loadTransport()
-	if os.IsNotExist(err) {
+	if _, err := loadTransport(); os.IsNotExist(err) {
 		return nil
-	}
-
-	if err != nil {
-		return err
-	}
-
-	if transport.Unit == 0 {
-		return os.Rename(filepath.Join(base, "transport.json"), filepath.Join(base, "transport.removed.json"))
-	}
-
-	records := []string{}
-	for _, record := range strings.Split(nvget("vpnc_clientlist"), "<") {
-		fields := strings.Split(record, ">")
-		if len(fields) > 6 && fields[1] == "OpenVPN" && fields[2] == strconv.Itoa(transport.Unit) && fields[6] == strconv.Itoa(transport.Index) {
-			continue
-		}
-
-		records = append(records, record)
-	}
-
-	if err := nvset("vpnc_clientlist", strings.Join(records, "<")); err != nil {
-		return err
-	}
-
-	if err := nvset(transport.Key, transport.OriginalCustom); err != nil {
-		return err
-	}
-
-	_, err = runner("nvram", "commit")
-	if err != nil {
+	} else if err != nil {
 		return err
 	}
 

@@ -121,17 +121,6 @@ func publishWeb() error {
 		if err = atomicWrite(filepath.Join(dir, dst), b, 0644); err != nil {
 			return err
 		}
-		// Existing bookmarked URL keeps working across the upgrade.
-
-		if dst == "extensions.html" {
-			if err = atomicWrite(filepath.Join(dir, "ocfusion.html"), b, 0644); err != nil {
-				return err
-			}
-		}
-	}
-
-	for _, name := range []string{"ocfusion-probe.cgi", "ocfusion-probe.asp", "extensions-diagnostics.js", "extensions-upload-probe.json", "extensions-upload-reply.json"} {
-		os.Remove(filepath.Join(dir, name))
 	}
 
 	js := fmt.Sprintf("window.OCF_SETTINGS={version:%q,language:%q,model:%q};\n", version, nvget("preferred_lang"), nvget("productid"))

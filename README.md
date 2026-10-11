@@ -4,6 +4,8 @@
 
 # OCFusion
 
+**All you need is USB flash**
+
 OCFusion is a platform for extending stock ASUSWRT functionality without flashing replacement firmware. It provides an extension panel and module lifecycle management.
 
 ## Available modules
@@ -32,8 +34,12 @@ The simplest installation uses a USB drive prepared on a Linux computer. Use an 
    ./ocfusion/install.sh --prepare-usb /media/user/USB
    ```
 
-3. Safely eject the drive, plug it into the supported router and wait for ASUS Apps startup. Installation runs automatically; SSH is not required for this path. The new preparation path still needs its first physical-device validation.
-4. Sign in to your router's ASUS web interface and click the OCFusion icon <img src="web/icon.png" alt="OCFusion" width="24" height="24"> in the top-right header. Configure OpenConnect in the OCFusion panel. In the ASUS settings for your SDN Wi-Fi/VLAN network, select the **OCFusion (managed)** VPN Fusion profile as its VPN connection. Leave this profile's switch **OFF** in VPN Fusion; OCFusion controls the tunnel.
+3. Safely eject the drive, plug it into the supported router and wait for ASUS Apps startup. Installation runs automatically; SSH is not required for this path.
+4. Sign in to your router's ASUS web interface and click the OCFusion icon <img src="web/icon.png" alt="OCFusion" width="24" height="24"> in the top-right header.
+
+   <img src="docs/screenshots/header-icon.png" alt="OCFusion icon in the ASUS header" width="208">
+
+   Configure OpenConnect in the OCFusion panel. In the ASUS settings for your SDN Wi-Fi/VLAN network, select the VPN Fusion profile shown in the OpenConnect module as its VPN connection. Leave this profile's switch **OFF** in VPN Fusion; OCFusion controls the tunnel.
 
 See [installation, updates and troubleshooting](INSTALLATION.md). Reinstalling preserves the profile, Fusion index and network bindings. Updating briefly interrupts the VPN connection.
 
@@ -46,6 +52,20 @@ See [installation, updates and troubleshooting](INSTALLATION.md). Reinstalling p
 - Static ARM64 executables built from pinned sources. No Entware installation is required.
 
 Server-advertised split exclusions are intentionally ignored for the managed full tunnel.
+
+## Screenshots
+
+### Overview
+
+<img src="docs/screenshots/overview.png" alt="OCFusion overview" width="900">
+
+### OpenConnect
+
+<img src="docs/screenshots/openconnect.png" alt="OpenConnect profiles and connection status" width="900">
+
+### VPN settings
+
+<img src="docs/screenshots/settings.png" alt="OpenConnect connection settings" width="900">
 
 ## Development
 

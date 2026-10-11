@@ -27,7 +27,7 @@ The platform owns shared web publication, the stock header icon, language/model 
 | --- | --- |
 | USB Apps root, exposed as `/tmp/opt` | Installed distribution, web assets, native Apps entrypoints and additional module versions |
 | `/jffs/ocfusion-platform` | extd/extctl, registry and private generic module configuration |
-| `/jffs/ocfusion` | OpenConnect private profile, compatibility CLI/hook and client payload manifest |
+| `/jffs/ocfusion` | OpenConnect private profile, client CLI/hook and client payload manifest |
 | `/jffs/ocfusion-vpn` | Native VPN connection registry and ownership |
 | `/jffs/ocfusion-update-backup` | Temporary transaction backup of platform and declared module state |
 | `/tmp/ocfusion-platform` | Private Unix control socket, verified module snapshots and process state |
@@ -62,17 +62,17 @@ OpenConnect's settings action returns public fields and secret-presence flags. I
 
 ## VPN and native networks
 
-The platform does not allocate a native VPN profile for web transport. The VPN provider owns connection records by module/profile and allocates native bindings, interfaces and routing resources independently. An existing shared default binding becomes VPN-owned during update, preserving its name, unit, index and SDN assignments. Recognizable old mailbox contents are cleared; administrator-edited custom contents are retained. The managed binding's switch stays OFF. ASUS owns Wi-Fi/VLAN/SDN topology. The VPN provider discovers assigned bridges and installs policy routes and forwarding/NAT/DNS rules. A tunnel default route is paired with an unreachable fallback; assigned IPv6 traffic is blocked. Server-advertised split exclusions are ignored for the managed IPv4 full tunnel.
+The platform does not allocate a native VPN profile for web transport. The VPN provider owns connection records by module/profile and allocates native bindings, interfaces and routing resources independently. The managed binding's switch stays OFF. ASUS owns Wi-Fi/VLAN/SDN topology. The VPN provider discovers assigned bridges and installs policy routes and forwarding/NAT/DNS rules. A tunnel default route is paired with an unreachable fallback; assigned IPv6 traffic is blocked. Server-advertised split exclusions are ignored for the managed IPv4 full tunnel.
 
 The managed OpenConnect patch keeps its hook environment bounded when a server advertises a large route list. OpenConnect normalizes hook events into interface/address/MTU/DNS parameters and sends them to the VPN provider. The client reports UP only after the provider acknowledges application. Each connection has independent runtime state and rules. The provider independently expires client heartbeats, detects loss of the tunnel interface and reconciles network rules. Client authentication credentials and server trust are separate: public roots plus an optional additional CA validate the server, while the client certificate/key authenticate the client.
 
 ## Updates and removal
 
-The binary archive keeps `install.sh` as its only executable at the top level. USB preparation helpers are in `scripts/`, ASUS Apps entries are in `init/`, and the manager is in `bin/`. Bundled modules are complete packages under `modules/<id>/`, each with its own manifest, executables, UI and resources. The installer registers every bundled package through the manager. OpenConnect keeps its historical JFFS data and installed hook locations for upgrades. `THIRD-PARTY.md` contains the complete dependency license notices; build inputs remain in the source archive.
+The binary archive keeps `install.sh` as its only executable at the top level. USB preparation helpers are in `scripts/`, ASUS Apps entries are in `init/`, and the manager is in `bin/`. Bundled modules are complete packages under `modules/<id>/`, each with its own manifest, executables, UI and resources. The installer registers every bundled package through the manager. OpenConnect owns its JFFS data and installed tunnel hook. `THIRD-PARTY.md` contains the complete dependency license notices; build inputs remain in the source archive.
 
 The installer verifies payload checksums and validates the bundled package set. It runs opted-in preflight hooks before changes, backs up platform and manifest-declared module state together with native VPN records and custom fields, then swaps owned files. Installation hooks run in dependency order before the bundled package set is registered atomically. Updates preserve private profiles, the Fusion index and SDN bindings. Empty bundled sets are supported; independently installed modules remain registered. Interrupted updates use owned backups for recovery; successful updates remove temporary backups. Service restart briefly interrupts VPN traffic.
 
-Updates from modular 0.2.9 migrate its single native connection into the connection registry, preserving its Fusion unit/index, interface, route table, priority and SDN assignments. The default OpenConnect profile remains in its current directory, with unchanged credentials. Additional profiles use separate persistent and RAM directories. Pre-0.2.9 MVP installation formats are not supported. The normal installation transaction backs up all declared state before migration and restores it on failure, including updates from a replacement USB drive with no old payload.
+Updates retain the current connection registry and private OpenConnect profiles. Additional profiles use separate persistent and RAM directories. The normal installation transaction backs up declared state and restores it on failure, including updates from a replacement USB drive with no old payload.
 
 The uploader uses an owned, unassigned CSS resource linked to the private RAM inbox. It does not modify captive portal configuration. Owned links are removed on shutdown, consumed input is cleared, and replies never echo private request payloads.
 

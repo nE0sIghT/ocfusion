@@ -8,7 +8,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 )
 
 func install() error {
@@ -17,45 +16,7 @@ func install() error {
 		return err
 	}
 
-	if err = writeConnections(registry); err != nil {
-		return err
-	}
-
-	// The old shared profile becomes a normal VPN-owned binding. Clear only
-	// recognizable mailbox data; preserve custom fields edited by an administrator.
-	var previous struct {
-		Unit     int    `json:"unit"`
-		Key      string `json:"key"`
-		Original string `json:"original_custom"`
-	}
-	data, err := os.ReadFile(transportPath)
-	if os.IsNotExist(err) {
-		return nil
-	}
-
-	if err != nil || json.Unmarshal(data, &previous) != nil {
-		return errors.New("invalid previous transport ownership")
-	}
-
-	if previous.Unit == 0 {
-		return nil
-	}
-
-	if previous.Unit < 1 || previous.Unit > 5 || previous.Key != fmt.Sprintf("vpn_client%d_custom", previous.Unit) {
-		return errors.New("invalid previous transport binding")
-	}
-
-	value := nvget(previous.Key)
-	if strings.HasPrefix(value, "# EXT-REQUEST1 ") || strings.HasPrefix(value, "# OCF-STATUS1 ") {
-		if err := nvset(previous.Key, previous.Original); err != nil {
-			return err
-		}
-
-		_, err = runner("nvram", "commit")
-		return err
-	}
-
-	return nil
+	return writeConnections(registry)
 }
 
 func remove() error {

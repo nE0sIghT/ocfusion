@@ -23,7 +23,6 @@ type Manifest struct {
 	Profile   string `json:"profile,omitempty"`
 	Interface string `json:"interface,omitempty"`
 	Name      string `json:"name,omitempty"`
-	Shared    bool   `json:"shared_transport,omitempty"`
 	Schema    int    `json:"schema"`
 	Unit      int    `json:"unit"`
 	Index     int    `json:"vpnc_idx"`
@@ -78,19 +77,6 @@ func saveJSON(path string, v any) error {
 	}
 
 	return atomicWrite(path, append(b, '\n'), 0600)
-}
-func loadManifest() (Manifest, error) {
-	var m Manifest
-	b, e := os.ReadFile(filepath.Join(root, "connection.json"))
-	if e == nil {
-		e = json.Unmarshal(b, &m)
-	}
-
-	if e == nil && (m.Schema != 1 || m.Unit < 1 || m.Unit > 5 || m.Index < 5 || m.Index > 20 || m.Table < 1000 || m.Priority < 50) {
-		e = errors.New("invalid manifest")
-	}
-
-	return m, e
 }
 
 // The fixed-format tables are data, never shell input. Preserve index associations.

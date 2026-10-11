@@ -6,18 +6,13 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 )
 
 type Transport struct {
-	Unit           int               `json:"unit"`
-	Index          int               `json:"vpnc_idx"`
-	Key            string            `json:"key"`
-	Bundle         string            `json:"bundle"`
-	OriginalCustom string            `json:"original_custom"`
-	Hashes         map[string]string `json:"hashes"`
+	Bundle string            `json:"bundle"`
+	Hashes map[string]string `json:"hashes"`
 }
 
 var platformAssets = []string{"web/import.html", "web/panel.js", "web/panel.css", "web/logo.png", "web/icon.png", "web/i18n.js"}
@@ -27,10 +22,6 @@ func loadTransport() (Transport, error) {
 	data, err := os.ReadFile(filepath.Join(base, "transport.json"))
 	if err == nil {
 		err = json.Unmarshal(data, &transport)
-	}
-
-	if err == nil && ((transport.Unit != 0 || transport.Index != 0 || transport.Key != "") && (transport.Unit < 1 || transport.Unit > 5 || transport.Index < 5 || transport.Index > 20 || transport.Key != fmt.Sprintf("vpn_client%d_custom", transport.Unit))) {
-		err = errors.New("invalid platform transport")
 	}
 
 	return transport, err

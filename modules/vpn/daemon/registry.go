@@ -17,8 +17,6 @@ type Connections struct {
 	Items  map[string]Manifest `json:"connections"`
 }
 
-var transportPath = "/jffs/ocfusion-platform/transport.json"
-
 func readConnections() (Connections, error) {
 	registry := Connections{Schema: 1, Items: map[string]Manifest{}}
 	data, err := os.ReadFile(filepath.Join(root, "connections.json"))
@@ -34,9 +32,6 @@ func readConnections() (Connections, error) {
 				if id != item.ID || !identifier.MatchString(id) || !identifier.MatchString(item.Client) || !identifier.MatchString(item.Profile) || !ifaceRE.MatchString(item.Interface) || item.Unit < 1 || item.Unit > 5 || item.Index < 5 || item.Index > 20 || item.Table < 1000 || item.Priority < 50 {
 					return registry, errors.New("invalid connection record")
 				}
-				item.Shared = false
-				registry.Items[id] = item
-
 				keys := []string{fmt.Sprintf("unit:%d", item.Unit), fmt.Sprintf("index:%d", item.Index), fmt.Sprintf("table:%d", item.Table), fmt.Sprintf("priority:%d", item.Priority), "interface:" + item.Interface, "owner:" + item.Client + "/" + item.Profile}
 				for _, key := range keys {
 					if used[key] {
@@ -52,23 +47,6 @@ func readConnections() (Connections, error) {
 	if !os.IsNotExist(err) {
 		return registry, err
 	}
-
-	// Upgrade modular 0.2.9 only. Preserve native bindings and all resources.
-	existing, err := loadManifest()
-	if os.IsNotExist(err) {
-		return registry, nil
-	}
-	if err != nil {
-		return registry, err
-	}
-
-	existing.ID = "openconnect-default"
-	existing.Client = "openconnect"
-	existing.Profile = "default"
-	existing.Interface = "ocvpn0"
-	existing.Name = fusionName
-	existing.Shared = false
-	registry.Items[existing.ID] = existing
 
 	return registry, nil
 }

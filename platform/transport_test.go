@@ -49,7 +49,7 @@ func TestPlatformPublishesWithoutNativeVPNReservation(t *testing.T) {
 	}
 
 	transport, err := loadTransport()
-	if err != nil || transport.Unit != 0 || transport.Index != 0 || values["vpnc_clientlist"] != "" {
+	if err != nil || transport.Bundle != bundle || values["vpnc_clientlist"] != "" {
 		t.Fatal("platform reserved a native VPN slot", transport, err)
 	}
 

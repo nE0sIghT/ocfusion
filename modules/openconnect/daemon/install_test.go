@@ -2,7 +2,6 @@
 package main
 
 import (
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -19,7 +18,7 @@ func TestRefreshPreservesInstallation(t *testing.T) {
 		os.WriteFile(p, []byte(r), 0600)
 	}
 
-	old := Manifest{Schema: 1, Unit: 4, Index: 7, Table: 51998, Priority: 90, Firmware: "firmware", Bundle: "old", OriginalCustom: "custom", OriginalEAS: "eas"}
+	old := Manifest{Schema: 1, Unit: 4, Index: 7, Table: 51998, Priority: 90, Firmware: "firmware", Bundle: "old"}
 	got, e := refreshedManifest(old, d)
 	if e != nil {
 		t.Fatal(e)
@@ -59,26 +58,6 @@ func TestAdditionalCADoesNotReplacePublicRoots(t *testing.T) {
 	got[0] = 'X'
 	if string(public) != "PUBLIC_ROOTS" {
 		t.Fatal("source bundle mutated")
-	}
-}
-
-func TestLegacyManifestRemovesObsoleteGates(t *testing.T) {
-	var m Manifest
-	if err := json.Unmarshal([]byte(`{"schema":1,"unit":4,"vpnc_idx":7,"table":51998,"priority":90,"boot_policy_verified":false,"autoconnect":false}`), &m); err != nil {
-		t.Fatal(err)
-	}
-
-	if m.Unit != 4 || m.Index != 7 {
-		t.Fatal("saved installation lost")
-	}
-
-	b, err := json.Marshal(m)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if strings.Contains(string(b), "boot_policy") || strings.Contains(string(b), "autoconnect") {
-		t.Fatal("obsolete gates retained")
 	}
 }
 

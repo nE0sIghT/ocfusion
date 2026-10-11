@@ -101,11 +101,11 @@ func checkInstall() error {
 
 	fmt.Println("CHECK tun=OK")
 
-	if _, e = os.Stat("/tmp/var/wwwext/ocfusion.html"); e != nil {
+	if _, e = os.Stat("/tmp/var/wwwext/extensions.html"); e != nil {
 		return errors.New("import page unavailable")
 	}
 
-	fmt.Println("CHECK panel=/user/extensions.html direct_page=/user/ocfusion.html")
+	fmt.Println("CHECK panel=/user/extensions.html ")
 
 	return nil
 }

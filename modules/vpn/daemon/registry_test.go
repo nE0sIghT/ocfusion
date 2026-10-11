@@ -4,7 +4,6 @@ package main
 import (
 	"errors"
 	"os"
-	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -13,12 +12,10 @@ import (
 
 func fixtureBroker(t *testing.T) (*Broker, map[string]string) {
 	t.Helper()
-	oldRoot, oldTransport, oldRunner := root, transportPath, runner
+	oldRoot, oldRunner := root, runner
 	root = t.TempDir()
-	transportPath = filepath.Join(t.TempDir(), "transport.json")
-	os.WriteFile(transportPath, []byte(`{"unit":4,"vpnc_idx":7,"key":"vpn_client4_custom"}`), 0600)
 	t.Cleanup(func() {
-		root, transportPath, runner = oldRoot, oldTransport, oldRunner
+		root, runner = oldRoot, oldRunner
 	})
 
 	values := map[string]string{
@@ -94,27 +91,6 @@ func TestNativeCapacity(t *testing.T) {
 	}
 }
 
-func TestMigrationPreserves029Resources(t *testing.T) {
-	fixtureBroker(t)
-	old := Manifest{Schema: 1, Unit: 4, Index: 7, Table: 51998, Priority: 90, Firmware: "test_102_build"}
-	saveJSON(filepath.Join(root, "connection.json"), old)
-	registry, err := readConnections()
-	if err != nil {
-		t.Fatal(err)
-	}
-	migrated := registry.Items["openconnect-default"]
-	if migrated.Unit != old.Unit || migrated.Index != old.Index || migrated.Table != old.Table || migrated.Priority != old.Priority || migrated.Interface != "ocvpn0" || migrated.Shared {
-		t.Fatal("migration changed resources", migrated)
-	}
-	if err := writeConnections(registry); err != nil {
-		t.Fatal(err)
-	}
-	again, err := readConnections()
-	if err != nil || !reflect.DeepEqual(registry, again) {
-		t.Fatal("migration not idempotent", err)
-	}
-}
-
 func TestFailedAllocationRestoresNativeState(t *testing.T) {
 	broker, values := fixtureBroker(t)
 	if _, err := broker.handle(Request{API: 1, Client: "first-vpn", Profile: "default", Operation: "claim"}); err != nil {
@@ -180,92 +156,36 @@ func TestExpiredConnectionDoesNotExpireOtherOwner(t *testing.T) {
 	}
 }
 
-func TestMalformedMigrationLeavesSourceUntouched(t *testing.T) {
-	fixtureBroker(t)
-	original := []byte(`{"schema":1,"unit":0,"vpnc_idx":7,"table":51998,"priority":90}`)
-	path := filepath.Join(root, "connection.json")
-	os.WriteFile(path, original, 0600)
-	if _, err := readConnections(); err == nil {
-		t.Fatal("malformed migration accepted")
-	}
-	after, _ := os.ReadFile(path)
-	if string(after) != string(original) {
-		t.Fatal("malformed source rewritten")
-	}
-	if _, err := os.Stat(filepath.Join(root, "connections.json")); !os.IsNotExist(err) {
-		t.Fatal("failed migration published registry")
-	}
-}
-
-func TestSharedBindingMigrationPreservesNetworksAndClearsMailbox(t *testing.T) {
-	_, values := fixtureBroker(t)
-	old := Manifest{Schema: 1, Unit: 4, Index: 7, Table: 51998, Priority: 90, Firmware: "test_102_build"}
-	saveJSON(filepath.Join(root, "connection.json"), old)
-	values["vpn_client4_custom"] = "# OCF-STATUS1 previous"
-	native := values["vpnc_clientlist"]
-	values["sdn_rl"] = "unchanged network bindings"
-
-	if err := install(); err != nil {
-		t.Fatal(err)
-	}
-
-	registry, err := readConnections()
-	if err != nil || registry.Items["openconnect-default"].Shared || registry.Items["openconnect-default"].Index != 7 || values["vpn_client4_custom"] != "" || values["vpnc_clientlist"] != native || values["sdn_rl"] != "unchanged network bindings" {
-		t.Fatal("migration changed binding or kept mailbox", registry, values, err)
-	}
-
-	values["vpn_client4_custom"] = "administrator content"
-	if err := install(); err != nil || values["vpn_client4_custom"] != "administrator content" {
-		t.Fatal("repeat migration changed administrator content", err)
-	}
-}
-
 func TestFreshAllocationDoesNotRequirePlatformTransport(t *testing.T) {
 	broker, values := fixtureBroker(t)
-	os.Remove(transportPath)
 	values["vpnc_clientlist"] = ""
 
 	response, err := broker.handle(Request{API: 1, Client: "other-vpn", Profile: "office", Operation: "claim"})
-	if err != nil || response.Manifest.Shared || response.Manifest.Unit != 1 {
+	if err != nil || response.Manifest.Unit != 1 {
 		t.Fatal("native binding depends on platform transport", response, err)
 	}
 }
 
-func TestMigrationOfShared03Connection(t *testing.T) {
+func TestCurrentInstallationRetainsConnectionRegistry(t *testing.T) {
 	broker, values := fixtureBroker(t)
-	manifest := Manifest{
-		Schema: 1, ID: "connection-7", Client: "openconnect", Profile: "default",
-		Unit: 4, Index: 7, Table: 51998, Priority: 90, Interface: "ocvpn0",
-		Name: fusionName, Shared: true, Firmware: "test_102_build",
-	}
-	registry := Connections{Schema: 1, Items: map[string]Manifest{manifest.ID: manifest}}
-	if err := writeConnections(registry); err != nil {
-		t.Fatal(err)
+	for _, profile := range []string{"default", "office"} {
+		if _, err := broker.handle(Request{API: 1, Client: "openconnect", Profile: profile, Operation: "claim"}); err != nil {
+			t.Fatal(err)
+		}
 	}
 
+	before := broker.registry
 	native := values["vpnc_clientlist"]
-	if err := install(); err != nil {
-		t.Fatal(err)
-	}
+	values["sdn_rl"] = "existing network assignments"
 
-	migrated, err := readConnections()
-	if err != nil {
-		t.Fatal(err)
-	}
+	for attempt := 0; attempt < 2; attempt++ {
+		if err := install(); err != nil {
+			t.Fatal(err)
+		}
 
-	expected := manifest
-	expected.Shared = false
-	if !reflect.DeepEqual(migrated.Items[manifest.ID], expected) || values["vpnc_clientlist"] != native {
-		t.Fatal("existing connection resources changed", migrated, values)
-	}
-
-	broker = newBroker(migrated)
-	response, err := broker.handle(Request{API: 1, Client: "openconnect", Profile: "default", Operation: "claim"})
-	if err != nil || response.Manifest.Unit != 4 || response.Manifest.Index != 7 || values["vpnc_clientlist"] != native {
-		t.Fatal("existing default allocated another binding", response, err)
-	}
-
-	if _, err := broker.handle(Request{API: 1, Client: "openconnect", Profile: "default", Connection: manifest.ID, Operation: "release"}); err != nil || strings.Contains(values["vpnc_clientlist"], ">7>") {
-		t.Fatal("transferred binding still owned by platform", values, err)
+		stored, err := readConnections()
+		if err != nil || !reflect.DeepEqual(before, stored) || values["vpnc_clientlist"] != native || values["sdn_rl"] != "existing network assignments" {
+			t.Fatal("current-format update changed bindings", stored, values, err)
+		}
 	}
 }

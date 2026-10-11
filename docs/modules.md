@@ -197,7 +197,7 @@ Use the interface returned by the provider rather than a fixed name. Responses c
 
 Renew each active connection with `apply` at least every 3 seconds. After 12 seconds without a heartbeat the provider closes that connection while keeping its guards. A bridge cannot belong to multiple connections. Remove native network assignments before `release`. Releasing a connection removes only its own native binding; web transport has no Fusion reservation.
 
-OpenConnect settings actions use `{ "profile": "office", "data": {...} }` as the module action configuration. `profiles` lists IDs; `add-profile` and `delete-profile` create/remove profiles; `settings`, `update-settings`, `import-profile`, `diagnose`, `connect`, `disconnect` and `reconnect` target the selected profile. The default profile preserves the 0.2.9 installation and cannot be deleted individually.
+OpenConnect settings actions use `{ "profile": "office", "data": {...} }` as the module action configuration. `profiles` lists IDs; `add-profile` and `delete-profile` create/remove profiles; `settings`, `update-settings`, `import-profile`, `diagnose`, `connect`, `disconnect` and `reconnect` target the selected profile. The default profile is created during installation and cannot be deleted individually.
 
 ## Persistent installation helpers
 

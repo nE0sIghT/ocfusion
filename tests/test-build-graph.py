@@ -88,7 +88,7 @@ def main():
             ["runtime-stage", "runtime"],
             [*C_TARGETS, "ocfusion-openconnect", "extd"],
         )
-    with changed_mtime(PROJECT_ROOT / "web/diagnostics.js"):
+    with changed_mtime(PROJECT_ROOT / "web/panel.js"):
         assert_targets(
             build_plan(arguments.build_dir),
             ["runtime-stage", "runtime"],
