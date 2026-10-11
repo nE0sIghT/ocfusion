@@ -12,12 +12,16 @@ import (
 // The daemon lock distinguishes live state from snapshots left after an exit.
 // PID files alone can be stale or refer to a reused PID.
 func readStatus() ([]byte, error) {
-	raw, err := os.ReadFile(filepath.Join(runDir, "status.json"))
+	return readStatusAt(runDir)
+}
+
+func readStatusAt(directory string) ([]byte, error) {
+	raw, err := os.ReadFile(filepath.Join(directory, "status.json"))
 	if err != nil {
 		return nil, err
 	}
 
-	lock, err := os.OpenFile(filepath.Join(runDir, "daemon.lock"), os.O_RDWR, 0)
+	lock, err := os.OpenFile(filepath.Join(directory, "daemon.lock"), os.O_RDWR, 0)
 	if err == nil {
 		defer lock.Close()
 

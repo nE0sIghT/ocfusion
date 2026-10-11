@@ -1,5 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 window.OCF_MODULE_TRANSLATIONS = {
+  "Connecting to the VPN server.": "Подключаемся к VPN-серверу.",
+  "Check the assigned Wi-Fi/VLAN networks and SSH diagnostics.":
+    "Проверьте назначенные сети Wi-Fi/VLAN и диагностику через SSH.",
+  "Check SSH diagnostics for details.":
+    "Подробности доступны в диагностике через SSH.",
   "Connection profiles": "Профили подключения",
   "Default profile": "Основной профиль",
   "Create profile": "Создать профиль",

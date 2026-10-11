@@ -83,7 +83,17 @@ func (m *Manager) publish() {
 			ui = "/user/extensions-modules/" + id + "/" + item.Manifest.UI
 		}
 
-		modules = append(modules, map[string]any{"id": id, "name": item.Manifest.Name, "version": item.Manifest.Version, "enabled": item.Enabled, "state": state, "ui": ui})
+		m.publishModuleStatus(id, state)
+
+		modules = append(modules, map[string]any{
+			"id":      id,
+			"name":    item.Manifest.Name,
+			"version": item.Manifest.Version,
+			"enabled": item.Enabled,
+			"state":   state,
+			"ui":      ui,
+			"status":  "/user/extensions-status/" + id + ".json",
+		})
 	}
 
 	state := "READY"

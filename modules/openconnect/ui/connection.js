@@ -105,7 +105,22 @@ async function refreshConnection() {
   }
 
   try {
-    renderConnection(await request("diagnose"));
+    const snapshot = await parent.EXTENSIONS.status(moduleID);
+    const profiles = snapshot.data && snapshot.data.profiles;
+
+    if (profiles) {
+      updateProfileOptions(profiles);
+    }
+
+    const status = profiles && profiles[selectedProfile];
+
+    renderConnection(
+      status || {
+        state: snapshot.state === "RUNNING" ? "STARTING" : snapshot.state,
+        message: "Public status unavailable",
+        networks: [],
+      },
+    );
   } catch (error) {
     const node = document.getElementById("api-error");
 

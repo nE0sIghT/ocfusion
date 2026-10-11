@@ -123,7 +123,17 @@ func (m *Manager) start(id string) error {
 
 	cmd := exec.Command(filepath.Join(payload, item.Manifest.Entry), "run")
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	cmd.Env = append(os.Environ(), "PATH=/usr/bin:/bin:/usr/sbin:/sbin", "EXT_MODULE_ID="+id, "EXT_PACKAGE_PATH="+item.Path, "EXT_PAYLOAD_PATH="+payload, "EXT_CONFIG_PATH="+filepath.Join(base, "modules", id, "config.json"))
+	statusPath := filepath.Join(ram, "modules", id, "public-status.json")
+	os.Remove(statusPath)
+
+	cmd.Env = append(os.Environ(),
+		"PATH=/usr/bin:/bin:/usr/sbin:/sbin",
+		"EXT_MODULE_ID="+id,
+		"EXT_PACKAGE_PATH="+item.Path,
+		"EXT_PAYLOAD_PATH="+payload,
+		"EXT_CONFIG_PATH="+filepath.Join(base, "modules", id, "config.json"),
+		"EXT_PUBLIC_STATUS_PATH="+statusPath,
+	)
 	cmd.Stdin = strings.NewReader(`{"api":1,"operation":"run"}`)
 
 	logdir := filepath.Join(ram, "modules", id)

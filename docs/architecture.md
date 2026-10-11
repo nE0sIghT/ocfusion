@@ -45,7 +45,9 @@ The panel uses the native ASUS server, login, CSS and language selector. A RAM b
 
 The manager publishes each manifest `ui` directory under `/user/extensions-modules/<id>/...` and generates menu/card metadata. The shared panel opens these pages in one iframe. Module pages reuse the parent language and common styles; they do not nest another ASUS header/sidebar. There are no build-time module HTML/JavaScript insertions.
 
-Browser requests follow this path:
+Routine platform/module status is read from RAM JSON through the stock web server. Modules atomically write a bounded redacted snapshot to the manager-provided `EXT_PUBLIC_STATUS_PATH`; the manager publishes a fresh envelope for running workers. OpenConnect aggregates public status for its profiles, rejecting stale source data and excluding request replies and raw error text. Missing, stopped or stale producers yield unavailable data. Status polling does not use NVRAM.
+
+Commands and settings requests follow this path:
 
 ```text
 Module page -> parent EXTENSIONS API -> authenticated ASUS NVRAM mailbox
@@ -53,7 +55,7 @@ Module page -> parent EXTENSIONS API -> authenticated ASUS NVRAM mailbox
             -> module entrypoint -> JSON response -> nonce-matched browser reply
 ```
 
-The mailbox serializes requests and bounds payloads. Configuration/action uploads use chunks, size/hash validation and final commit. The manager validates declared actions before invoking the module. Public registry metadata and UI files contain no private configuration. Modules own their response redaction; the transport does not make arbitrary diagnostic JSON safe.
+The mailbox serializes requests and bounds payloads. Replies use volatile NVRAM writes without an explicit commit; module settings retain their own persistence. This does not establish whether the stock HTTP request writer commits internally. Configuration/action uploads use chunks, size/hash validation and final commit. The manager validates declared actions before invoking the module. Public registry metadata and UI files contain no private configuration. Modules own their response redaction; the transport does not make arbitrary diagnostic JSON safe.
 
 OpenConnect's settings action returns public fields and secret-presence flags. Its update action applies a revision-checked patch to the private VPN profile, preserving unchanged credentials. Full configuration uses validation/import through the module adapter. That private profile remains authoritative; the manager's generic configuration copy is not a replacement for it. Credentials are materialized privately in RAM for the client.
 
@@ -70,6 +72,8 @@ The binary archive keeps `install.sh` as its only executable at the top level. U
 The installer verifies payload checksums and validates the bundled package set. It runs opted-in preflight hooks before changes, backs up platform and manifest-declared module state together with the native transport reservation, then swaps owned files. Installation hooks run in dependency order before the bundled package set is registered atomically. Updates preserve private profiles, the Fusion index and SDN bindings. Empty bundled sets are supported; independently installed modules remain registered. Interrupted updates use owned backups for recovery; successful updates remove temporary backups. Service restart briefly interrupts VPN traffic.
 
 Updates from modular 0.2.9 migrate its single native connection into the connection registry, preserving its Fusion unit/index, interface, route table, priority and SDN assignments. The default OpenConnect profile remains in its current directory, with unchanged credentials. Additional profiles use separate persistent and RAM directories. Pre-0.2.9 MVP installation formats are not supported. The normal installation transaction backs up all declared state before migration and restores it on failure, including updates from a replacement USB drive with no old payload.
+
+The panel's System page includes communication diagnostics. It tests RAM JSON, a harmless stock NVRAM read, nonce-matched mailbox ping and fixed input-free CGI/ASP probes on the same authenticated stock web address. Source served as a static file does not count as executable CGI, and unexpanded template markup does not count as an ASP hook. Probes do not configure reverse proxying or add a listener. Authentication without a session requires a separate private-window check; credential omission in the active browser session would not reliably prove protection. The report includes classifications and timing, not response bodies or credentials.
 
 The public module snapshot includes platform readiness and a periodically refreshed timestamp. The installer marks installation in progress before stopping the previous manager; this state overrides readiness until the transaction finishes. A clean manager shutdown publishes STOPPED and stopped module states before exiting. The panel hides module frames and rejects actions while installation is pending, services are stopped or the snapshot is stale. It uses the ASUS HTTP Date header for timestamp comparisons where available. The published files can remain in RAM after USB removal; their presence alone does not indicate a running service.
 

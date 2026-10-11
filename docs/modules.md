@@ -83,6 +83,10 @@ A declared action is invoked in the same way. One-shot operations receive JSON o
 
 `config` may be null. `EXT_MODULE_ID` identifies the module. One-shot execution has a 20-second timeout and a 32 KiB stdout capture. Return exit status 0 and valid JSON, for example `{"ok":true}`. Empty output is treated as `{}`. A nonzero exit status rejects the operation; JSON alone does not determine success. Stderr is not forwarded to the UI. Keep diagnostic JSON small enough to avoid truncation.
 
+A module may publish a public status snapshot without a browser request. The manager supplies `EXT_PUBLIC_STATUS_PATH` to `run`. Atomically replace this private RAM file with at most 16 KiB of valid JSON, using mode 0600. Refresh it at least every five seconds. This is an opt-in interface: do not write private configuration, credentials, URLs containing secrets, raw errors or request replies. Use an explicit projection of safe fields. The platform validates size, JSON and freshness, but cannot infer which fields are secret.
+
+The manager publishes a copy at `/user/extensions-status/<id>.json` through the stock ASUS web server. The envelope contains `module`, process `state`, `updated_at`, `data_updated_at` and `data`. `data` is null when the worker is stopped, the snapshot is missing/invalid or its file has not been refreshed for 15 seconds. This is the same mechanism for shipped and independently installed modules. A per-profile producer should also reject stale source snapshots instead of refreshing old data indefinitely.
+
 `run` receives `{"api":1,"operation":"run"}` on stdin. `EXT_CONFIG_PATH` points to the private configuration. The manager owns the process group; stop sends TERM, then KILL after five seconds. Handle TERM and clean up your children. Keep the process alive in the foreground. The manager detects early exit during startup and restarts unexpected exits with backoff. General status values include RUNNING, STOPPED, RESTARTING and WAIT_STORAGE_OR_DEPENDENCY. Stdout is bounded; a streaming NDJSON status protocol is not interpreted.
 
 Install uses staging and validate/prepare before replacing the previous version. Startup failure restores the previous version where possible. Same version/same hashes is idempotent; same version/different bytes is rejected. Configuration updates validate, atomically save a mode-0600 JSON file and invoke reload. Reload failure restores the prior configuration. Generic configuration is whole-object replacement, not field-wise secret PATCH.
@@ -115,14 +119,18 @@ An iframe can call:
 ```js
 await parent.EXTENSIONS.action('heartbeat', 'enable');
 await parent.EXTENSIONS.action('heartbeat', 'disable');
-const diagnostics = await parent.EXTENSIONS.action('heartbeat', 'diagnose');
+// Public status polling does not use the command mailbox.
+const snapshot = await parent.EXTENSIONS.status('heartbeat');
+const diagnostics = snapshot.data;
+// An on-demand diagnostic action may still use the mailbox.
+await parent.EXTENSIONS.action('heartbeat', 'diagnose');
 // Custom actions must be declared and implemented by the module.
 const settings = await parent.EXTENSIONS.action('heartbeat', 'settings');
 await parent.EXTENSIONS.call('heartbeat', 'update-settings', {interval: 10});
 await parent.EXTENSIONS.configure('heartbeat', {interval: 10});
 ```
 
-`action(id, operation)` returns the operation's JSON response. Standard browser operations are `enable`, `disable`, `status` and `diagnose`; other operations must be declared in the manifest's `actions`. `call(id, action, data, onProgress?)` invokes a declared action with JSON data, delivered in the entrypoint's usual stdin envelope as `config`. `configure(id, config, onProgress?)` keeps the validate/save/reload whole-object configuration contract. Optional progress callbacks receive display text. `EXTENSIONS.busy` reports an active transport transaction; calls during another transaction reject rather than overwrite the mailbox.
+`status(id)` reads a public snapshot and checks its envelope freshness. It does not serialize with command transactions or write NVRAM. Treat null data as unavailable, never as a successful tunnel state. `action(id, operation)` returns the operation's JSON response. Standard browser operations are `enable`, `disable`, `status` and `diagnose`; other operations must be declared in the manifest's `actions`. `call(id, action, data, onProgress?)` invokes a declared action with JSON data, delivered in the entrypoint's usual stdin envelope as `config`. `configure(id, config, onProgress?)` keeps the validate/save/reload whole-object configuration contract. Optional progress callbacks receive display text. `EXTENSIONS.busy` reports an active transport transaction; calls during another transaction reject rather than overwrite the mailbox.
 
 The browser transport uses the ASUS session, bounded NVRAM mailbox, nonce acknowledgements and chunked uploads. Calls with up to 1024 bytes of JSON use a bounded inline request and work over HTTP as well as HTTPS. Larger calls and configuration uploads require HTTPS for the browser SHA-256 implementation. Configuration/action data is limited to 16 KiB. Browser JSON responses are limited to 2048 bytes after JSON compaction, and must fit the complete 4 KiB ASUS mailbox response; larger responses reject. Entrypoints retain their 32 KiB CLI output bound, so browser-facing actions should return a small object. Requests expire rather than acknowledging a stale status. Entry failure rejects the Promise with a generic message; stderr and raw errors are not exposed.
 

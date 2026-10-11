@@ -41,11 +41,15 @@ func serveMailbox(done <-chan struct{}) {
 				data, _ = json.Marshal(response)
 			}
 
-			// Never overwrite a newer request queued while a module operation was running.
-			if nvget(transport.Key) == value {
-				nvset(transport.Key, "# OCF-STATUS1 "+base64.StdEncoding.EncodeToString(data))
-				runner("nvram", "commit")
-			}
+			replyMailbox(transport.Key, value, data)
 		}
+	}
+}
+
+// Replies are transient: persist module settings through their own lifecycle,
+// never commit a transport acknowledgement to flash.
+func replyMailbox(key, request string, data []byte) {
+	if nvget(key) == request {
+		nvset(key, "# OCF-STATUS1 "+base64.StdEncoding.EncodeToString(data))
 	}
 }

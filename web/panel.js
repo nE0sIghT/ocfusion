@@ -113,22 +113,6 @@ function render() {
   document.getElementById("api-error").hidden = true;
 }
 
-async function refresh() {
-  try {
-    const value = await read();
-
-    if (value.startsWith("# OCF-STATUS1 ")) {
-      render(decode(value.slice(14)));
-    }
-  } catch (e) {
-    const node = document.getElementById("api-error");
-
-    node.hidden = false;
-    node.textContent =
-      "Unable to read status: " + e.message + ". Check your ASUS session.";
-  }
-}
-
 async function request(action, data = {}) {
   if (!platformReady) {
     throw Error("OCFusion services are not ready. Check the platform status.");
@@ -227,7 +211,57 @@ async function uploadConfig(
   return (await request("upload.finish", { upload })).request_data;
 }
 
+async function publicStatus(module) {
+  if (!platformReady) {
+    throw Error("OCFusion services are not ready. Check the platform status.");
+  }
+
+  if (!/^[a-z][a-z0-9-]{0,31}$/.test(module)) {
+    throw Error("Invalid module ID");
+  }
+
+  const response = await fetch(
+    "/user/extensions-status/" + module + ".json?_=" + Date.now(),
+    {
+      credentials: "same-origin",
+      cache: "no-store",
+    },
+  );
+
+  if (!response.ok) {
+    throw Error("Public status unavailable");
+  }
+
+  const text = await response.text();
+
+  if (text.length > 32768) {
+    throw Error("Public status unavailable");
+  }
+
+  const snapshot = JSON.parse(text);
+  const serverDate = response.headers?.get("Date");
+  const now = serverDate ? Date.parse(serverDate) : Date.now();
+
+  if (
+    snapshot.module !== module ||
+    !Number.isFinite(snapshot.updated_at) ||
+    now - snapshot.updated_at >= 15000
+  ) {
+    throw Error("Public status unavailable");
+  }
+
+  if (
+    !Number.isFinite(snapshot.data_updated_at) ||
+    now - snapshot.data_updated_at >= 15000
+  ) {
+    snapshot.data = null;
+  }
+
+  return snapshot;
+}
+
 window.EXTENSIONS = {
+  status: publicStatus,
   get busy() {
     return pending;
   },
@@ -321,6 +355,18 @@ async function loadModules() {
     }
 
     installedModules = data.modules;
+
+    const statusLink = document.getElementById("transport-module-json");
+    const statusModule = installedModules.find((module) => module.ui);
+
+    if (statusLink) {
+      statusLink.hidden = !statusModule;
+
+      if (statusModule && /^[a-z][a-z0-9-]{0,31}$/.test(statusModule.id)) {
+        statusLink.href =
+          "/user/extensions-status/" + statusModule.id + ".json";
+      }
+    }
 
     for (const id of ["module-list", "module-overview", "module-menu"]) {
       const container = document.getElementById(id);
@@ -452,16 +498,10 @@ try {
   /* Preserve the native header if rendered; fallback is initially visible. */
 }
 
-refresh();
-
 loadModules();
 
 setInterval(() => {
   loadModules();
-
-  if (!pending && platformReady) {
-    refresh();
-  }
 }, 5000);
 
 // Change the brand only on our page; the shared ASUS header keeps its controls.

@@ -89,3 +89,35 @@ func TestStockContributionWithoutUI(t *testing.T) {
 		t.Fatalf("contribution not published: %v", err)
 	}
 }
+
+func TestMailboxReplyDoesNotCommitOrOverwriteNewRequest(t *testing.T) {
+	previous := runner
+	t.Cleanup(func() {
+		runner = previous
+	})
+	value := "request"
+	writes := 0
+	runner = func(name string, args ...string) (string, error) {
+		if name != "nvram" || len(args) == 0 {
+			t.Fatal("unexpected command", name, args)
+		}
+
+		switch args[0] {
+		case "get":
+			return value, nil
+		case "set":
+			writes++
+			return "", nil
+		default:
+			t.Fatal("transport committed to flash", args)
+		}
+
+		return "", nil
+	}
+	replyMailbox("key", "request", []byte(`{"ok":true}`))
+	value = "new request"
+	replyMailbox("key", "request", []byte(`{"ok":true}`))
+	if writes != 1 {
+		t.Fatal("new request overwritten", writes)
+	}
+}

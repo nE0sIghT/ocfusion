@@ -9,6 +9,7 @@ runtime_go = files(
     'daemon/profile_settings.go',
     'daemon/router.go',
     'daemon/status.go',
+    'daemon/public_status.go',
     'daemon/vpn.go',
 )
 

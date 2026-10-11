@@ -88,6 +88,12 @@ def main():
             ["runtime-stage", "runtime"],
             [*C_TARGETS, "ocfusion-openconnect", "extd"],
         )
+    with changed_mtime(PROJECT_ROOT / "web/diagnostics.js"):
+        assert_targets(
+            build_plan(arguments.build_dir),
+            ["runtime-stage", "runtime"],
+            [*C_TARGETS, "ocfusion-openconnect", "extd"],
+        )
     assert "no work to do" in build_plan(arguments.build_dir)
     print(
         "PASS: no-op rebuild; Go, recipe, patch and CA changes "

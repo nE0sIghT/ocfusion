@@ -129,3 +129,9 @@ After removal, safely eject USB and reboot. Other ASUS Apps files are left in pl
 Report problems through [GitHub Issues](https://github.com/nE0sIghT/ocfusion/issues). Include the router model, firmware, OCFusion version, installation output and sanitized status/doctor output. Do not include private keys, passwords, profile files, cookies or secret query parameters.
 
 See [architecture](architecture.md) for implementation details and [module development](modules.md) for the module interfaces.
+
+## Communication diagnostics
+
+Open the OCFusion panel using its icon in the ASUS header, then select System and Run diagnostics. The tests do not change VPN settings. Copy the report to share the observed channels and timings.
+
+For the authentication check, open both the platform and module status JSON links in a separate private browser session without signing in. Record whether ASUS requires login for both links or returns JSON for either link using the selector in the diagnostic card. The automatic tests use your current ASUS session and do not prove anonymous access is blocked.

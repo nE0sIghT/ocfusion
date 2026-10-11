@@ -79,6 +79,12 @@ func (w *webMailbox) apply(raw []byte, now time.Time) (string, bool, string) {
 	message := "Request rejected"
 
 	switch q.Action {
+	case "platform.ping":
+		w.LastData = json.RawMessage(`{"pong":true,"response_storage":"RAM"}`)
+		w.DataUntil = now.Add(30 * time.Second)
+		e = nil
+		message = "Action accepted"
+
 	case "upload.begin":
 		if (q.Kind == "" || q.Kind == "module.call" && moduleIDRE.MatchString(q.Operation)) && moduleIDRE.MatchString(q.Module) && validNonce(q.Upload) && q.Size > 0 && q.Size <= 16384 && len(q.SHA256) == 64 {
 			if _, err := hex.DecodeString(q.SHA256); err == nil {

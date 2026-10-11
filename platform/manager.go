@@ -286,6 +286,7 @@ func (m *Manager) handle(q Request) (any, error) {
 
 		m.stop(q.ID)
 		delete(m.registry.Modules, q.ID)
+		os.Remove(filepath.Join(webRoot, "extensions-status", q.ID+".json"))
 
 		return nil, m.save()
 	case "remove":
@@ -309,6 +310,7 @@ func (m *Manager) handle(q Request) (any, error) {
 		}
 
 		delete(m.registry.Modules, q.ID)
+		os.Remove(filepath.Join(webRoot, "extensions-status", q.ID+".json"))
 
 		return nil, m.save()
 	case "action":

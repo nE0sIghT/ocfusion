@@ -100,6 +100,59 @@
               <p>Keep the USB drive connected for the service to run.</p>
             </article>
 
+            <article class="ext-card">
+              <h2>Communication diagnostics</h2>
+              <p>Test available channels without changing VPN settings.</p>
+              <button id="transport-test" type="button">Run diagnostics</button>
+              <p id="transport-result" role="status"></p>
+              <p>
+                Check both JSON links in a private window without signing in.
+                The browser cannot reliably test authentication using its
+                current session.
+              </p>
+              <p>
+                <a
+                  href="/user/extensions-modules.json"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >Open public status JSON</a
+                >
+              </p>
+              <p>
+                <a
+                  id="transport-module-json"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  hidden
+                  >Open module status JSON</a
+                >
+              </p>
+              <div class="ext-field">
+                <label for="transport-auth"
+                  >Access without authentication</label
+                >
+                <select id="transport-auth">
+                  <option value="NOT_CHECKED">Not checked</option>
+                  <option value="LOGIN_REQUIRED">Login required</option>
+                  <option value="JSON_ACCESSIBLE">
+                    JSON accessible without login
+                  </option>
+                </select>
+              </div>
+              <p>
+                <button id="transport-copy" class="ext-secondary" type="button">
+                  Copy report
+                </button>
+              </p>
+              <textarea
+                id="transport-report"
+                readonly
+                rows="14"
+                style="width: 100%; box-sizing: border-box"
+                aria-label="Diagnostic report"
+              ></textarea>
+            </article>
+
             <article class="ext-card" id="about-project">
               <h2>About</h2>
               <p>
@@ -158,6 +211,7 @@
       </div>
     </div>
     <script src="/user/extensions-panel.js"></script>
+    <script src="/user/extensions-diagnostics.js"></script>
     <script src="/user/ocfusion-i18n.js"></script>
   </body>
 </html>

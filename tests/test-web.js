@@ -6,7 +6,12 @@ const crypto = require("crypto");
 const fs = require("fs");
 const vm = require("vm");
 
-for (const filename of ["import.html", "panel.js", "i18n.js"]) {
+for (const filename of [
+  "import.html",
+  "panel.js",
+  "i18n.js",
+  "diagnostics.js",
+]) {
   const shared = fs.readFileSync(__dirname + "/../web/" + filename, "utf8");
 
   assert(
@@ -250,7 +255,57 @@ async function testUnavailablePlatform() {
   }
 }
 
+async function testPublicStatusReads() {
+  const nodes = createNodes();
+  const mailbox = createMailbox(true);
+  const originalFetch = mailbox.fetch;
+  let timestamp = Date.now();
+  let body = { profiles: { default: { state: "UP" } } };
+
+  mailbox.fetch = async (url, options) => {
+    if (url.startsWith("/user/extensions-status/example.json")) {
+      return {
+        ok: true,
+        text: async () =>
+          JSON.stringify({
+            module: "example",
+            state: "RUNNING",
+            updated_at: timestamp,
+            data_updated_at: timestamp,
+            data: body,
+          }),
+      };
+    }
+
+    return originalFetch(url, options);
+  };
+
+  const context = createContext(nodes, mailbox);
+
+  vm.runInNewContext(panelScript, context);
+  await vm.runInNewContext("loadModules()", context);
+  const status = await context.window.EXTENSIONS.status("example");
+
+  assert.equal(status.data.profiles.default.state, "UP");
+  assert.equal(mailbox.requests.length, 0);
+
+  timestamp -= 60000;
+  await assert.rejects(
+    context.window.EXTENSIONS.status("example"),
+    /unavailable/,
+  );
+  await assert.rejects(
+    context.window.EXTENSIONS.status("..\/example"),
+    /Invalid/,
+  );
+
+  timestamp = Date.now();
+  body = null;
+  assert.equal((await context.window.EXTENSIONS.status("example")).data, null);
+}
+
 async function main() {
+  await testPublicStatusReads();
   await testUnavailablePlatform();
   await testProfileUpload(true);
   await testProfileUpload(false);

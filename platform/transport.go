@@ -22,7 +22,7 @@ type Transport struct {
 	Hashes         map[string]string `json:"hashes"`
 }
 
-var platformAssets = []string{"web/import.html", "web/panel.js", "web/panel.css", "web/logo.png", "web/icon.png", "web/i18n.js"}
+var platformAssets = []string{"web/import.html", "web/panel.js", "web/panel.css", "web/logo.png", "web/icon.png", "web/i18n.js", "web/diagnostics.js"}
 
 func loadTransport() (Transport, error) {
 	var transport Transport

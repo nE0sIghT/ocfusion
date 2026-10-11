@@ -214,6 +214,8 @@ func superviseProfiles() error {
 			}
 		}
 
+		publishPublicProfiles()
+
 		select {
 		case id := <-exits:
 			delete(processes, id)

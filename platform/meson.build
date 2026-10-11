@@ -4,6 +4,7 @@ platform_go = files(
     'cli.go',
     'daemon.go',
     'dependencies.go',
+    'public_status.go',
     'install_state.go',
     'ipc.go',
     'mailbox.go',

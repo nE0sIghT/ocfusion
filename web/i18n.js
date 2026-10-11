@@ -2,6 +2,27 @@
 "use strict";
 
 const OCF_TRANSLATIONS = {
+  "Public status unavailable": "Публичный статус пока недоступен",
+  "Communication diagnostics": "Диагностика обмена",
+  "Test available channels without changing VPN settings.":
+    "Проверка каналов обмена без изменения настроек VPN.",
+  "Run diagnostics": "Запустить диагностику",
+  "Check both JSON links in a private window without signing in. The browser cannot reliably test authentication using its current session.":
+    "Откройте обе ссылки JSON в приватном окне без входа. Проверка авторизации из текущей сессии браузера ненадёжна.",
+  "Open module status JSON": "Открыть JSON статуса модуля",
+  "Open public status JSON": "Открыть JSON публичного статуса",
+  "Access without authentication": "Доступ без авторизации",
+  "Not checked": "Не проверено",
+  "Login required": "Требуется вход",
+  "JSON accessible without login": "JSON доступен без входа",
+  "Copy report": "Копировать отчёт",
+  "Diagnostic report": "Отчёт диагностики",
+  "Running communication diagnostics...": "Проверяем каналы обмена...",
+  "Diagnostics complete. Copy the report to share it.":
+    "Диагностика завершена. Скопируйте отчёт для передачи.",
+  "Report copied.": "Отчёт скопирован.",
+  "Report selected. Copy it with Ctrl+C.":
+    "Отчёт выделен. Скопируйте его с помощью Ctrl+C.",
   "OCFusion is stopping. Please wait.": "OCFusion останавливается. Подождите.",
   "Checking platform availability...": "Проверяем доступность платформы...",
   "Installation or update in progress. Please wait.":

@@ -57,21 +57,43 @@ function busy(value) {
     });
 }
 
-async function loadProfiles() {
-  const ids = await parent.EXTENSIONS.call(moduleID, "profiles", {});
+function updateProfileOptions(profiles) {
+  const ids = Object.keys(profiles).sort();
   const selector = document.getElementById("profile-select");
-  selector.replaceChildren();
+  const current = Array.from(selector.options, (option) => option.value);
 
-  for (const id of ids) {
-    const option = document.createElement("option");
-    option.value = id;
-    option.textContent = id === "default" ? "Default profile" : id;
-    selector.appendChild(option);
+  if (JSON.stringify(current) !== JSON.stringify(ids)) {
+    selector.replaceChildren();
+
+    for (const id of ids) {
+      const option = document.createElement("option");
+
+      option.value = id;
+      option.textContent = id === "default" ? "Default profile" : id;
+      selector.appendChild(option);
+    }
   }
 
   selector.value = selectedProfile;
   document.getElementById("profile-delete").disabled =
     selectedProfile === "default";
+}
+
+async function loadProfiles() {
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const snapshot = await parent.EXTENSIONS.status(moduleID);
+    const profiles = snapshot.data && snapshot.data.profiles;
+
+    if (profiles && profiles[selectedProfile]) {
+      updateProfileOptions(profiles);
+
+      return;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+
+  throw Error("Public status unavailable");
 }
 
 document

@@ -112,7 +112,7 @@ func publishWeb() error {
 		return e
 	}
 
-	for src, dst := range map[string]string{"web/import.html": "extensions.html", "web/panel.js": "extensions-panel.js", "web/panel.css": "extensions-panel.css", "web/logo.png": "ocfusion-logo.png", "web/icon.png": "ocfusion-icon.png", "web/i18n.js": "ocfusion-i18n.js"} {
+	for src, dst := range map[string]string{"web/import.html": "extensions.html", "web/panel.js": "extensions-panel.js", "web/panel.css": "extensions-panel.css", "web/logo.png": "ocfusion-logo.png", "web/icon.png": "ocfusion-icon.png", "web/i18n.js": "ocfusion-i18n.js", "web/diagnostics.js": "extensions-diagnostics.js"} {
 		b, err := os.ReadFile(filepath.Join(m.Bundle, src))
 		if err != nil {
 			return err
@@ -128,6 +128,10 @@ func publishWeb() error {
 				return err
 			}
 		}
+	}
+
+	if e = publishTransportProbes(); e != nil {
+		return e
 	}
 
 	js := fmt.Sprintf("window.OCF_SETTINGS={unit:%d,index:%d,key:%q,version:%q,language:%q,model:%q};\n", m.Unit, m.Index, m.Key, version, nvget("preferred_lang"), nvget("productid"))

@@ -57,6 +57,51 @@ function createFixtureServer() {
       );
     }
 
+    if (url.pathname === "/user/extensions-status/openconnect.json") {
+      const statuses = Object.fromEntries(
+        profiles.map((profile) => [
+          profile,
+          {
+            profile,
+            state: "UP",
+            fusion_name: "OCFusion (managed)",
+            message: "IPv4 full tunnel; Wi-Fi/VLAN bindings active",
+            networks: [
+              { bridge: "br55", cidr: "192.168.52.0/24", sdn_idx: "4" },
+            ],
+          },
+        ]),
+      );
+
+      return send(
+        JSON.stringify({
+          module: "openconnect",
+          state: "RUNNING",
+          updated_at: Date.now(),
+          data_updated_at: Date.now(),
+          data: { profiles: statuses },
+        }),
+        "application/json",
+      );
+    }
+
+    if (url.pathname === "/user/ocfusion-probe.cgi") {
+      return send("#!/bin/sh\nprintf 'probe'", "text/plain");
+    }
+    if (url.pathname === "/user/ocfusion-probe.asp") {
+      return send(
+        JSON.stringify({ ocfusion_template: "EN" }),
+        "application/json",
+      );
+    }
+
+    if (
+      url.pathname === "/appGet.cgi" &&
+      url.searchParams.get("hook") === "nvram_get(preferred_lang)"
+    ) {
+      return send(JSON.stringify({ preferred_lang: "EN" }), "application/json");
+    }
+
     if (url.pathname === "/appGet.cgi") {
       return send(
         JSON.stringify({
@@ -129,7 +174,9 @@ function createFixtureServer() {
                     { bridge: "br55", cidr: "192.168.52.0/24", sdn_idx: "4" },
                   ],
                 }
-              : { ok: true };
+              : q.action === "platform.ping"
+                ? { pong: true, response_storage: "RAM" }
+                : { ok: true };
 
       mailbox = {
         state: "UP",
@@ -159,6 +206,7 @@ function createFixtureServer() {
     const files = {
       "/user/extensions.html": "web/import.html",
       "/user/extensions-panel.js": "web/panel.js",
+      "/user/extensions-diagnostics.js": "web/diagnostics.js",
       "/user/ocfusion-i18n.js": "web/i18n.js",
       "/user/extensions-panel.css": "web/panel.css",
     };
@@ -297,6 +345,56 @@ async function testModuleUI(browser, address, language) {
     await frame.locator("#settings-save").waitFor({ state: "visible" });
   }
 
+  assert(
+    !requests.some(
+      (request) =>
+        request.operation === "diagnose" || request.operation === "profiles",
+    ),
+    "Status polling used the command mailbox",
+  );
+
+  await page.locator('a[data-page="system"]').click();
+  assert.equal(
+    await page.locator("#transport-module-json").getAttribute("href"),
+    "/user/extensions-status/openconnect.json",
+  );
+  if (language === "RU") {
+    assert.equal(
+      await page.locator("#transport-test").textContent(),
+      "Запустить диагностику",
+    );
+  }
+
+  if (language === "EN") {
+    await page.locator("#transport-test").click();
+    await page
+      .locator("#transport-result")
+      .filter({ hasText: "Diagnostics complete" })
+      .waitFor();
+
+    const report = JSON.parse(
+      await page.locator("#transport-report").inputValue(),
+    );
+
+    assert.equal(
+      report.tests.find((test) => test.channel === "ram_json").result,
+      "PASS",
+    );
+    assert.equal(
+      report.tests.find((test) => test.channel === "custom_cgi").result,
+      "STATIC_FILE_ONLY",
+    );
+    assert.equal(
+      report.tests.find((test) => test.channel === "stock_template").result,
+      "PASS",
+    );
+    assert.equal(
+      report.tests.find((test) => test.channel === "nvram_mailbox").result,
+      "PASS",
+    );
+    assert.equal(report.authentication.result, "NOT_CHECKED");
+  }
+
   // External and shipped modules use the same generated menu and iframe route.
   await page.locator('#module-menu a[href="#module-heartbeat"]').click();
   await frame.locator("#title").waitFor();
@@ -383,9 +481,10 @@ async function main() {
       ),
     );
     assert(
-      requests.some(
+      !requests.some(
         (q) => q.module === "openconnect" && q.operation === "diagnose",
       ),
+      "Routine status polling wrote to the mailbox",
     );
     console.log(
       "PASS: one iframe contract for builtin/external modules, settings/status API, EN/RU/fallback, model and Fusion links",
