@@ -25,7 +25,8 @@ RUN rm -f /etc/apt/sources.list.d/* \
         binutils-aarch64-linux-gnu=2.44-3 \
         linux-libc-dev-arm64-cross=6.12.38-1cross1 \
         libc6-dev-arm64-cross=2.41-11cross1 \
-    && ln -s aarch64-linux-gnu-gcc-14 /usr/local/bin/aarch64-linux-gnu-gcc \
+    && ln -s /usr/bin/aarch64-linux-gnu-gcc-14 /usr/local/bin/aarch64-linux-gnu-gcc \
+    && test "$(aarch64-linux-gnu-gcc -dumpfullversion)" = "14.2.0" \
     && rm -rf /var/lib/apt/lists/*
 
 COPY build-env/requirements.txt /tmp/ocfusion-build-requirements.txt
