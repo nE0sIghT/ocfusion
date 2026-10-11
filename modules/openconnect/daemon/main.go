@@ -28,7 +28,7 @@ func main() {
 	}
 	os.Setenv("PATH", "/usr/sbin:/usr/bin:/sbin:/bin")
 	if len(os.Args) < 2 {
-		fmt.Println("ocfusion-openconnect", version, "commands: doctor setup import start stop enable disable status event web uninstall")
+		fmt.Println("ocfusion-openconnect", version, "("+revision+")", "commands: doctor setup import start stop enable disable status event web uninstall")
 
 		return
 	}
@@ -51,7 +51,7 @@ func main() {
 		_, e := vpnCall(vpnRequest{Operation: "claim"})
 		die(e)
 	case "version":
-		fmt.Println("ocfusion-openconnect", version)
+		fmt.Println("ocfusion-openconnect", version, "("+revision+")")
 	case "module-validate", "module-import", "module-patch", "module-settings":
 		data, err := moduleOperation(cmd, os.Stdin)
 		die(err)
@@ -165,7 +165,7 @@ func main() {
 }
 
 func doctor() {
-	fmt.Println("ocfusion-openconnect", version, "UID", os.Getuid(), "EUID", os.Geteuid(), "(account name is irrelevant)")
+	fmt.Println("ocfusion-openconnect", version, "("+revision+")", "UID", os.Getuid(), "EUID", os.Geteuid(), "(account name is irrelevant)")
 
 	for _, k := range []string{"productid", "firmver", "buildno", "extendno", "apps_install_folder", "apps_mounted_path", "apps_local_space", "stop_runapp"} {
 		fmt.Println(k + "=" + nvget(k))

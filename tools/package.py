@@ -10,6 +10,8 @@ import os
 import tarfile
 from pathlib import Path, PurePosixPath
 
+from version import resolve_revision
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SOURCE_DIRECTORIES = (
     "modules",
@@ -56,7 +58,7 @@ def write_checksums(target, files, relative_to):
     target.write_text("".join(lines))
 
 
-def write_archive(target, entries, timestamp):
+def write_archive(target, entries, timestamp, source_version="", source_revision=""):
     with (
         target.open("wb") as output,
         gzip.GzipFile(
@@ -74,6 +76,15 @@ def write_archive(target, entries, timestamp):
             entry.uid = entry.gid = 0
             entry.uname = entry.gname = ""
             entry.mode = 0o755 if path.stat().st_mode & 0o111 else 0o644
+            archive.addfile(entry, io.BytesIO(data))
+
+        if source_revision:
+            root = f"ocfusion-{source_version}"
+            data = (source_revision + "\n").encode()
+            entry = tarfile.TarInfo(root + "/.git-revision")
+            entry.size = len(data)
+            entry.mtime = timestamp
+            entry.mode = 0o644
             archive.addfile(entry, io.BytesIO(data))
 
 
@@ -125,7 +136,9 @@ def main():
     runtime_archive = output_directory / f"ocfusion-{version}-aarch64.tar.gz"
     source_archive = output_directory / f"ocfusion-{version}-source.tar.gz"
     write_archive(runtime_archive, runtime_entries(runtime_tree), timestamp)
-    write_archive(source_archive, source_entries(version), timestamp)
+    write_archive(
+        source_archive, source_entries(version), timestamp, version, resolve_revision()
+    )
     write_checksums(
         output_directory / "SHA256SUMS",
         [runtime_archive, source_archive],

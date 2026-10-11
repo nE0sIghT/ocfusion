@@ -107,7 +107,7 @@ func (m *Manager) publish() {
 		state = "INSTALLING"
 	}
 
-	b, _ := json.Marshal(map[string]any{"version": version, "modules": modules, "state": state, "updated_at": time.Now().UnixMilli()})
+	b, _ := json.Marshal(map[string]any{"version": version, "revision": revision, "modules": modules, "state": state, "updated_at": time.Now().UnixMilli()})
 	os.MkdirAll(webRoot, 0755)
 
 	path := filepath.Join(webRoot, "extensions-modules.json")

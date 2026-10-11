@@ -201,7 +201,7 @@ function createFixtureServer() {
 
     if (url.pathname === "/user/ocfusion.js") {
       return send(
-        'window.OCF_SETTINGS={version:"0.2.9",language:"RU",model:"TEST-ROUTER"};',
+        'window.OCF_SETTINGS={version:"0.2.9",revision:"0123456789012345678901234567890123456789",language:"RU",model:"TEST-ROUTER"};',
         "text/javascript",
       );
     }
@@ -375,6 +375,10 @@ async function testModuleUI(browser, address, language) {
 
   await page.locator('a[data-page="system"]').click();
   assert.equal(await page.locator("#transport-test").count(), 0);
+  assert.equal(
+    await page.locator("#system-revision").textContent(),
+    "0123456789012345678901234567890123456789",
+  );
 
   // External and shipped modules use the same generated menu and iframe route.
   await page.locator('#module-menu a[href="#module-heartbeat"]').click();

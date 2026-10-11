@@ -52,7 +52,7 @@ func main() {
 	var err error
 	switch os.Args[1] {
 	case "version":
-		fmt.Println("ocfusion-vpn", version)
+		fmt.Println("ocfusion-vpn", version, "("+revision+")")
 		return
 	case "validate", "reload":
 		var envelope struct {

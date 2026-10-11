@@ -36,6 +36,27 @@ class VersionTests(unittest.TestCase):
         with patch.object(version, "git_output", side_effect=["", "v0.2.9-3-gabcdef0"]):
             self.assertEqual(version.resolve_version(), "0.2.9-dev.3.gabcdef0")
 
+    def test_revision_from_git(self):
+        revision = "abcdef0123" * 4
+        with patch.object(version, "git_output", return_value=revision):
+            self.assertEqual(version.resolve_revision(), revision)
+
+    def test_revision_survives_source_archive(self):
+        revision = "0123456789" * 4
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            patch.object(version, "PROJECT_ROOT", Path(directory)),
+            patch.object(
+                version, "git_output", side_effect=AssertionError("Unexpected Git call")
+            ),
+        ):
+            metadata = Path(directory) / ".git-revision"
+            metadata.write_text(revision + "\n")
+            self.assertEqual(version.resolve_revision(), revision)
+
+            metadata.write_text("invalid")
+            self.assertEqual(version.resolve_revision(), "unknown")
+
     def test_source_archive_has_safe_fallback(self):
         with (
             tempfile.TemporaryDirectory() as directory,

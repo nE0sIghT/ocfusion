@@ -38,10 +38,29 @@ def resolve_version(override=""):
     return "0.0.0-dev" + (".g" + revision if revision else "")
 
 
+def resolve_revision():
+    metadata = PROJECT_ROOT / ".git-revision"
+    if metadata.is_file() and not (PROJECT_ROOT / ".git").exists():
+        revision = metadata.read_text().strip()
+    else:
+        revision = git_output("rev-parse", "HEAD")
+
+    if re.fullmatch(r"[0-9a-f]{40}", revision):
+        return revision
+
+    return "unknown"
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--override", default="")
-    print(resolve_version(parser.parse_args().override))
+    parser.add_argument("--revision", action="store_true")
+    arguments = parser.parse_args()
+    print(
+        resolve_revision()
+        if arguments.revision
+        else resolve_version(arguments.override)
+    )
 
 
 if __name__ == "__main__":

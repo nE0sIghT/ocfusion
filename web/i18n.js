@@ -27,6 +27,7 @@ const OCF_TRANSLATIONS = {
   "Installation and updates": "Установка и обновление",
   Platform: "Платформа",
   Router: "Роутер",
+  "Source commit": "Коммит исходников",
   "Extension version": "Версия расширения",
   Panel: "Панель",
   "ASUS web server": "Штатный веб-сервер ASUS",

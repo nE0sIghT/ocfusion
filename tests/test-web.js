@@ -53,6 +53,7 @@ const nodeIds = [
   "networks",
   "platform-version",
   "system-version",
+  "system-revision",
   "about-version",
   "vpn-settings",
   "settings-fields",

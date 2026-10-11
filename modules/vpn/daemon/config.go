@@ -13,6 +13,7 @@ import (
 )
 
 var version = "dev"
+var revision = "unknown"
 var root = "/jffs/ocfusion-vpn"
 var runDir = "/tmp/ocfusion-vpn"
 var ifaceRE = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_.-]{0,14}$`)

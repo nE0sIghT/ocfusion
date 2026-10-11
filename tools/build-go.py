@@ -14,6 +14,7 @@ def main():
     parser.add_argument("--module", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--version", required=True)
+    parser.add_argument("--revision", required=True)
     arguments = parser.parse_args()
     environment = dict(
         os.environ, CGO_ENABLED="0", GOOS="linux", GOARCH="arm64", GOTOOLCHAIN="local"
@@ -24,7 +25,10 @@ def main():
             "build",
             "-buildvcs=false",
             "-trimpath",
-            f"-ldflags=-s -w -buildid= -X main.version={arguments.version}",
+            (
+                f"-ldflags=-s -w -buildid= -X main.version={arguments.version} "
+                f"-X main.revision={arguments.revision}"
+            ),
             "-o",
             str(arguments.output.resolve()),
             ".",

@@ -481,6 +481,9 @@ for (const id of ["platform-version", "system-version", "about-version"]) {
   document.getElementById(id).textContent = cfg ? cfg.version : "";
 }
 
+document.getElementById("system-revision").textContent =
+  cfg && cfg.revision ? cfg.revision : "unknown";
+
 document.querySelectorAll("[data-router-model]").forEach((node) => {
   node.textContent = cfg && cfg.model ? cfg.model : "ASUSWRT";
 });

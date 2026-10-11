@@ -16,6 +16,7 @@ import (
 )
 
 var version = "dev"
+var revision = "unknown"
 
 var root = "/jffs/ocfusion"
 var runDir = "/tmp/ocfusion"

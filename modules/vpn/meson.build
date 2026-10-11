@@ -25,5 +25,7 @@ vpn_service = custom_target(
         '@OUTPUT@',
         '--version',
         version,
+        '--revision',
+        revision,
     ],
 )

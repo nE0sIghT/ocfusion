@@ -123,7 +123,7 @@ func publishWeb() error {
 		}
 	}
 
-	js := fmt.Sprintf("window.OCF_SETTINGS={version:%q,language:%q,model:%q};\n", version, nvget("preferred_lang"), nvget("productid"))
+	js := fmt.Sprintf("window.OCF_SETTINGS={version:%q,revision:%q,language:%q,model:%q};\n", version, revision, nvget("preferred_lang"), nvget("productid"))
 	if e = atomicWrite(filepath.Join(dir, "ocfusion.js"), []byte(js), 0644); e != nil {
 		return e
 	}
