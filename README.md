@@ -4,15 +4,11 @@
 
 # OCFusion - all you need is USB flash
 
-OCFusion is a platform for extending stock ASUSWRT functionality without flashing replacement firmware. It provides an extension panel and module lifecycle management. An ext4-formatted USB flash drive must remain connected while OCFusion is running.
+OCFusion is a platform for extending stock ASUSWRT functionality without flashing replacement firmware. Its web panel lets you configure and manage extension modules. An ext4-formatted USB flash drive must remain connected while OCFusion is running.
 
 ## Available modules
 
-- **OpenConnect** - VPN connectivity for selected ASUS Wi-Fi/VLAN networks.
-
-It lets you route a selected ASUS Wi-Fi/VLAN network through an OpenConnect tunnel while keeping network configuration in the ASUS interface. The OCFusion panel provides connection settings, certificate authentication, DTLS, status and automatic reconnection. English and Russian follow the router's native language setting.
-
-The extension-module API is experimental.
+- **OpenConnect** - adds OpenConnect VPN support, with connection settings and status in the OCFusion panel.
 
 ## Compatibility
 
@@ -43,13 +39,10 @@ See [installation, updates and troubleshooting](INSTALLATION.md). Reinstalling p
 
 ## Features
 
-- OpenConnect with full URL/query support, password or client-certificate authentication, additional CA, server pin, DTLS, MTU and DNS settings.
-- IPv4 full tunnel for assigned SDN networks, with firewall/routing reconciliation and IPv6 blocking for those networks.
-- Native ASUS login, header and language-change flow; a separate OCFusion panel with English/Russian UI.
-- USB-backed lifecycle, supervision and an experimental manager for separate executable modules.
-- Static ARM64 executables built from pinned sources. No Entware installation is required.
-
-Server-advertised split exclusions are intentionally ignored for the managed full tunnel.
+- Extend stock ASUSWRT with additional modules without replacing the firmware.
+- Manage extensions from a web panel integrated with the ASUS interface.
+- Connect to OpenConnect VPN servers using the included module.
+- English and Russian UI, following the router's language setting.
 
 ## Screenshots
 
@@ -67,14 +60,11 @@ Server-advertised split exclusions are intentionally ignored for the managed ful
 
 ## Development
 
-Only source files and source assets are tracked. Meson/Ninja builds the runtime and source archives through the `bundle` target; no firmware image or prebuilt executable is needed.
+To build OCFusion and run its tests, follow the [build instructions](docs/building.md). The project uses Meson/Ninja, Go and a C cross-compiler.
 
-- [Build and test](docs/building.md)
-- [Module format and development](docs/modules.md)
-- [Architecture](docs/architecture.md)
-- [Third-party inputs and licenses](third_party/README.md)
+To create an extension, see the [module development guide](docs/modules.md). The module API is experimental and may change.
 
-Documentation and development use English. Product UI supports English and Russian equally. Use ASCII `-` instead of typographic dashes in documentation and UI text.
+See the [architecture overview](docs/architecture.md) for how the platform and modules work together.
 
 ## Project and support
 
@@ -92,4 +82,4 @@ OCFusion is free software licensed under the **GNU General Public License, versi
 
 Third-party components retain their own licenses. The runtime distribution includes their required license notices.
 
-Patches to third-party projects may be distributed under the original project's license. The OpenConnect patch is licensed under the **GNU Lesser General Public License, version 2.1**.
+Patches to third-party OSS projects are distributed under the licenses of those projects. The OpenConnect patch is licensed under the **GNU Lesser General Public License, version 2.1**.
