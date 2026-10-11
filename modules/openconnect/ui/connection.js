@@ -24,7 +24,8 @@ function renderConnection(st) {
 
   for (const id of ["network-summary", "networks"]) {
     document.getElementById(id).textContent =
-      lines.join("\n") || "Assign OCFusion (managed) to your network in ASUS.";
+      lines.join("\n") ||
+      "Assign the VPN Fusion profile shown above to your network in ASUS.";
   }
 
   document.getElementById("api-error").hidden = true;
@@ -115,8 +116,13 @@ async function refreshConnection() {
   }
 }
 
-loadSettings();
-
-refreshConnection();
+loadProfiles()
+  .catch((error) => {
+    result.textContent = error.message;
+  })
+  .then(async () => {
+    await loadSettings();
+    await refreshConnection();
+  });
 
 setInterval(refreshConnection, 5000);

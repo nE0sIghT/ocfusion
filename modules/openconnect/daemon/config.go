@@ -38,6 +38,12 @@ type Profile struct {
 	Enabled     bool     `json:"enabled"`
 }
 type Manifest struct {
+	ID             string            `json:"id,omitempty"`
+	Client         string            `json:"client,omitempty"`
+	Profile        string            `json:"profile,omitempty"`
+	Interface      string            `json:"interface,omitempty"`
+	Name           string            `json:"name,omitempty"`
+	Shared         bool              `json:"shared_transport,omitempty"`
 	Schema         int               `json:"schema"`
 	Unit           int               `json:"unit"`
 	Index          int               `json:"vpnc_idx"`

@@ -13,11 +13,16 @@
     "asus.fusion.sdn"
   ],
   "actions": [
+    "diagnose",
     "reconnect",
     "settings",
     "update-settings",
     "connect",
-    "disconnect"
+    "disconnect",
+    "profiles",
+    "add-profile",
+    "delete-profile",
+    "import-profile"
   ],
   "dependencies": [
     {

@@ -2,8 +2,6 @@
 package main
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -71,7 +69,7 @@ func TestLegacyManifestRemovesObsoleteGates(t *testing.T) {
 	}
 
 	if m.Unit != 4 || m.Index != 7 {
-		t.Fatal("legacy installation lost")
+		t.Fatal("saved installation lost")
 	}
 
 	b, err := json.Marshal(m)
@@ -132,40 +130,6 @@ func TestArchitectureGuard(t *testing.T) {
 	}
 }
 
-func TestLegacyBundlePathsRemainVerifiable(t *testing.T) {
-	directory := t.TempDir()
-	manifest := Manifest{Bundle: directory, BundleSHA: map[string]string{}}
-
-	for _, relative := range legacyBundleFiles {
-		path := filepath.Join(directory, relative)
-		os.MkdirAll(filepath.Dir(path), 0700)
-		data := []byte(relative)
-		os.WriteFile(path, data, 0600)
-		digest := sha256.Sum256(data)
-		manifest.BundleSHA[relative] = hex.EncodeToString(digest[:])
-	}
-
-	if err := verifyBundle(manifest); err != nil {
-		t.Fatal(err)
-	}
-
-	for _, relative := range []string{"bin/openconnect", "ca-bundle.crt", "web/fusion.js"} {
-		if bundleRelative(manifest, relative) != relative {
-			t.Fatalf("legacy path changed: %s", relative)
-		}
-
-		current := "modules/openconnect/" + relative
-		if relative == "web/fusion.js" {
-			current = "modules/openconnect/ui/fusion.js"
-		}
-
-		manifest.BundleSHA[current] = "current"
-		if bundleRelative(manifest, relative) != current {
-			t.Fatalf("nested package path not selected: %s", relative)
-		}
-	}
-}
-
 func TestUpgradeWithReplacementDrive(t *testing.T) {
 	replacement := t.TempDir()
 	for _, name := range bundleFiles {
@@ -175,7 +139,7 @@ func TestUpgradeWithReplacementDrive(t *testing.T) {
 	}
 
 	oldDirectory := filepath.Join(t.TempDir(), "removed-bundle")
-	old := Manifest{Bundle: oldDirectory, BundleSHA: map[string]string{"web/logo.png": "old-hash"}}
+	old := Manifest{Bundle: oldDirectory, BundleSHA: map[string]string{"ui/index.html": "old-hash"}}
 	if err := verifyUpgrade(old, replacement); err != nil {
 		t.Fatalf("replacement drive rejected: %v", err)
 	}

@@ -22,6 +22,7 @@ class VersionTests(unittest.TestCase):
             version, "git_output", side_effect=AssertionError("Unexpected Git call")
         ):
             self.assertEqual(version.resolve_version("0.2.9"), "0.2.9")
+            self.assertEqual(version.resolve_version("0.3"), "0.3")
 
     def test_invalid_override_is_rejected(self):
         with self.assertRaises(SystemExit):

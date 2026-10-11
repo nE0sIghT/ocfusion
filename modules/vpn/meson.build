@@ -1,9 +1,10 @@
 vpn_go = files(
     'daemon/go.mod',
     'daemon/config.go',
+    'daemon/broker.go',
     'daemon/main.go',
+    'daemon/registry.go',
     'daemon/network.go',
-    'daemon/overlay.go',
     'daemon/router.go',
     'daemon/service.go',
 )

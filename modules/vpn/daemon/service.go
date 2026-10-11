@@ -22,18 +22,21 @@ type Tunnel struct {
 }
 
 type Request struct {
-	API       int     `json:"api"`
-	Operation string  `json:"operation"`
-	Client    string  `json:"client"`
-	Tunnel    *Tunnel `json:"tunnel,omitempty"`
+	API        int     `json:"api"`
+	Operation  string  `json:"operation"`
+	Client     string  `json:"client"`
+	Profile    string  `json:"profile"`
+	Connection string  `json:"connection,omitempty"`
+	Tunnel     *Tunnel `json:"tunnel,omitempty"`
 }
 
 type Response struct {
-	OK       bool      `json:"ok"`
-	Manifest Manifest  `json:"manifest"`
-	Networks []Network `json:"networks"`
-	DNS      string    `json:"dns,omitempty"`
-	Error    string    `json:"error,omitempty"`
+	Connections []Manifest `json:"connections,omitempty"`
+	OK          bool       `json:"ok"`
+	Manifest    Manifest   `json:"manifest"`
+	Networks    []Network  `json:"networks"`
+	DNS         string     `json:"dns,omitempty"`
+	Error       string     `json:"error,omitempty"`
 }
 
 type Service struct {
@@ -49,10 +52,10 @@ func (s *Service) down() {
 	closeTunnel(s.manifest)
 	for _, network := range s.networks {
 		if s.dns != "" {
-			dnsRules(network, s.dns, "del")
+			dnsRules(s.manifest, network, s.dns, "del")
 		}
 
-		forwarding(network, "del")
+		forwarding(s.manifest, network, "del")
 	}
 
 	s.event = nil
@@ -103,7 +106,7 @@ func (s *Service) reconcile(refreshTunnel bool) error {
 			return errors.New("VPN client heartbeat expired")
 		}
 
-		if _, err = runner("ip", "link", "show", "dev", "ocvpn0"); err != nil {
+		if _, err = runner("ip", "link", "show", "dev", tunnelInterface(s.manifest)); err != nil {
 			s.down()
 
 			return errors.New("tunnel interface unavailable")
@@ -128,34 +131,8 @@ func (s *Service) handle(request Request) (Response, error) {
 		return response, errors.New("unsupported VPN request")
 	}
 
-	if request.Operation == "claim" && (s.owner == "" || s.owner == request.Client) {
-		if err := atomicWrite(filepath.Join(root, "owner"), []byte(request.Client), 0600); err != nil {
-			return response, err
-		}
-
-		s.owner = request.Client
-		response.OK = true
-		return response, nil
-	}
-
 	if request.Client != s.owner {
 		return response, errors.New("VPN connection owned by another client")
-	}
-
-	if request.Operation == "release" {
-		assigned, err := networks(s.manifest)
-		if err != nil || len(assigned) != 0 {
-			return response, errors.New("reassign native Wi-Fi/VLAN networks before releasing VPN connection")
-		}
-
-		s.down()
-		if err := atomicWrite(filepath.Join(root, "owner"), []byte(""), 0600); err != nil {
-			return response, err
-		}
-
-		s.owner = ""
-		response.OK = true
-		return response, nil
 	}
 
 	if request.Operation == "state" {
@@ -197,7 +174,7 @@ func (s *Service) handle(request Request) (Response, error) {
 
 		if s.dns != "" && s.dns != dns {
 			for _, network := range s.networks {
-				dnsRules(network, s.dns, "del")
+				dnsRules(s.manifest, network, s.dns, "del")
 			}
 		}
 
@@ -216,18 +193,26 @@ func (s *Service) handle(request Request) (Response, error) {
 }
 
 func serve() error {
-	manifest, err := loadManifest()
+	return serveUntil(nil)
+}
+
+func serveUntil(stop <-chan struct{}) error {
+	registry, err := readConnections()
 	if err != nil {
 		return err
 	}
 
-	owner, err := os.ReadFile(filepath.Join(root, "owner"))
-	if err != nil {
-		return err
-	}
-
-	service := &Service{manifest: manifest, owner: string(owner)}
+	service := newBroker(registry)
 	os.MkdirAll(runDir, 0700)
+	lock, err := os.OpenFile(filepath.Join(runDir, "service.lock"), os.O_CREATE|os.O_RDWR, 0600)
+	if err != nil {
+		return err
+	}
+	defer lock.Close()
+	if err = syscall.Flock(int(lock.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+		return errors.New("VPN provider already running")
+	}
+
 	path := filepath.Join(runDir, "control.sock")
 	os.Remove(path)
 	listener, err := net.Listen("unix", path)
@@ -284,14 +269,10 @@ func serve() error {
 			json.NewEncoder(connection).Encode(response)
 			connection.Close()
 		case <-tick.C:
-			err := service.reconcile(true)
-			state := "BLOCKED"
-			if service.event != nil && err == nil {
-				state = "UP"
-			}
-
-			saveJSON(filepath.Join(runDir, "status.json"), map[string]any{"state": state, "networks": service.networks})
+			service.reconcile()
 		case <-signals:
+			return nil
+		case <-stop:
 			return nil
 		}
 	}

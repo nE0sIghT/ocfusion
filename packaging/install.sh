@@ -57,13 +57,19 @@ cleanup() {
             /jffs/ocfusion-platform/extctl stop >/dev/null 2>&1 || true
         fi
         "$HERE/bin/extd" web-reset >/dev/null 2>&1 || true
-        rollback_platform_migration
         if [ "$MODE" = update ]; then
             restore_previous_installation
         else
             remove_incomplete_installation
         fi
     fi
+    rm -f /tmp/ocfusion-installing
+
+    if [ "$SUCCESS" != 1 ]; then
+        printf '{"state":"UNAVAILABLE","modules":[]}\n' > /tmp/var/wwwext/extensions-modules.json.new
+        mv /tmp/var/wwwext/extensions-modules.json.new /tmp/var/wwwext/extensions-modules.json
+    fi
+
     rm -rf "$APP_ROOT/ocfusion.next" "$LOCK"
 }
 
@@ -94,7 +100,7 @@ check_router_identity() {
     check_asuswrt
 
     MODE=install
-    if [ -f /jffs/ocfusion-platform/transport.json ] || [ -f /jffs/ocfusion/manifest.json ]; then
+    if [ -f /jffs/ocfusion-platform/transport.json ]; then
         MODE=update
     fi
     [ -d /jffs ] && [ -w /jffs ] || fail 'JFFS is not writable.'
@@ -219,11 +225,6 @@ backup_existing_installation() {
         /jffs/ocfusion-platform/extctl stop || fail 'Cannot stop extension manager.'
     fi
 
-    # Upgrade compatibility: the original MVP also supported a standalone supervisor.
-    if [ -x /jffs/ocfusion/ocfusion ]; then
-        /jffs/ocfusion/ocfusion stop || fail 'Cannot stop legacy supervisor.'
-    fi
-
     [ ! -f "$APP_ROOT/etc/init.d/S95ocfusion" ] || cp "$APP_ROOT/etc/init.d/S95ocfusion" "$BACKUP/"
     [ ! -f "$APP_ROOT/lib/ipkg/info/ocfusion.control" ] || cp "$APP_ROOT/lib/ipkg/info/ocfusion.control" "$BACKUP/"
 }
@@ -260,42 +261,6 @@ CONTROL
 
 
 
-# Keep the legacy installation intact until the new services pass their checks.
-migrate_platform_storage() {
-    if [ -d /jffs/asus-extensions ] && [ ! -e /jffs/ocfusion-platform ]; then
-        /jffs/asus-extensions/extctl stop || fail 'Cannot stop legacy extension manager.'
-        cp -Rp /jffs/asus-extensions /jffs/ocfusion-platform
-        touch /jffs/ocfusion-platform/.legacy-migration
-    fi
-
-    if [ -d "$APP_ROOT/asus-extensions/modules" ] && [ ! -e "$APP_ROOT/ocfusion-modules" ]; then
-        cp -Rp "$APP_ROOT/asus-extensions/modules" "$APP_ROOT/ocfusion-modules"
-        touch "$APP_ROOT/ocfusion-modules/.legacy-migration"
-    fi
-}
-
-rollback_platform_migration() {
-    if [ -f /jffs/ocfusion-platform/.legacy-migration ]; then
-        rm -rf /jffs/ocfusion-platform
-    fi
-
-    if [ -f "$APP_ROOT/ocfusion-modules/.legacy-migration" ]; then
-        rm -rf "$APP_ROOT/ocfusion-modules"
-    fi
-}
-
-finish_platform_migration() {
-    if [ -f /jffs/ocfusion-platform/.legacy-migration ]; then
-        rm -rf /jffs/asus-extensions
-        rm -f /jffs/ocfusion-platform/.legacy-migration
-    fi
-
-    if [ -f "$APP_ROOT/ocfusion-modules/.legacy-migration" ]; then
-        rm -rf "$APP_ROOT/asus-extensions/modules"
-        rm -f "$APP_ROOT/ocfusion-modules/.legacy-migration"
-    fi
-}
-
 install_extension_manager() {
     mkdir -p /jffs/ocfusion-platform
     chmod 700 /jffs/ocfusion-platform
@@ -318,7 +283,6 @@ start_and_check_services() {
 }
 
 finish_installation() {
-    finish_platform_migration
     SUCCESS=1
     rm -rf "$BACKUP" "$APP_ROOT/ocfusion.previous"
     echo 'CHECK extension_manager=OK panel=/user/extensions.html'
@@ -345,7 +309,6 @@ parse_uninstall_options() {
 check_uninstall_destination() {
     [ -f /jffs/ocfusion-platform/transport.json ] ||
         [ -f /jffs/ocfusion-platform/transport.removed.json ] ||
-        [ -f /jffs/ocfusion/manifest.json ] ||
         fail 'No owned OCFusion installation found.'
 
     if [ -e /tmp/opt ]; then
@@ -355,8 +318,7 @@ check_uninstall_destination() {
 
     "$HERE/bin/extd" check-removal ||
         fail 'Remove additional modules before uninstalling the platform.'
-    "$HERE/bin/extd" check-removal /jffs/asus-extensions/registry.json ||
-        fail 'Remove legacy additional modules before uninstalling the platform.'
+
 }
 
 stop_installed_services() {
@@ -366,12 +328,10 @@ stop_installed_services() {
             fail 'Module removal failed; reassign its Wi-Fi/VLAN networks first.'
         /jffs/ocfusion-platform/extctl web-reset || fail 'Cannot remove owned web overlays.'
         /jffs/ocfusion-platform/extctl remove-transport || fail 'Cannot remove platform transport.'
-    elif [ -x /jffs/ocfusion/ocfusion ]; then
-        # Compatibility with an installation made by the MVP distribution.
-        /jffs/ocfusion/ocfusion uninstall || fail 'Legacy module removal failed.'
+
     fi
 
-    for manager in /jffs/ocfusion-platform/extctl /jffs/asus-extensions/extctl; do
+    for manager in /jffs/ocfusion-platform/extctl; do
         if [ -x "$manager" ]; then
             "$manager" stop || fail 'Cannot stop extension manager.'
         fi
@@ -384,10 +344,9 @@ remove_installed_programs() {
     rm -f "$APP_ROOT/etc/init.d/S95ocfusion" "$APP_ROOT/etc/init.d/S94ocfusionprep"
     rm -f "$APP_ROOT/lib/ipkg/info/ocfusion.control" "$APP_ROOT/lib/ipkg/info/ocfusionprep.control"
     rm -rf "$APP_ROOT/ocfusion" "$APP_ROOT/ocfusion-installer" "$APP_ROOT/ocfusion-modules"
-    rm -rf "$APP_ROOT/asus-extensions/modules"
 
 
-    for directory in /jffs/ocfusion-platform /jffs/asus-extensions; do
+    for directory in /jffs/ocfusion-platform; do
         rm -f "$directory/extd" "$directory/extctl" "$directory/registry.json"
     done
 }
@@ -395,7 +354,6 @@ remove_installed_programs() {
 finish_uninstall() {
     if [ "$PRUNE" = 1 ]; then
         "$HERE/bin/extd" prune-state "$HERE/modules" || fail 'Cannot prune module data.'
-        rm -rf /jffs/asus-extensions
         echo 'UNINSTALL OK; saved OCFusion data deleted.'
     else
         echo 'UNINSTALL OK; saved OCFusion data retained. Use --uninstall --prune to delete it.'
@@ -461,9 +419,12 @@ main() {
     acquire_install_lock
     initialize_transaction
     trap cleanup EXIT
+    : > /tmp/ocfusion-installing
+    mkdir -p /tmp/var/wwwext
+    printf '{"state":"INSTALLING","updated_at":%s000,"modules":[]}\n' "$(date +%s)" > /tmp/var/wwwext/extensions-modules.json.new
+    mv /tmp/var/wwwext/extensions-modules.json.new /tmp/var/wwwext/extensions-modules.json
     link_apps_root
     backup_existing_installation
-    migrate_platform_storage
     install_bundle
     install_apps_entry
     install_extension_manager

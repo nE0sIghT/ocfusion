@@ -94,7 +94,7 @@ func TestDNSCapturesBothTransports(t *testing.T) {
 
 		return "", nil
 	}
-	e := dnsRules(Network{Bridge: "br3"}, "10.0.0.53", "add")
+	e := dnsRules(Manifest{}, Network{Bridge: "br3"}, "10.0.0.53", "add")
 	if e != nil || len(mutations) != 2 {
 		t.Fatal(e, mutations)
 	}
@@ -173,7 +173,7 @@ func TestAddressChangeRemovesStaleTunnelAddress(t *testing.T) {
 
 		return "", nil
 	}
-	if e := setTunAddress(net.ParseIP("10.2.3.5")); e != nil {
+	if e := setTunAddress(Manifest{Interface: "ocvpn0"}, net.ParseIP("10.2.3.5")); e != nil {
 		t.Fatal(e)
 	}
 
@@ -182,7 +182,7 @@ func TestAddressChangeRemovesStaleTunnelAddress(t *testing.T) {
 	}
 
 	changes = nil
-	if e := setTunAddress(net.ParseIP("10.2.3.4")); e != nil || len(changes) != 0 {
+	if e := setTunAddress(Manifest{Interface: "ocvpn0"}, net.ParseIP("10.2.3.4")); e != nil || len(changes) != 0 {
 		t.Fatal("unchanged address mutated", e, changes)
 	}
 }
@@ -283,5 +283,33 @@ func TestKernelCommentBootstrap(t *testing.T) {
 	}
 	if e := ensureComment(read); e == nil || !strings.Contains(e.Error(), "module missing") {
 		t.Fatal("lost module diagnostic")
+	}
+}
+
+func TestRulesUseOnlyConnectionResources(t *testing.T) {
+	previous := runner
+	defer func() { runner = previous }()
+	calls := []string{}
+	runner = func(name string, args ...string) (string, error) {
+		if strings.Contains(strings.Join(args, " "), "-C ") {
+			return "", errors.New("missing rule")
+		}
+		calls = append(calls, name+" "+strings.Join(args, " "))
+
+		return "", nil
+	}
+	manifest := Manifest{ID: "connection-8", Interface: "ocvpn1", Index: 8, Table: 51999, Priority: 91}
+	network := Network{Bridge: "br56", CIDR: "192.168.53.0/24"}
+	for _, err := range []error{guard(manifest, network, "add"), forwarding(manifest, network, "add"), dnsRules(manifest, network, "10.0.0.53", "add"), closeTunnel(manifest)} {
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	commands := strings.Join(calls, "\n")
+	if strings.Contains(commands, "ocvpn0") || strings.Contains(commands, "51998") || strings.Contains(commands, "vpnc7_") {
+		t.Fatal("other connection resources used", commands)
+	}
+	if !strings.Contains(commands, "ocfusion:connection-8:") || !strings.Contains(commands, "dev ocvpn1") || !strings.Contains(commands, "table 51999") {
+		t.Fatal("connection-specific ownership missing", commands)
 	}
 }

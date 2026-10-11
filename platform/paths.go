@@ -7,6 +7,8 @@ var base = "/jffs/ocfusion-platform"
 var ram = "/tmp/ocfusion-platform"
 var socket = ram + "/control.sock"
 
+var installMarker = "/tmp/ocfusion-installing"
+
 var packageRoot = "/tmp/opt/ocfusion-modules"
 
 var idRE = regexp.MustCompile(`^[a-z][a-z0-9-]{0,31}$`)

@@ -12,15 +12,6 @@ import (
 	"time"
 )
 
-var legacyBundleFiles = []string{"bin/openconnect", "ca-bundle.crt", "web/import.html", "web/panel.js", "web/panel.css", "web/logo.png", "web/icon.png", "web/i18n.js", "web/fusion.js", "ui/index.html", "ui/app.js", "ui/settings.js", "ui/connection.js", "ui/translations.js"}
-
-var previousBundleFiles = []string{
-	"modules/openconnect/bin/openconnect", "modules/openconnect/ca-bundle.crt",
-	"modules/openconnect/ui/fusion.js", "modules/openconnect/ui/index.html",
-	"modules/openconnect/ui/app.js", "modules/openconnect/ui/settings.js",
-	"modules/openconnect/ui/connection.js", "modules/openconnect/ui/translations.js",
-}
-
 var bundleFiles = []string{
 	"bin/openconnect", "ca-bundle.crt", "ui/index.html", "ui/app.js", "ui/settings.js",
 	"ui/connection.js", "ui/translations.js", "scripts/vpnc-script",
@@ -42,20 +33,6 @@ func verifyUpgrade(m Manifest, replacement string) error {
 	}
 
 	return verifyBundle(m)
-}
-
-// Legacy manifests must remain verifiable before an upgrade swaps their bundle.
-func bundleRelative(m Manifest, legacy string) string {
-	current := "modules/openconnect/" + legacy
-	if legacy == "web/fusion.js" {
-		current = "modules/openconnect/ui/fusion.js"
-	}
-
-	if _, exists := m.BundleSHA[current]; exists {
-		return current
-	}
-
-	return legacy
 }
 
 // Refresh only payload identity. User configuration and bindings are not rewritten.
@@ -128,7 +105,7 @@ func checkInstall() error {
 		return errors.New("import page unavailable")
 	}
 
-	fmt.Println("CHECK panel=/user/extensions.html legacy_page=/user/ocfusion.html")
+	fmt.Println("CHECK panel=/user/extensions.html direct_page=/user/ocfusion.html")
 
 	return nil
 }

@@ -243,26 +243,3 @@ func TestPlatformRemovalPreservesAdditionalModules(t *testing.T) {
 		}
 	}
 }
-
-func TestMigrateRegistryPaths(t *testing.T) {
-	registry := Registry{Modules: map[string]Installed{
-		"example":     {Path: "/tmp/opt/asus-extensions/modules/example/1", Previous: "/tmp/opt/asus-extensions/modules/example/0"},
-		"openconnect": {Path: "/tmp/opt/ocfusion"},
-	}}
-	if !migrateRegistryPaths(&registry) {
-		t.Fatal("migration not applied")
-	}
-
-	item := registry.Modules["example"]
-	if item.Path != packageRoot+"/example/1" || item.Previous != packageRoot+"/example/0" {
-		t.Fatal(item)
-	}
-
-	if registry.Modules["openconnect"].Path != "/tmp/opt/ocfusion" {
-		t.Fatal("VPN bundle moved")
-	}
-
-	if migrateRegistryPaths(&registry) {
-		t.Fatal("migration not idempotent")
-	}
-}

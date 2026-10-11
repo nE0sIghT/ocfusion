@@ -54,12 +54,6 @@ func daemon() error {
 		}
 	}
 
-	if migrateRegistryPaths(&m.registry) {
-		if e = m.save(); e != nil {
-			return e
-		}
-	}
-
 	if _, err := loadTransport(); err == nil {
 		publishWeb()
 	}
@@ -117,6 +111,9 @@ func daemon() error {
 		case <-sig:
 			m.mu.Lock()
 
+			m.stopping = true
+			m.publish()
+
 			order, _ := dependencyOrder(m.registry.Modules)
 			for i := len(order) - 1; i >= 0; i-- {
 				m.stop(order[i])
@@ -125,6 +122,8 @@ func daemon() error {
 				m.stop(id)
 			}
 
+			m.stopped = true
+			m.publish()
 			m.mu.Unlock()
 
 			return nil

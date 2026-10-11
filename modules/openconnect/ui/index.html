@@ -11,6 +11,45 @@
   <body class="bg">
     <main class="ext-shell ext-module">
       <article class="ext-card">
+        <h2>Connection profiles</h2>
+        <div class="ext-fields">
+          <div class="ext-field">
+            <label for="profile-select">Connection profile</label>
+            <select id="profile-select">
+              <option value="default">Default profile</option>
+            </select>
+          </div>
+        </div>
+        <p>
+          <button id="profile-new" type="button">Add profile</button>
+          <button
+            id="profile-delete"
+            class="ext-secondary"
+            type="button"
+            disabled
+          >
+            Delete profile
+          </button>
+        </p>
+        <div id="profile-create" hidden>
+          <div class="ext-fields">
+            <div class="ext-field">
+              <label for="profile-name">New profile ID</label>
+              <input id="profile-name" maxlength="32" placeholder="office" />
+            </div>
+          </div>
+          <p>
+            <button id="profile-add" type="button">Create profile</button>
+            <button id="profile-cancel" class="ext-secondary" type="button">
+              Cancel
+            </button>
+          </p>
+        </div>
+        <p>
+          Reassign its Wi-Fi/VLAN networks in ASUS before deleting a profile.
+        </p>
+      </article>
+      <article class="ext-card">
         <div class="ext-card-heading">
           <h2>OpenConnect</h2>
           <span id="state-badge" class="ext-badge">Loading…</span>
@@ -21,6 +60,10 @@
       <section>
         <h1>OpenConnect</h1>
         <p class="ext-description">VPN settings and assigned networks.</p>
+        <p>
+          <span>VPN Fusion profile</span>:
+          <strong id="fusion-profile-name"></strong>
+        </p>
         <article class="ext-card">
           <h2>Connection</h2>
           <p id="connection-state">Loading…</p>
@@ -221,8 +264,8 @@
           <div id="networks"></div>
           <p>
             Configure network bindings in the
-            <a href="/Guest_network.asp">ASUS interface</a>. Keep the “OCFusion
-            (managed)” profile switched OFF in Fusion.
+            <a href="/Guest_network.asp">ASUS interface</a>. Keep this
+            connection's VPN Fusion profile switched OFF.
           </p>
         </article>
         <details class="ext-card">

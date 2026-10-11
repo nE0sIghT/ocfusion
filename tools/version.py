@@ -8,7 +8,7 @@ import subprocess
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-RELEASE_VERSION = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+(?:-[A-Za-z0-9.-]+)?")
+RELEASE_VERSION = re.compile(r"[0-9]+\.[0-9]+(?:\.[0-9]+)?(?:-[A-Za-z0-9.-]+)?")
 
 
 def git_output(*arguments):
@@ -23,7 +23,9 @@ def git_output(*arguments):
 def resolve_version(override=""):
     if override:
         if not RELEASE_VERSION.fullmatch(override):
-            raise SystemExit("Invalid release_version: use MAJOR.MINOR.PATCH[-suffix]")
+            raise SystemExit(
+                "Invalid release_version: use MAJOR.MINOR[.PATCH][-suffix]"
+            )
         return override
     exact_tag = git_output("describe", "--tags", "--exact-match", "--match", "v[0-9]*")
     if exact_tag and RELEASE_VERSION.fullmatch(exact_tag[1:]):

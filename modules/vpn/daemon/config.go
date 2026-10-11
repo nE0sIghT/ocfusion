@@ -17,21 +17,19 @@ var root = "/jffs/ocfusion-vpn"
 var runDir = "/tmp/ocfusion-vpn"
 var ifaceRE = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_.-]{0,14}$`)
 
-type Profile struct {
-	DNS []string `json:"dns,omitempty"`
-	MTU int      `json:"mtu,omitempty"`
-}
 type Manifest struct {
-	Schema         int               `json:"schema"`
-	Unit           int               `json:"unit"`
-	Index          int               `json:"vpnc_idx"`
-	Table          int               `json:"table"`
-	Priority       int               `json:"priority"`
-	Firmware       string            `json:"firmware"`
-	Bundle         string            `json:"bundle"`
-	BundleSHA      map[string]string `json:"bundle_sha256"`
-	OriginalCustom string            `json:"original_custom"`
-	OriginalEAS    string            `json:"original_eas"`
+	ID        string `json:"id,omitempty"`
+	Client    string `json:"client,omitempty"`
+	Profile   string `json:"profile,omitempty"`
+	Interface string `json:"interface,omitempty"`
+	Name      string `json:"name,omitempty"`
+	Shared    bool   `json:"shared_transport,omitempty"`
+	Schema    int    `json:"schema"`
+	Unit      int    `json:"unit"`
+	Index     int    `json:"vpnc_idx"`
+	Table     int    `json:"table"`
+	Priority  int    `json:"priority"`
+	Firmware  string `json:"firmware"`
 }
 type Network struct {
 	Index      string `json:"sdn_idx"`

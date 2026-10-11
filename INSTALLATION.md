@@ -29,14 +29,14 @@ If installation fails, read `/tmp/ocfusion-install.log` through SSH. The prepare
 Download the runtime archive from [Releases](https://github.com/nE0sIghT/ocfusion/releases) and enable SSH in ASUS administration. Transfer the runtime archive to the USB drive. If SCP is unavailable, use SSH streaming from your computer:
 
 ```sh
-ssh admin@192.168.50.1 'cat > /tmp/mnt/sda/ocfusion-0.2.9-aarch64.tar.gz' < ocfusion-0.2.9-aarch64.tar.gz
+ssh admin@192.168.50.1 'cat > /tmp/mnt/sda/ocfusion-0.3-aarch64.tar.gz' < ocfusion-0.3-aarch64.tar.gz
 ```
 
 Replace the login, router address and USB mount path. On the router:
 
 ```sh
 cd /tmp/mnt/sda
-tar -xzf ocfusion-0.2.9-aarch64.tar.gz
+tar -xzf ocfusion-0.3-aarch64.tar.gz
 cd ocfusion
 /bin/sh install.sh
 ```

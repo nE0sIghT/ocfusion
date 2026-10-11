@@ -15,6 +15,8 @@ import (
 var errProfileChanged = errors.New("profile changed; reload settings")
 
 type profileSettings struct {
+	Profile        string   `json:"profile"`
+	FusionName     string   `json:"fusion_name"`
 	Schema         int      `json:"schema"`
 	Revision       string   `json:"revision"`
 	Server         string   `json:"server"`
@@ -54,6 +56,11 @@ func readSettings() (json.RawMessage, error) {
 	}
 
 	settings := profileSettings{Schema: 1, Revision: revision, Server: p.Server, Protocol: p.Protocol, Username: p.Username, Authgroup: p.Authgroup, ServerCert: p.ServerCert, DNS: p.DNS, MTU: p.MTU, NoDTLS: p.NoDTLS, Enabled: p.Enabled, HasPassword: p.Password != "", HasCA: p.CA != "", HasCertificate: p.Certificate != "", HasPrivateKey: p.PrivateKey != ""}
+	settings.Profile = profileID
+	if manifest, err := loadManifest(); err == nil {
+		settings.FusionName = manifest.Name
+	}
+
 	b, e := json.Marshal(settings)
 	// Response must fit alongside status in the reserved stock 4KiB mailbox.
 	if len(b) > 2048 {

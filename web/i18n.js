@@ -2,6 +2,17 @@
 "use strict";
 
 const OCF_TRANSLATIONS = {
+  "OCFusion is stopping. Please wait.": "OCFusion останавливается. Подождите.",
+  "Checking platform availability...": "Проверяем доступность платформы...",
+  "Installation or update in progress. Please wait.":
+    "Идёт установка или обновление. Подождите.",
+  "OCFusion is stopped. Connect the USB drive to start services.":
+    "OCFusion остановлен. Подключите USB-накопитель для запуска служб.",
+  "OCFusion is unavailable. Check the USB drive and installation log.":
+    "OCFusion недоступен. Проверьте USB-накопитель и журнал установки.",
+  "OCFusion services are not ready. Check the platform status.":
+    "Службы OCFusion не готовы. Проверьте состояние платформы.",
+  "Loading…": "Загрузка…",
   "VPN integration": "Интеграция VPN",
   "ASUSWRT extensions": "Расширения ASUSWRT",
   "Back to ASUS ↗": "Вернуться в ASUS ↗",
@@ -75,7 +86,7 @@ const OCF_TRANSLATIONS = {
       const from = to === "en" ? ru : en;
       const dest = to === "en" ? en : ru;
 
-      if (trimmed === from.trim()) {
+      if (trimmed.replace(/\s+/g, " ") === from.trim().replace(/\s+/g, " ")) {
         return text.replace(trimmed, dest.trim());
       }
     }
@@ -106,7 +117,15 @@ const OCF_TRANSLATIONS = {
     let node;
 
     while ((node = walker.nextNode())) {
-      if (node.parentElement.closest("script,style,pre,#TopBanner")) {
+      if (node.parentElement.closest("script,style,#TopBanner")) {
+        continue;
+      }
+
+      if (
+        node.parentElement.closest("pre") &&
+        node.nodeValue.trim() !== "Loading…" &&
+        node.nodeValue.trim() !== "Загрузка…"
+      ) {
         continue;
       }
 

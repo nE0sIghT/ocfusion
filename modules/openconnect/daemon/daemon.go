@@ -17,6 +17,8 @@ import (
 )
 
 type Status struct {
+	Profile        string          `json:"profile"`
+	FusionName     string          `json:"fusion_name"`
 	Version        string          `json:"version"`
 	State          string          `json:"state"`
 	Message        string          `json:"message"`
@@ -47,7 +49,7 @@ func launch(p Profile, m Manifest) (*Child, error) {
 	}
 
 	for _, f := range []struct{ rel, target string }{{"bin/openconnect", "openconnect"}, {"ca-bundle.crt", "ca-bundle.crt"}} {
-		b, e := os.ReadFile(filepath.Join(m.Bundle, bundleRelative(m, f.rel)))
+		b, e := os.ReadFile(filepath.Join(m.Bundle, f.rel))
 		if e != nil {
 			return nil, e
 		}
@@ -73,7 +75,7 @@ func launch(p Profile, m Manifest) (*Child, error) {
 		return nil, e
 	}
 
-	args := []string{"--protocol", p.Protocol, "--interface", "ocvpn0", "--script", filepath.Join(root, "vpnc-script"), "--disable-ipv6", "--non-inter", "--reconnect-timeout", "60", "--cafile", filepath.Join(runDir, "effective-ca.pem"), "--no-system-trust"}
+	args := []string{"--protocol", p.Protocol, "--interface", m.Interface, "--script", filepath.Join(clientRoot, "vpnc-script"), "--disable-ipv6", "--non-inter", "--reconnect-timeout", "60", "--cafile", filepath.Join(runDir, "effective-ca.pem"), "--no-system-trust"}
 	if p.PrivateKey != "" {
 		for name, value := range map[string]string{"client.pem": p.Certificate, "key.pem": p.PrivateKey} {
 			if e := atomicWrite(filepath.Join(runDir, name), []byte(value), 0600); e != nil {
@@ -212,7 +214,7 @@ func daemon() error {
 	var importID string
 	var importOK bool
 	publish := func() {
-		st := Status{Version: version, State: state, Message: message, Index: m.Index, Networks: ns, ImportID: importID, ImportOK: importOK}
+		st := Status{Profile: profileID, FusionName: m.Name, Version: version, State: state, Message: message, Index: m.Index, Networks: ns, ImportID: importID, ImportOK: importOK}
 		saveJSON(filepath.Join(runDir, "status.json"), st)
 	}
 	defer func() {
@@ -285,7 +287,7 @@ func daemon() error {
 					invalidate()
 
 					state = "WAIT_NETWORK"
-					message = "Assign OCFusion (managed) to a dedicated SDN Wi-Fi/VLAN in ASUS web"
+					message = "Assign this connection's VPN Fusion profile to a dedicated SDN Wi-Fi/VLAN in ASUS web"
 				case prepErr != nil:
 					invalidate()
 

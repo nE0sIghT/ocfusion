@@ -66,7 +66,7 @@ func removeOwnedWebMount(target, source string) error {
 	for _, line := range strings.Split(string(info), "\n") {
 		f := strings.Fields(line)
 		if len(f) > 5 && f[4] == target {
-			if !ownWebMount(string(info), target, source) && !(target == "/www/state.js" && ownWebMount(string(info), target, "/ocfusion/state.js")) {
+			if !ownWebMount(string(info), target, source) {
 				return fmt.Errorf("%s already mounted by another owner", target)
 			}
 
@@ -78,10 +78,6 @@ func removeOwnedWebMount(target, source string) error {
 }
 
 func removeWebOverlays() error {
-	if e := removeOwnedWebMount("/www/VPN/vpnc.html", "/ocfusion/vpnc.html"); e != nil {
-		return e
-	}
-
 	return removeOwnedWebMount("/www/state.js", "/ocfusion-platform/state.js")
 }
 

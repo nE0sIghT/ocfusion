@@ -28,11 +28,9 @@ check_apps_owner() {
             grep -qx 'Package: ocfusion' "$APP/lib/ipkg/info/ocfusion.control" &&
             [ -f "$APP/etc/init.d/S95ocfusion" ] &&
             grep -q '^# ASUS app entrypoint.' "$APP/etc/init.d/S95ocfusion" &&
-            { [ -f "$APP/ocfusion/bin/extd" ] ||
-                [ -f "$APP/ocfusion/modules/openconnect/bin/ocfusion" ] ||
-                [ -f "$APP/ocfusion/bin/ocfusion" ]; } &&
+            [ -f "$APP/ocfusion/bin/extd" ] &&
             [ -f "$APP/.asusrouter" ]; then
-            # Existing OCFusion installation, including the original SSH installer.
+            # Existing OCFusion installation, including SSH installation.
             # Preserve its ASUS marker and all other package records.
             :
         else

@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 var webRoot = "/tmp/var/wwwext"
@@ -73,7 +74,7 @@ func (m *Manager) publish() {
 
 	for id, item := range m.registry.Modules {
 		state := "STOPPED"
-		if w := m.workers[id]; w != nil {
+		if w := m.workers[id]; w != nil && !m.stopping {
 			state = w.state
 		}
 
@@ -85,7 +86,18 @@ func (m *Manager) publish() {
 		modules = append(modules, map[string]any{"id": id, "name": item.Manifest.Name, "version": item.Manifest.Version, "enabled": item.Enabled, "state": state, "ui": ui})
 	}
 
-	b, _ := json.Marshal(map[string]any{"version": version, "modules": modules})
+	state := "READY"
+	if m.stopping {
+		state = "STOPPING"
+	}
+	if m.stopped {
+		state = "STOPPED"
+	}
+	if _, err := os.Stat(installMarker); err == nil {
+		state = "INSTALLING"
+	}
+
+	b, _ := json.Marshal(map[string]any{"version": version, "modules": modules, "state": state, "updated_at": time.Now().UnixMilli()})
 	os.MkdirAll(webRoot, 0755)
 
 	path := filepath.Join(webRoot, "extensions-modules.json")

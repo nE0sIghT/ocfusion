@@ -23,6 +23,9 @@ func die(e error) {
 }
 
 func main() {
+	if id := os.Getenv("OCF_PROFILE"); id != "" {
+		die(selectProfile(id))
+	}
 	os.Setenv("PATH", "/usr/sbin:/usr/bin:/sbin:/bin")
 	if len(os.Args) < 2 {
 		fmt.Println("ocfusion-openconnect", version, "commands: doctor setup import start stop enable disable status event web uninstall")
@@ -33,6 +36,17 @@ func main() {
 	cmd := os.Args[1]
 
 	switch cmd {
+	case "supervise":
+		die(superviseProfiles())
+	case "profile-action":
+		if len(os.Args) != 3 {
+			die(errors.New("profile-action OPERATION"))
+		}
+		result, err := profileAction(os.Args[2], os.Stdin)
+		die(err)
+		data, err := json.Marshal(result)
+		die(err)
+		fmt.Println(string(data))
 	case "claim":
 		_, e := vpnCall(vpnRequest{Operation: "claim"})
 		die(e)
@@ -188,7 +202,11 @@ func setup(bundle string) error {
 		return err
 	}
 
-	response, err := vpnCall(vpnRequest{Operation: "state"})
+	if _, err := refreshedManifest(Manifest{}, bundle); err != nil {
+		return err
+	}
+
+	response, err := vpnCall(vpnRequest{Operation: "claim"})
 	if err != nil {
 		return err
 	}
@@ -200,7 +218,16 @@ func setup(bundle string) error {
 		return err
 	}
 
-	return saveJSON(filepath.Join(root, "manifest.json"), manifest)
+	path := filepath.Join(root, "manifest.json")
+	_, previousErr := os.Stat(path)
+	if err = saveJSON(path, manifest); err != nil {
+		if os.IsNotExist(previousErr) {
+			vpnCall(vpnRequest{Operation: "release", Connection: manifest.ID})
+		}
+		return err
+	}
+
+	return nil
 }
 
 func pid() int {
@@ -304,23 +331,35 @@ func writeEvent() error {
 }
 
 func uninstall() error {
-	if _, err := os.Stat(filepath.Join(root, "manifest.json")); os.IsNotExist(err) {
-		return nil
-	}
-
-	if _, err := vpnCall(vpnRequest{Operation: "release"}); err != nil {
+	ids, err := profileIDs()
+	if err != nil {
 		return err
 	}
-
-	if err := stop(); err != nil {
-		return err
+	// Validate every binding before removing any profile resources.
+	for _, id := range ids {
+		if err = selectProfile(id); err != nil {
+			return err
+		}
+		if _, err = loadManifest(); os.IsNotExist(err) {
+			continue
+		}
+		response, err := vpnCall(vpnRequest{Operation: "state"})
+		if err != nil || len(response.Networks) != 0 {
+			return errors.New("reassign all OpenConnect networks before removal")
+		}
 	}
-
-	if err := os.Rename(filepath.Join(root, "manifest.json"), filepath.Join(root, "manifest.uninstalled.json")); err != nil {
-		return err
+	for _, id := range ids {
+		selectProfile(id)
+		if _, err = loadManifest(); os.IsNotExist(err) {
+			continue
+		}
+		if _, err = vpnCall(vpnRequest{Operation: "release"}); err != nil {
+			return err
+		}
+		stop()
 	}
-
-	for _, name := range []string{"ocfusion", "vpnc-script", "web-overlay.enabled"} {
+	selectProfile("default")
+	for _, name := range []string{"ocfusion", "vpnc-script"} {
 		os.Remove(filepath.Join(root, name))
 	}
 

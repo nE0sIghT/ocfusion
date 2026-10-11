@@ -12,6 +12,8 @@ import (
 
 type Manager struct {
 	mu       sync.Mutex
+	stopping bool
+	stopped  bool
 	registry Registry
 	workers  map[string]*Worker
 }

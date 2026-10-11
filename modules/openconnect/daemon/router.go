@@ -75,7 +75,7 @@ func verifyBundle(m Manifest) error {
 	for rel, want := range m.BundleSHA {
 		allowed := false
 
-		for _, name := range append(append(append([]string{}, bundleFiles...), legacyBundleFiles...), previousBundleFiles...) {
+		for _, name := range bundleFiles {
 			if rel == name {
 				allowed = true
 				break

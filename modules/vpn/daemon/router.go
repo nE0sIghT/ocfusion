@@ -67,7 +67,7 @@ func verifyIdentity(m Manifest) error {
 	for _, r := range strings.Split(nvget("vpnc_clientlist"), "<") {
 		f := strings.Split(r, ">")
 		if len(f) > 6 && f[6] == strconv.Itoa(m.Index) {
-			if (f[0] != "OpenConnect (SSH)" && f[0] != fusionName) || f[1] != "OpenVPN" || f[2] != strconv.Itoa(m.Unit) {
+			if (f[0] != connectionName(m)) || f[1] != "OpenVPN" || f[2] != strconv.Itoa(m.Unit) {
 				return errors.New("reserved Fusion profile changed")
 			}
 
@@ -143,4 +143,12 @@ func ensureNativePolicy(m Manifest) error {
 	}
 
 	return nil
+}
+
+func connectionName(m Manifest) string {
+	if m.Name == "" {
+		return fusionName
+	}
+
+	return m.Name
 }

@@ -21,7 +21,7 @@
 
       if (
         !title ||
-        !["OCFusion (managed)", "OpenConnect (SSH)"].includes(
+        !/^OCFusion(?: \(managed\)| [a-z][a-z0-9-]*\/[a-z][a-z0-9-]*)$/.test(
           title.textContent.trim(),
         ) ||
         row.querySelector(".ocfusion-managed-note")

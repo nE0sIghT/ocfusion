@@ -7,6 +7,12 @@ const fs = require("fs");
 const http = require("http");
 const path = require("path");
 const root = path.resolve(__dirname, "..");
+const openconnectManifest = JSON.parse(
+  fs.readFileSync(
+    path.join(root, "modules/openconnect/packaging/module.json.in"),
+    "utf8",
+  ),
+);
 const modules = [
   {
     id: "openconnect",
@@ -34,6 +40,9 @@ function statusWire() {
 }
 
 function createFixtureServer() {
+  let uploadOperation = "";
+  let uploadBytes = [];
+  const profiles = ["default"];
   return http.createServer(async (request, response) => {
     const url = new URL(request.url, "http://localhost");
     const send = (body, type) => {
@@ -42,7 +51,10 @@ function createFixtureServer() {
     };
 
     if (url.pathname === "/user/extensions-modules.json") {
-      return send(JSON.stringify({ modules }), "application/json");
+      return send(
+        JSON.stringify({ modules, state: "READY", updated_at: Date.now() }),
+        "application/json",
+      );
     }
 
     if (url.pathname === "/appGet.cgi") {
@@ -67,25 +79,57 @@ function createFixtureServer() {
       );
 
       requests.push(q);
+      if (q.action === "module.call" && q.module === "openconnect") {
+        assert(
+          openconnectManifest.actions.includes(q.operation),
+          "Undeclared module action: " + q.operation,
+        );
+      }
+      if (q.action === "upload.begin") {
+        uploadOperation = q.operation;
+        uploadBytes = [];
+      }
+      if (q.action === "upload.chunk") {
+        uploadBytes.push(Buffer.from(q.data, "base64"));
+      }
+      if (q.action === "upload.finish") {
+        q.operation = uploadOperation;
+        const payload = JSON.parse(Buffer.concat(uploadBytes).toString());
+        if (q.operation === "add-profile") {
+          profiles.push(payload.profile);
+        }
+        if (q.operation === "delete-profile") {
+          profiles.splice(profiles.indexOf(payload.profile), 1);
+        }
+      }
+
+      if (q.action === "module.call" && q.operation === "add-profile") {
+        profiles.push(q.config.profile);
+      }
+      if (q.action === "module.call" && q.operation === "delete-profile") {
+        profiles.splice(profiles.indexOf(q.config.profile), 1);
+      }
 
       const data =
-        q.operation === "settings"
-          ? {
-              revision: "revision1",
-              server: "https://vpn.example/",
-              enabled: true,
-              has_certificate: true,
-              has_private_key: true,
-            }
-          : q.operation === "diagnose"
+        q.operation === "profiles"
+          ? profiles
+          : q.operation === "settings"
             ? {
-                state: "UP",
-                message: "IPv4 full tunnel; Wi-Fi/VLAN bindings active",
-                networks: [
-                  { bridge: "br55", cidr: "192.168.52.0/24", sdn_idx: "4" },
-                ],
+                revision: "revision1",
+                server: "https://vpn.example/",
+                enabled: true,
+                has_certificate: true,
+                has_private_key: true,
               }
-            : { ok: true };
+            : q.operation === "diagnose"
+              ? {
+                  state: "UP",
+                  message: "IPv4 full tunnel; Wi-Fi/VLAN bindings active",
+                  networks: [
+                    { bridge: "br55", cidr: "192.168.52.0/24", sdn_idx: "4" },
+                  ],
+                }
+              : { ok: true };
 
       mailbox = {
         state: "UP",
@@ -167,6 +211,9 @@ async function testModuleUI(browser, address, language) {
   await page.addInitScript((language) => {
     window.TEST_LANGUAGE = language;
   }, language);
+  await page.addInitScript(() => {
+    Object.defineProperty(window.crypto, "subtle", { value: undefined });
+  });
   await page.goto(address + "/user/extensions.html#openconnect");
 
   const frame = page.frameLocator("#module-frame");
@@ -232,12 +279,22 @@ async function testModuleUI(browser, address, language) {
     assert(
       requests.some(
         (q) =>
-          q.action === "upload.begin" &&
-          q.kind === "module.call" &&
+          q.action === "module.call" &&
           q.module === "openconnect" &&
           q.operation === "update-settings",
       ),
     );
+  }
+
+  if (language === "EN") {
+    await frame.locator("#profile-new").click();
+    await frame.locator("#profile-name").fill("office");
+    await frame.locator("#profile-add").click();
+    await frame
+      .locator('#profile-select option[value="office"]')
+      .waitFor({ state: "attached" });
+    await frame.locator("#profile-select").selectOption("default");
+    await frame.locator("#settings-save").waitFor({ state: "visible" });
   }
 
   // External and shipped modules use the same generated menu and iframe route.
@@ -252,6 +309,23 @@ async function testModuleUI(browser, address, language) {
     modules[1].ui,
   );
   assert.deepEqual(errors, []);
+
+  for (const state of ["INSTALLING", "STOPPED"]) {
+    await page.route("**/user/extensions-modules.json?*", (route) =>
+      route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({ modules, state, updated_at: Date.now() }),
+      }),
+    );
+    await page.evaluate(() => loadModules());
+    await page.locator("#platform-state").waitFor({ state: "visible" });
+    await page.locator("#module-frame").waitFor({ state: "hidden" });
+    assert.equal(await page.locator("#module-frame").getAttribute("src"), null);
+    await page.unroute("**/user/extensions-modules.json?*");
+  }
+
+  await page.evaluate(() => loadModules());
+  await frame.locator("#title").waitFor();
   await page.close();
 }
 

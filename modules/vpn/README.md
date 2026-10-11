@@ -1,7 +1,7 @@
 # VPN provider
 
-The VPN provider owns native connection bindings, SDN discovery, TUN preparation, kill switch, routing, forwarding, NAT and DNS. It provides a private versioned API to VPN client modules, independently of their authentication and protocol implementation.
+The VPN provider owns native Fusion profiles, SDN discovery, TUN preparation, kill switch, routing, forwarding, NAT and DNS. It allocates independent resources for each module/profile owner through API 1, without receiving client credentials.
 
-The current implementation manages one connection. Its native Fusion index is leased from the platform's stock mailbox reservation. Migration preserves the existing index and SDN assignments. Disconnecting or losing a client retains the network guards; removing a connection requires reassignment of its native networks first.
+Disconnecting or losing a client retains its network guards. Removal requires reassignment of its native networks. The platform mailbox reservation has a separate lifetime; removing a connection does not remove web transport.
 
-`daemon/` builds `ocfusion-vpn`. `packaging/` contains its manifest. `ui/` contains the integration page and the declared stock Fusion contribution. See the [VPN API and module contract](../../docs/modules.md#vpn-provider-api-1).
+`daemon/` builds `ocfusion-vpn`, `packaging/` contains its manifest and `ui/` contains the stock Fusion contribution. This API-only module has no settings page. See the [VPN API and module contract](../../docs/modules.md#vpn-provider-api-1).

@@ -68,11 +68,6 @@ func backupState(directory, backup string) error {
 	}
 
 	for path := range paths {
-		if path == base {
-			if _, err := os.Stat(filepath.Join(base, ".legacy-migration")); err == nil {
-				continue
-			}
-		}
 		if _, err := os.Stat(path); os.IsNotExist(err) {
 			continue
 		} else if err != nil {

@@ -70,3 +70,47 @@ func TestGenericMailboxCommitsOnlyCompleteVerifiedUploads(t *testing.T) {
 	send(webRequest{Action: "upload.begin", Module: "example", Upload: upload, Size: 16385, SHA256: hex.EncodeToString(digest[:])}, false)
 	send(webRequest{Action: "exec"}, false)
 }
+
+func TestInlineModuleCall(t *testing.T) {
+	previousRAM, previousCommand := ram, runModuleCommand
+	ram = t.TempDir()
+	t.Cleanup(func() {
+		ram, runModuleCommand = previousRAM, previousCommand
+	})
+
+	calls := 0
+	runModuleCommand = func(args ...string) (json.RawMessage, error) {
+		calls++
+		if len(args) != 4 || args[0] != "call" || args[1] != "example" || args[2] != "settings" {
+			t.Fatal(args)
+		}
+
+		data, err := os.ReadFile(args[3])
+		if err != nil || string(data) != `{"profile":"default"}` {
+			t.Fatal("invalid inline configuration", err)
+		}
+
+		return json.RawMessage(`{"enabled":true}`), nil
+	}
+
+	mailbox := &webMailbox{}
+	request := webRequest{ID: strings.Repeat("a", 32), Action: "module.call", Module: "example", Operation: "settings", Config: json.RawMessage(`{"profile":"default"}`)}
+	raw, _ := json.Marshal(request)
+	if _, ok, _ := mailbox.apply(raw, time.Now()); !ok {
+		t.Fatal(mailbox.LastMessage)
+	}
+	if _, err := os.Stat(ram + "/web-config.json"); !os.IsNotExist(err) {
+		t.Fatal("temporary configuration retained", err)
+	}
+	mailbox.apply(raw, time.Now())
+	if calls != 1 {
+		t.Fatal("duplicate request invoked twice")
+	}
+
+	request.ID = strings.Repeat("b", 32)
+	request.Module = "../example"
+	raw, _ = json.Marshal(request)
+	if _, ok, _ := mailbox.apply(raw, time.Now()); ok {
+		t.Fatal("invalid module accepted")
+	}
+}

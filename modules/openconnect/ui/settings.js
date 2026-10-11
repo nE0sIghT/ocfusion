@@ -9,6 +9,8 @@ const settingsResult = document.getElementById("settings-result");
 
 function fillSettings(s) {
   settingsSnapshot = s;
+  document.getElementById("fusion-profile-name").textContent =
+    s.fusion_name || "OCFusion (managed)";
 
   const values = {
     "vpn-server": s.server,

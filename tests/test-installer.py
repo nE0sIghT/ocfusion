@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Exercise installation, updates and rollback in a fake router filesystem."""
 
-import argparse
 import os
 import shutil
 import subprocess
@@ -217,63 +216,6 @@ def test_fresh_and_repeated_install(router):
     ).read_bytes() == (router.bundle / "modules/openconnect/ui/index.html").read_bytes()
 
 
-def test_legacy_distribution_update(router, legacy):
-    for name in ("module.sh", "vpnc-script"):
-        shutil.copy(legacy / name, router.bundle / name)
-
-    for name in ("ocfusion", "openconnect"):
-        source_name = "ocfusion-openconnect" if name == "ocfusion" else name
-        shutil.copy(
-            router.bundle / "modules/openconnect/bin" / source_name,
-            router.bundle / "bin" / name,
-        )
-    shutil.copy(router.bundle / "modules/openconnect/ca-bundle.crt", router.bundle)
-    shutil.copytree(router.bundle / "modules/openconnect/ui", router.bundle / "ui")
-
-    router.adapt_router_scripts(legacy / "install.sh")
-    shutil.copy(legacy / "module.json", router.bundle / "module.json")
-    assert_success(router.install())
-    assert not (router.apps / "ocfusion/ui").exists()
-    assert (router.jffs / "asus-extensions/extd").exists()
-    legacy_data = router.jffs / "asus-extensions/modules/example/data"
-    legacy_data.mkdir(parents=True)
-    (legacy_data / "state").write_text("retained module data")
-    original_manifest = router.manifest.read_bytes()
-    router.profile.write_text("legacy-private-profile-with-certificates")
-    retained = router.jffs / "ocfusion/web-overlay.enabled"
-    retained.write_text("legacy-state")
-
-    router.adapt_router_scripts()
-    for name in ("module.sh", "vpnc-script", "S95ocfusion"):
-        (router.bundle / name).unlink()
-
-    failed = router.install(fail=True)
-    assert failed.returncode != 0
-    assert (legacy_data / "state").read_text() == "retained module data"
-    assert not router.manager.exists()
-    assert router.profile.read_text() == "legacy-private-profile-with-certificates"
-
-    template = PROJECT_ROOT / "modules/openconnect/packaging/module.json.in"
-    for name in ("module.json", "ca-bundle.crt", "bin/ocfusion", "bin/openconnect"):
-        (router.bundle / name).unlink()
-    shutil.rmtree(router.bundle / "ui")
-    (router.bundle / "modules/openconnect/module.json").write_text(template.read_text())
-    assert_success(router.install())
-    assert router.manifest.read_bytes() == original_manifest
-    assert router.profile.read_text() == "legacy-private-profile-with-certificates"
-    assert retained.read_text() == "legacy-state"
-    assert not (router.jffs / "asus-extensions").exists()
-    assert (
-        router.jffs / "ocfusion-platform/modules/example/data/state"
-    ).read_text() == "retained module data"
-    assert (router.apps / "ocfusion/modules/openconnect/ui/index.html").exists()
-    assert (router.apps / "ocfusion/modules/openconnect/scripts/module.sh").exists()
-    assert not (router.apps / "ocfusion/module.sh").exists()
-    assert (
-        router.apps / "ocfusion/modules/openconnect/module.json"
-    ).read_bytes() == template.read_bytes()
-
-
 def test_failed_update_and_retry(router):
     original_supervisor = router.supervisor.read_bytes()
     original_manager = router.manager.read_bytes()
@@ -313,17 +255,6 @@ def test_interrupted_update_recovery(router):
 
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--legacy-distribution", type=Path)
-    arguments = parser.parse_args()
-    if arguments.legacy_distribution:
-        with tempfile.TemporaryDirectory() as temporary:
-            router = RouterFixture(Path(temporary))
-            test_legacy_distribution_update(router, arguments.legacy_distribution)
-        print(
-            "PASS: legacy installer to current installer, "
-            "private profile and index preserved, module UI migrated"
-        )
     with tempfile.TemporaryDirectory() as temporary:
         router = RouterFixture(Path(temporary))
         wrong_architecture = router.install(architecture="x86_64")

@@ -90,7 +90,7 @@ def test_migration_from_ssh_installation(usb):
     (usb.apps / "etc/init.d/S95ocfusion").write_text("# ASUS app entrypoint. fixture\n")
     binary_directory = usb.apps / "ocfusion/bin"
     binary_directory.mkdir(parents=True)
-    (binary_directory / "ocfusion").write_text("fixture")
+    (binary_directory / "extd").write_text("fixture")
 
     usb.prepare()
     assert marker.read_text() == "stock marker fixture\n"

@@ -22,9 +22,5 @@
     "network.firewall",
     "asus.fusion.sdn"
   ],
-  "resources": {
-    "tun": "ocvpn0",
-    "route_table": "51998",
-    "rule_priority": "90"
-  }
+  "resources": {"asus.vpn_allocator": "owned"}
 }

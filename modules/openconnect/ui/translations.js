@@ -1,5 +1,26 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 window.OCF_MODULE_TRANSLATIONS = {
+  "Connection profiles": "Профили подключения",
+  "Default profile": "Основной профиль",
+  "Create profile": "Создать профиль",
+  Cancel: "Отмена",
+  "Assign this connection's VPN Fusion profile to a dedicated SDN Wi-Fi/VLAN in ASUS web":
+    "Назначьте профиль VPN Fusion этого подключения сети SDN Wi-Fi/VLAN в интерфейсе ASUS",
+  "Assign the VPN Fusion profile shown above to your network in ASUS.":
+    "Назначьте указанный выше профиль VPN Fusion своей сети в ASUS.",
+  ". Keep this connection's VPN Fusion profile switched OFF.":
+    ". Профиль VPN Fusion этого подключения оставьте выключенным.",
+
+  "VPN Fusion profile": "Профиль VPN Fusion",
+  "Connection profile": "Профиль подключения",
+  "New profile ID": "ID нового профиля",
+  "Add profile": "Добавить профиль",
+  "Delete profile": "Удалить профиль",
+  "Reassign its Wi-Fi/VLAN networks in ASUS before deleting a profile.":
+    "Перед удалением профиля переназначьте его сети Wi-Fi/VLAN в ASUS.",
+  "Use a lowercase profile ID, up to 32 characters.":
+    "Используйте ID профиля строчными латинскими буквами, до 32 символов.",
+
   "VPN client with certificates, DTLS and ASUS network bindings.":
     "Клиент VPN с сертификатами, DTLS и привязкой к сетям ASUS.",
   "Loading…": "Загрузка…",

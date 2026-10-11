@@ -23,6 +23,10 @@ const nodeIds = [
   "import",
   "file",
   "api-error",
+  "platform-state",
+  "module-list",
+  "module-overview",
+  "module-menu",
   "state-badge",
   "state-message",
   "connection-state",
@@ -47,6 +51,7 @@ function createNodes() {
       disabled: false,
       hidden: false,
       listeners: {},
+      replaceChildren() {},
       addEventListener(event, handler) {
         this.listeners[event] = handler;
       },
@@ -62,6 +67,17 @@ function createMailbox(acknowledge) {
   const chunks = [];
 
   async function fetch(url, options) {
+    if (url.startsWith("/user/extensions-modules.json")) {
+      return {
+        ok: true,
+        json: async () => ({
+          state: "READY",
+          updated_at: Date.now(),
+          modules: [],
+        }),
+      };
+    }
+
     if (options.method !== "POST") {
       const encoded = Buffer.from(JSON.stringify(status)).toString("base64");
 
@@ -155,6 +171,8 @@ async function testProfileUpload(acknowledge, operation = "") {
 
   vm.runInNewContext(panelScript, context);
 
+  await vm.runInNewContext("loadModules()", context);
+
   let error;
   let reply;
 
@@ -198,7 +216,42 @@ async function testProfileUpload(acknowledge, operation = "") {
   }
 }
 
+async function testUnavailablePlatform() {
+  for (const state of ["STOPPED", "INSTALLING", "READY"]) {
+    const nodes = createNodes();
+    const mailbox = createMailbox(true);
+    const originalFetch = mailbox.fetch;
+
+    mailbox.fetch = async (url, options) => {
+      if (url.startsWith("/user/extensions-modules.json")) {
+        return {
+          ok: true,
+          json: async () => ({
+            state,
+            updated_at: Date.now() - 60000,
+            modules: [],
+          }),
+        };
+      }
+
+      return originalFetch(url, options);
+    };
+
+    const context = createContext(nodes, mailbox);
+
+    vm.runInNewContext(panelScript, context);
+    await vm.runInNewContext("loadModules()", context);
+    assert.equal(nodes["platform-state"].hidden, false);
+    await assert.rejects(
+      context.window.EXTENSIONS.action("example", "diagnose"),
+      /not ready/,
+    );
+    assert.equal(mailbox.requests.length, 0);
+  }
+}
+
 async function main() {
+  await testUnavailablePlatform();
   await testProfileUpload(true);
   await testProfileUpload(false);
   await testProfileUpload(true, "update-settings");

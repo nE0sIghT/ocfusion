@@ -1,6 +1,6 @@
 # Module development - API 1
 
-This document describes the implemented OCFusion 0.2.9 module contract. Modules are separate trusted executables, not Go plugins. Install them through the router's administrator SSH account. They run with administrator privileges; resource/capability declarations are not a security sandbox.
+This document describes the implemented OCFusion 0.3 module contract. Modules are separate trusted executables, not Go plugins. Install them through the router's administrator SSH account. They run with administrator privileges; resource/capability declarations are not a security sandbox.
 
 ## Package
 
@@ -124,7 +124,7 @@ await parent.EXTENSIONS.configure('heartbeat', {interval: 10});
 
 `action(id, operation)` returns the operation's JSON response. Standard browser operations are `enable`, `disable`, `status` and `diagnose`; other operations must be declared in the manifest's `actions`. `call(id, action, data, onProgress?)` invokes a declared action with JSON data, delivered in the entrypoint's usual stdin envelope as `config`. `configure(id, config, onProgress?)` keeps the validate/save/reload whole-object configuration contract. Optional progress callbacks receive display text. `EXTENSIONS.busy` reports an active transport transaction; calls during another transaction reject rather than overwrite the mailbox.
 
-The browser transport uses the ASUS session, bounded NVRAM mailbox, nonce acknowledgements and chunked uploads. Configuration/action data is limited to 16 KiB. Browser JSON responses are limited to 2048 bytes after JSON compaction, and must fit the complete 4 KiB ASUS mailbox response; larger responses reject. Entrypoints retain their 32 KiB CLI output bound, so browser-facing actions should return a small object. Requests expire rather than acknowledging a stale status. Entry failure rejects the Promise with a generic message; stderr and raw errors are not exposed.
+The browser transport uses the ASUS session, bounded NVRAM mailbox, nonce acknowledgements and chunked uploads. Calls with up to 1024 bytes of JSON use a bounded inline request and work over HTTP as well as HTTPS. Larger calls and configuration uploads require HTTPS for the browser SHA-256 implementation. Configuration/action data is limited to 16 KiB. Browser JSON responses are limited to 2048 bytes after JSON compaction, and must fit the complete 4 KiB ASUS mailbox response; larger responses reject. Entrypoints retain their 32 KiB CLI output bound, so browser-facing actions should return a small object. Requests expire rather than acknowledging a stale status. Entry failure rejects the Promise with a generic message; stderr and raw errors are not exposed.
 
 There is no browser archive installer or automatic secret redaction. A module implements its own settings/read/PATCH actions if needed, declares them in `actions` and returns only safe public fields. Configuration file paths remain private; do not expose secrets in UI assets or diagnostics.
 
@@ -151,28 +151,31 @@ If your module needs a separate persistent directory, declare it in `state_paths
 
 ## VPN provider API 1
 
-The `vpn` module provides API 1. A client declares `dependencies: [{"id":"vpn","api":1}]`. The current provider manages one connection, using the existing `ocvpn0` interface and native binding. Multiple simultaneous connections are not implemented.
+The `vpn` module provides API 1. A client declares `dependencies: [{"id":"vpn","api":1}]`. Connections belong to a stable pair of module ID and client profile ID. Each receives an independent native Fusion binding, interface, routing table and rule priority. OpenConnect and other consumers use the same contract.
 
-Requests use one JSON object per connection to `/tmp/ocfusion-vpn/control.sock`, mode 0600. Modules run as the administrator; the API is a trusted local integration boundary. Requests are bounded to 16 KiB and require `api`, `client` and `operation`. A client ID must match the module ID syntax. Operations:
+Send one JSON object per connection to `/tmp/ocfusion-vpn/control.sock`, mode 0600. Requests are bounded to 16 KiB. This is a trusted administrator integration boundary, not a sandbox. All requests include `api: 1`, `client` and `profile`; IDs match `[a-z][a-z0-9-]{0,31}`.
 
 | Operation | Effect |
 | --- | --- |
-| `claim` | Claim an unowned connection or confirm ownership; another owner is rejected |
-| `state` | Return native connection metadata and assigned networks |
+| `list` | List connections owned by the requesting module |
+| `claim` | Create or retrieve the connection for the owner pair; repeated requests are idempotent |
+| `state` | Return connection resources and assigned networks |
 | `prepare` | Ensure native policy and guards are ready |
-| `apply` | Apply normalized tunnel parameters and renew the client heartbeat |
-| `down` | Close the tunnel route and forwarding, retaining network guards |
-| `release` | Release ownership after native Wi-Fi/VLAN assignments have been removed |
+| `apply` | Apply normalized tunnel parameters and renew this connection's heartbeat |
+| `down` | Close this connection's forwarding, retaining its guards |
+| `release` | Remove the connection after its native Wi-Fi/VLAN assignments are removed |
 
-Example application request:
+`claim` returns `manifest.id`, `interface`, `unit`, `vpnc_idx`, `table`, `priority` and `name`. Subsequent requests must include that ID as `connection`. A different module or profile cannot operate on it. Capacity is limited by available native slots and network resources; allocation failure must be handled by the client.
 
 ```json
 {
   "api": 1,
   "client": "example-vpn-client",
+  "profile": "office",
+  "connection": "connection-8",
   "operation": "apply",
   "tunnel": {
-    "interface": "ocvpn0",
+    "interface": "ocvpn1",
     "address": "192.168.199.151",
     "mtu": 1426,
     "dns": ["8.8.8.8"]
@@ -180,9 +183,11 @@ Example application request:
 }
 ```
 
-Responses contain `ok` and, on success, connection `manifest`, `networks` and selected `dns`. A failed operation returns `ok: false` and a diagnostic `error`; clients must redact errors before exposing them to the browser. No credentials are sent to the VPN provider. Clients renew the heartbeat at least every 3 seconds while connected. The provider closes expired tunnels after 12 seconds and keeps the terminal route and guards.
+Use the interface returned by the provider rather than a fixed name. Responses contain `ok`, connection `manifest`, `networks` and selected `dns`. Failures return `ok: false` and `error`; redact errors before exposing them to the browser. Credentials never go to the provider.
 
-Remove native Wi-Fi/VLAN assignments before calling `release`. Calling `down` disconnects the tunnel while retaining the provider and its guards.
+Renew each active connection with `apply` at least every 3 seconds. After 12 seconds without a heartbeat the provider closes that connection while keeping its guards. A bridge cannot belong to multiple connections. Remove native network assignments before `release`. Releasing a connection never removes the platform mailbox reservation.
+
+OpenConnect settings actions use `{ "profile": "office", "data": {...} }` as the module action configuration. `profiles` lists IDs; `add-profile` and `delete-profile` create/remove profiles; `settings`, `update-settings`, `import-profile`, `diagnose`, `connect`, `disconnect` and `reconnect` target the selected profile. The default profile preserves the 0.2.9 installation and cannot be deleted individually.
 
 ## Persistent installation helpers
 

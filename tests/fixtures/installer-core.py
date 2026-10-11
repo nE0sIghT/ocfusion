@@ -28,7 +28,7 @@ def backup_state():
 
     snapshot = {}
     for path in paths:
-        existed = path.exists() and not (path / ".legacy-migration").exists()
+        existed = path.exists()
         snapshot[str(path)] = existed
         if existed:
             shutil.copytree(path, directory / path.name, symlinks=True)

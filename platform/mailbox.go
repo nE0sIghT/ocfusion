@@ -19,16 +19,17 @@ import (
 var moduleIDRE = regexp.MustCompile(`^[a-z][a-z0-9-]{0,31}$`)
 
 type webRequest struct {
-	ID        string `json:"id"`
-	Action    string `json:"action"`
-	Module    string `json:"module,omitempty"`
-	Operation string `json:"operation,omitempty"`
-	Upload    string `json:"upload,omitempty"`
-	Size      int    `json:"size,omitempty"`
-	Kind      string `json:"kind,omitempty"`
-	SHA256    string `json:"sha256,omitempty"`
-	Offset    int    `json:"offset,omitempty"`
-	Data      []byte `json:"data,omitempty"`
+	ID        string          `json:"id"`
+	Action    string          `json:"action"`
+	Module    string          `json:"module,omitempty"`
+	Operation string          `json:"operation,omitempty"`
+	Upload    string          `json:"upload,omitempty"`
+	Size      int             `json:"size,omitempty"`
+	Kind      string          `json:"kind,omitempty"`
+	SHA256    string          `json:"sha256,omitempty"`
+	Offset    int             `json:"offset,omitempty"`
+	Data      []byte          `json:"data,omitempty"`
+	Config    json.RawMessage `json:"config,omitempty"`
 }
 type uploadSession struct {
 	ID        string
@@ -129,6 +130,20 @@ func (w *webMailbox) apply(raw []byte, now time.Time) (string, bool, string) {
 
 			w.Upload = nil
 		}
+	case "module.call":
+		if moduleIDRE.MatchString(q.Module) && moduleIDRE.MatchString(q.Operation) && len(q.Config) > 0 && json.Valid(q.Config) {
+			path := ram + "/web-config.json"
+			e = atomicWrite(path, q.Config, 0600)
+			if e == nil {
+				w.LastData, e = runModuleCommand("call", q.Module, q.Operation, path)
+				os.Remove(path)
+			}
+			if e == nil {
+				message = "Action accepted"
+				w.DataUntil = now.Add(30 * time.Second)
+			}
+		}
+
 	case "module.action":
 		if moduleIDRE.MatchString(q.Module) && moduleIDRE.MatchString(q.Operation) {
 			args := []string{"call", q.Module, q.Operation}

@@ -4,6 +4,40 @@
 const cfg = window.OCF_SETTINGS;
 
 let pending = false;
+let platformReady = false;
+
+const platformMessages = {
+  READY: "",
+  INSTALLING: "Installation or update in progress. Please wait.",
+  STOPPING: "OCFusion is stopping. Please wait.",
+  STOPPED: "OCFusion is stopped. Connect the USB drive to start services.",
+  UNAVAILABLE:
+    "OCFusion is unavailable. Check the USB drive and installation log.",
+};
+
+function setPlatformState(state) {
+  platformReady = state === "READY";
+
+  const banner = document.getElementById("platform-state");
+
+  banner.hidden = platformReady;
+  banner.textContent = platformMessages[state] || platformMessages.UNAVAILABLE;
+
+  const frame = document.getElementById("module-frame");
+
+  if (frame && !platformReady) {
+    frame.hidden = true;
+    frame.removeAttribute("src");
+  }
+
+  document.querySelectorAll("[data-module-state]").forEach((node) => {
+    if (!platformReady) {
+      node.textContent = state || "UNAVAILABLE";
+    }
+  });
+
+  navigate();
+}
 
 const decode = (s) =>
   JSON.parse(
@@ -96,6 +130,10 @@ async function refresh() {
 }
 
 async function request(action, data = {}) {
+  if (!platformReady) {
+    throw Error("OCFusion services are not ready. Check the platform status.");
+  }
+
   const id = nonce();
   const wire =
     "# EXT-REQUEST1 " + encode(JSON.stringify({ id, action, ...data }));
@@ -104,6 +142,12 @@ async function request(action, data = {}) {
 
   for (let i = 0; i < 20; i++) {
     await sleep(1000);
+
+    if (!platformReady) {
+      throw Error(
+        "OCFusion services are not ready. Check the platform status.",
+      );
+    }
 
     const value = await read();
 
@@ -227,6 +271,16 @@ window.EXTENSIONS = {
     busy(true);
 
     try {
+      if (new TextEncoder().encode(JSON.stringify(data)).length <= 1024) {
+        const status = await request("module.call", {
+          module,
+          operation,
+          config: data,
+        });
+
+        return status.request_data;
+      }
+
       return await uploadConfig(
         new TextEncoder().encode(JSON.stringify(data)),
         module,
@@ -248,10 +302,19 @@ async function loadModules() {
     );
 
     if (!response.ok) {
-      return;
+      throw Error("Platform status unavailable");
     }
 
     const data = await response.json();
+    const serverDate = response.headers?.get("Date");
+    const now = serverDate ? Date.parse(serverDate) : Date.now();
+    const fresh =
+      Number.isFinite(data.updated_at) &&
+      now - data.updated_at < (data.state === "INSTALLING" ? 300000 : 15000);
+    const state =
+      data.state === "STOPPED" ? "STOPPED" : fresh ? data.state : "UNAVAILABLE";
+
+    setPlatformState(state);
 
     if (!Array.isArray(data.modules)) {
       return;
@@ -295,7 +358,12 @@ async function loadModules() {
 
         const info = document.createElement("p");
 
-        info.textContent = module.version + " · " + module.state;
+        info.dataset.moduleState = module.id;
+
+        info.textContent =
+          module.version +
+          " · " +
+          (platformReady ? module.state : state || "UNAVAILABLE");
         card.appendChild(info);
 
         if (module.ui) {
@@ -312,7 +380,7 @@ async function loadModules() {
 
     navigate();
   } catch (e) {
-    /* Keep the bundled cards if the registry is unavailable. */
+    setPlatformState("UNAVAILABLE");
   }
 }
 
@@ -341,7 +409,11 @@ function navigate() {
 
     const frame = document.getElementById("module-frame");
 
-    if (frame.getAttribute("src") !== module.ui) {
+    frame.hidden = !platformReady;
+
+    if (!platformReady) {
+      frame.removeAttribute("src");
+    } else if (frame.getAttribute("src") !== module.ui) {
       frame.setAttribute("src", module.ui);
     }
   }
@@ -385,9 +457,10 @@ refresh();
 loadModules();
 
 setInterval(() => {
-  if (!pending) {
+  loadModules();
+
+  if (!pending && platformReady) {
     refresh();
-    loadModules();
   }
 }, 5000);
 

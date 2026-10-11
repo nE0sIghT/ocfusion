@@ -10,7 +10,6 @@ platform_go = files(
     'main.go',
     'manager.go',
     'manifest.go',
-    'migration.go',
     'package.go',
     'paths.go',
     'process.go',

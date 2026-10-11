@@ -47,13 +47,13 @@ func xt(tool, table, op, chain string, args ...string) error {
 	return nil
 }
 
-func guard(n Network, op string) error {
-	args := []string{"-i", n.Bridge, "!", "-o", "ocvpn0", "-m", "comment", "--comment", "ocfusion:guard", "-j", "REJECT"}
+func guard(m Manifest, n Network, op string) error {
+	args := []string{"-i", n.Bridge, "!", "-o", tunnelInterface(m), "-m", "comment", "--comment", ruleComment(m, "guard"), "-j", "REJECT"}
 	if e := xt("iptables", "filter", op, "FORWARD", args...); e != nil {
 		return e
 	}
 
-	return xt("ip6tables", "filter", op, "FORWARD", "-i", n.Bridge, "-m", "comment", "--comment", "ocfusion:ipv6", "-j", "REJECT")
+	return xt("ip6tables", "filter", op, "FORWARD", "-i", n.Bridge, "-m", "comment", "--comment", ruleComment(m, "ipv6"), "-j", "REJECT")
 }
 
 func routeRule(m Manifest, n Network, op string) error {
@@ -99,16 +99,16 @@ func closeTunnel(m Manifest) error {
 	}
 	// Delete only our metric-10 tunnel default; never flush someone else's table.
 
-	runner("ip", "route", "del", "default", "dev", "ocvpn0", "metric", "10", "table", strconv.Itoa(m.Table))
+	runner("ip", "route", "del", "default", "dev", tunnelInterface(m), "metric", "10", "table", strconv.Itoa(m.Table))
 	nvset(fmt.Sprintf("vpnc%d_state_t", m.Index), "4")
 	nvset(fmt.Sprintf("vpnc%d_sbstate_t", m.Index), "0")
 
 	return nil
 }
 
-func dnsRules(n Network, dns, op string) error {
+func dnsRules(m Manifest, n Network, dns, op string) error {
 	for _, proto := range []string{"udp", "tcp"} {
-		e := xt("iptables", "nat", op, "PREROUTING", "-i", n.Bridge, "-p", proto, "--dport", "53", "-m", "comment", "--comment", "ocfusion:dns", "-j", "DNAT", "--to-destination", dns)
+		e := xt("iptables", "nat", op, "PREROUTING", "-i", n.Bridge, "-p", proto, "--dport", "53", "-m", "comment", "--comment", ruleComment(m, "dns"), "-j", "DNAT", "--to-destination", dns)
 		if e != nil {
 			return e
 		}
@@ -117,20 +117,20 @@ func dnsRules(n Network, dns, op string) error {
 	return nil
 }
 
-func forwarding(n Network, op string) error {
-	if e := xt("iptables", "filter", op, "FORWARD", "-i", n.Bridge, "-o", "ocvpn0", "-m", "comment", "--comment", "ocfusion:out", "-j", "ACCEPT"); e != nil {
+func forwarding(m Manifest, n Network, op string) error {
+	if e := xt("iptables", "filter", op, "FORWARD", "-i", n.Bridge, "-o", tunnelInterface(m), "-m", "comment", "--comment", ruleComment(m, "out"), "-j", "ACCEPT"); e != nil {
 		return e
 	}
 
-	if e := xt("iptables", "filter", op, "FORWARD", "-i", "ocvpn0", "-o", n.Bridge, "-m", "conntrack", "--ctstate", "ESTABLISHED,RELATED", "-m", "comment", "--comment", "ocfusion:in", "-j", "ACCEPT"); e != nil {
+	if e := xt("iptables", "filter", op, "FORWARD", "-i", tunnelInterface(m), "-o", n.Bridge, "-m", "conntrack", "--ctstate", "ESTABLISHED,RELATED", "-m", "comment", "--comment", ruleComment(m, "in"), "-j", "ACCEPT"); e != nil {
 		return e
 	}
 
-	if e := xt("iptables", "nat", op, "POSTROUTING", "-s", n.CIDR, "-o", "ocvpn0", "-m", "comment", "--comment", "ocfusion:nat", "-j", "MASQUERADE"); e != nil {
+	if e := xt("iptables", "nat", op, "POSTROUTING", "-s", n.CIDR, "-o", tunnelInterface(m), "-m", "comment", "--comment", ruleComment(m, "nat"), "-j", "MASQUERADE"); e != nil {
 		return e
 	}
 
-	return xt("iptables", "mangle", op, "FORWARD", "-i", n.Bridge, "-o", "ocvpn0", "-p", "tcp", "--tcp-flags", "SYN,RST", "SYN", "-m", "comment", "--comment", "ocfusion:mss", "-j", "TCPMSS", "--clamp-mss-to-pmtu")
+	return xt("iptables", "mangle", op, "FORWARD", "-i", n.Bridge, "-o", tunnelInterface(m), "-p", "tcp", "--tcp-flags", "SYN,RST", "SYN", "-m", "comment", "--comment", ruleComment(m, "mss"), "-j", "TCPMSS", "--clamp-mss-to-pmtu")
 }
 
 func prepare(m Manifest, ns []Network) error {
@@ -149,7 +149,7 @@ func prepare(m Manifest, ns []Network) error {
 			return fmt.Errorf("bridge %s not ready", n.Bridge)
 		}
 
-		if e := guard(n, "add"); e != nil {
+		if e := guard(m, n, "add"); e != nil {
 			return e
 		}
 
@@ -163,16 +163,16 @@ func prepare(m Manifest, ns []Network) error {
 
 func unbind(m Manifest, n Network, dns string) {
 	if dns != "" {
-		dnsRules(n, dns, "del")
+		dnsRules(m, n, dns, "del")
 	}
 
-	forwarding(n, "del")
+	forwarding(m, n, "del")
 	routeRule(m, n, "del")
-	guard(n, "del")
+	guard(m, n, "del")
 }
 
-func setTunAddress(ip net.IP) error {
-	addresses, e := runner("ip", "-4", "address", "show", "dev", "ocvpn0")
+func setTunAddress(m Manifest, ip net.IP) error {
+	addresses, e := runner("ip", "-4", "address", "show", "dev", tunnelInterface(m))
 	if e != nil {
 		return e
 	}
@@ -185,17 +185,17 @@ func setTunAddress(ip net.IP) error {
 		}
 	}
 
-	if _, e = runner("ip", "-4", "address", "flush", "dev", "ocvpn0"); e != nil {
+	if _, e = runner("ip", "-4", "address", "flush", "dev", tunnelInterface(m)); e != nil {
 		return e
 	}
 
-	_, e = runner("ip", "address", "add", ip.String()+"/32", "dev", "ocvpn0")
+	_, e = runner("ip", "address", "add", ip.String()+"/32", "dev", tunnelInterface(m))
 
 	return e
 }
 
 func applyConnect(m Manifest, ns []Network, tunnel Tunnel) (retDNS string, retErr error) {
-	if tunnel.Interface != "ocvpn0" {
+	if tunnel.Interface != tunnelInterface(m) {
 		return "", errors.New("unexpected TUN name")
 	}
 
@@ -230,8 +230,8 @@ func applyConnect(m Manifest, ns []Network, tunnel Tunnel) (retDNS string, retEr
 			closeTunnel(m)
 
 			for _, n := range ns {
-				dnsRules(n, dns, "del")
-				forwarding(n, "del")
+				dnsRules(m, n, dns, "del")
+				forwarding(m, n, "del")
 			}
 		}
 	}()
@@ -245,36 +245,36 @@ func applyConnect(m Manifest, ns []Network, tunnel Tunnel) (retDNS string, retEr
 		mtu = 1300
 	}
 
-	if _, e := runner("ip", "link", "set", "dev", "ocvpn0", "mtu", strconv.Itoa(mtu), "up"); e != nil {
+	if _, e := runner("ip", "link", "set", "dev", tunnelInterface(m), "mtu", strconv.Itoa(mtu), "up"); e != nil {
 		return "", e
 	}
 	// Strict reverse-path filtering would reject Internet replies arriving on TUN
 	// because the router main default remains WAN. Scope loose validation to our TUN.
 
-	if e := os.WriteFile("/proc/sys/net/ipv4/conf/ocvpn0/rp_filter", []byte("2\n"), 0600); e != nil {
+	if e := os.WriteFile("/proc/sys/net/ipv4/conf/"+tunnelInterface(m)+"/rp_filter", []byte("2\n"), 0600); e != nil {
 		return "", fmt.Errorf("TUN reverse-path filtering: %w", e)
 	}
 
-	if e := setTunAddress(ip); e != nil {
+	if e := setTunAddress(m, ip); e != nil {
 		return "", e
 	}
 
 	for _, n := range ns {
-		if e := dnsRules(n, dns, "add"); e != nil {
+		if e := dnsRules(m, n, dns, "add"); e != nil {
 			return "", e
 		}
 
-		if e := forwarding(n, "add"); e != nil {
+		if e := forwarding(m, n, "add"); e != nil {
 			return "", e
 		}
 	}
 	// Last operation opens external forwarding through TUN, terminal route remains.
 
-	if _, e := runner("ip", "route", "replace", "default", "dev", "ocvpn0", "metric", "10", "table", strconv.Itoa(m.Table)); e != nil {
+	if _, e := runner("ip", "route", "replace", "default", "dev", tunnelInterface(m), "metric", "10", "table", strconv.Itoa(m.Table)); e != nil {
 		return "", e
 	}
 
-	for k, val := range map[string]string{"ifname": "ocvpn0", "ipaddr": ip.String(), "dns": dns, "state_t": "2", "sbstate_t": "0"} {
+	for k, val := range map[string]string{"ifname": tunnelInterface(m), "ipaddr": ip.String(), "dns": dns, "state_t": "2", "sbstate_t": "0"} {
 		if e := nvset(fmt.Sprintf("vpnc%d_%s", m.Index, k), val); e != nil {
 			return "", e
 		}
@@ -341,47 +341,14 @@ func prepareKernel() error {
 
 const fusionName = "OCFusion (managed)"
 
-func renamedFusion(raw string, m Manifest) (string, error) {
-	rows := strings.Split(raw, "<")
-
-	for i, row := range rows {
-		f := strings.Split(row, ">")
-		if len(f) > 6 && f[6] == strconv.Itoa(m.Index) {
-			if f[1] != "OpenVPN" || f[2] != strconv.Itoa(m.Unit) || (f[0] != "OpenConnect (SSH)" && f[0] != fusionName) {
-				return "", errors.New("reserved Fusion profile changed")
-			}
-
-			f[0] = fusionName
-			rows[i] = strings.Join(f, ">")
-
-			return strings.Join(rows, "<"), nil
-		}
-	}
-
-	return "", errors.New("reserved Fusion profile missing")
+func tunnelInterface(m Manifest) string {
+	return m.Interface
 }
 
-func renameFusion() error {
-	m, e := loadManifest()
-	if e != nil {
-		return e
+func ruleComment(m Manifest, kind string) string {
+	if m.ID == "" || m.Interface == "ocvpn0" {
+		return "ocfusion:" + kind
 	}
 
-	if e = verifyIdentity(m); e != nil {
-		return e
-	}
-
-	before := nvget("vpnc_clientlist")
-	after, e := renamedFusion(before, m)
-	if e != nil || after == before {
-		return e
-	}
-
-	if e = nvset("vpnc_clientlist", after); e != nil {
-		return e
-	}
-
-	_, e = runner("nvram", "commit")
-
-	return e
+	return "ocfusion:" + m.ID + ":" + kind
 }

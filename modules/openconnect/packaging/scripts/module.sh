@@ -28,31 +28,13 @@ case "$1" in
         printf '%s\n' '{"ok":true}'
         ;;
     run)
-        exec "$CTL" daemon
+        exec "$CTL" supervise
         ;;
     reload)
         exec "$CTL" module-import
         ;;
-    settings)
-        exec "$CTL" module-settings
-        ;;
-    update-settings)
-        exec "$CTL" module-patch
-        ;;
-    stop)
-        "$CTL" stop >/dev/null && printf '%s\n' '{"ok":true}'
-        ;;
-    diagnose)
-        "$CTL" status
-        ;;
-    connect)
-        "$CTL" enable >/dev/null && printf '%s\n' '{"ok":true}'
-        ;;
-    disconnect)
-        "$CTL" disable >/dev/null && printf '%s\n' '{"ok":true}'
-        ;;
-    reconnect)
-        "$CTL" disable >/dev/null && "$CTL" enable >/dev/null && printf '%s\n' '{"ok":true}'
+    settings | update-settings | diagnose | connect | disconnect | reconnect | profiles | add-profile | delete-profile | import-profile)
+        exec "$CTL" profile-action "$1"
         ;;
     remove)
         "$CTL" uninstall >/dev/null && printf '%s\n' '{"ok":true}'

@@ -5,6 +5,7 @@ runtime_go = files(
     'daemon/daemon.go',
     'daemon/install.go',
     'daemon/main.go',
+    'daemon/profiles.go',
     'daemon/profile_settings.go',
     'daemon/router.go',
     'daemon/status.go',

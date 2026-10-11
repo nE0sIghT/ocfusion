@@ -14,7 +14,7 @@ func TestExpiredClientClosesTunnelAndKeepsTerminalRoute(t *testing.T) {
 		runner = original
 	})
 
-	manifest := Manifest{Schema: 1, Unit: 4, Index: 7, Table: 51998, Priority: 90, Firmware: "test_102_build"}
+	manifest := Manifest{Schema: 1, Interface: "ocvpn0", Unit: 4, Index: 7, Table: 51998, Priority: 90, Firmware: "test_102_build"}
 	commands := []string{}
 	runner = func(name string, args ...string) (string, error) {
 		command := name + " " + strings.Join(args, " ")

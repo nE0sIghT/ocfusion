@@ -41,17 +41,9 @@ func loadTransport() (Transport, error) {
 func preparePlatform(bundle string) error {
 	transport, err := loadTransport()
 	if os.IsNotExist(err) {
-		// Adopt the existing reservation during an MVP upgrade; do not allocate a new index.
-		data, legacyErr := os.ReadFile("/jffs/ocfusion/manifest.json")
-		if legacyErr == nil {
-			legacyErr = json.Unmarshal(data, &transport)
-		}
-
-		if legacyErr != nil {
-			transport, err = reserveTransport()
-			if err != nil {
-				return err
-			}
+		transport, err = reserveTransport()
+		if err != nil {
+			return err
 		}
 	} else if err != nil {
 		return err

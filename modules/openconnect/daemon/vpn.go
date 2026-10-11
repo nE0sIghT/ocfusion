@@ -24,10 +24,12 @@ type Tunnel struct {
 }
 
 type vpnRequest struct {
-	API       int     `json:"api"`
-	Operation string  `json:"operation"`
-	Client    string  `json:"client"`
-	Tunnel    *Tunnel `json:"tunnel,omitempty"`
+	API        int     `json:"api"`
+	Operation  string  `json:"operation"`
+	Client     string  `json:"client"`
+	Profile    string  `json:"profile"`
+	Connection string  `json:"connection,omitempty"`
+	Tunnel     *Tunnel `json:"tunnel,omitempty"`
 }
 
 type vpnResponse struct {
@@ -44,6 +46,12 @@ func callVPN(request vpnRequest) (vpnResponse, error) {
 	var response vpnResponse
 	request.API = 1
 	request.Client = "openconnect"
+	request.Profile = profileID
+	if request.Operation != "claim" && request.Connection == "" {
+		if manifest, err := loadManifest(); err == nil {
+			request.Connection = manifest.ID
+		}
+	}
 	connection, err := net.DialTimeout("unix", "/tmp/ocfusion-vpn/control.sock", 2*time.Second)
 	if err != nil {
 		return response, errors.New("VPN service unavailable")
