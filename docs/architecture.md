@@ -41,7 +41,7 @@ USB preparation places a temporary Apps entry that runs the installer using the 
 
 ## Web and request flow
 
-The panel uses the native ASUS server, login, CSS and language selector. A RAM bind overlay of the verified original `/www/state.js` adds one leading OCFusion icon <img src="../web/icon.png" alt="OCFusion" width="24" height="24"> and loads declared module contributions on supported stock pages. Overlay ownership/hash checks prevent replacing an unknown page. The panel also has a direct URL. Firmware assets are referenced on the running router, not redistributed.
+The panel uses the native ASUS server, login, CSS and language selector. A RAM bind overlay of the verified original `/www/state.js` adds one leading OCFusion icon <img src="../web/icon.png" alt="OCFusion" width="24" height="24"> and loads declared module contributions on supported stock pages. Overlay ownership/hash checks prevent replacing an unknown page. The panel also has a direct URL. Firmware assets are referenced on the running router, not redistributed. Own panel scripts load in order with fresh URLs on each page load; reload an already open panel after an update.
 
 The manager publishes each manifest `ui` directory under `/user/extensions-modules/<id>/...` and generates menu/card metadata. The shared panel opens these pages in one iframe. Module pages reuse the parent language and common styles; they do not nest another ASUS header/sidebar. There are no build-time module HTML/JavaScript insertions.
 

@@ -2,11 +2,9 @@
   <a href="https://github.com/nE0sIghT/ocfusion"><img src="web/logo.png" alt="OCFusion" width="360"></a>
 </p>
 
-# OCFusion
+# OCFusion - all you need is USB flash
 
-**All you need is USB flash**
-
-OCFusion is a platform for extending stock ASUSWRT functionality without flashing replacement firmware. It provides an extension panel and module lifecycle management.
+OCFusion is a platform for extending stock ASUSWRT functionality without flashing replacement firmware. It provides an extension panel and module lifecycle management. An ext4-formatted USB flash drive must remain connected while OCFusion is running.
 
 ## Available modules
 
