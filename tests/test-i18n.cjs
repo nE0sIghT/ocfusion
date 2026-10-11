@@ -269,6 +269,24 @@ async function testModuleUI(browser, address, language) {
   const frame = page.frameLocator("#module-frame");
 
   await frame.locator("#vpn-server").waitFor();
+  const resourceURLs = await page
+    .locator("body > script[src]")
+    .evaluateAll((scripts) =>
+      scripts.map((script) => script.getAttribute("src")),
+    );
+
+  assert.deepEqual(
+    resourceURLs.map((url) => url.split("?")[0]),
+    [
+      "/user/ocfusion.js",
+      "/user/extensions-panel.js",
+      "/user/ocfusion-i18n.js",
+    ],
+  );
+  assert(
+    resourceURLs.every((url) => /\?_=[0-9]+$/.test(url)),
+    "Own scripts can reuse same-version browser cache",
+  );
   await page
     .waitForFunction(
       () => {

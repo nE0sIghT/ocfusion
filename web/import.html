@@ -15,7 +15,6 @@
     <script src="/general.js"></script>
     <script src="/help.js"></script>
     <link rel="stylesheet" href="/user/extensions-panel.css" />
-    <script src="/user/ocfusion.js"></script>
   </head>
   <body class="bg">
     <div id="TopBanner">
@@ -157,7 +156,23 @@
         </main>
       </div>
     </div>
-    <script src="/user/extensions-panel.js"></script>
-    <script src="/user/ocfusion-i18n.js"></script>
+    <script>
+      (() => {
+        const revision = Date.now();
+        const resources = [
+          "/user/ocfusion.js",
+          "/user/extensions-panel.js",
+          "/user/ocfusion-i18n.js",
+        ];
+
+        for (const resource of resources) {
+          const script = document.createElement("script");
+
+          script.async = false;
+          script.src = resource + "?_=" + revision;
+          document.body.appendChild(script);
+        }
+      })();
+    </script>
   </body>
 </html>
