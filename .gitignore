@@ -6,8 +6,6 @@
 /node_modules/
 __pycache__/
 *.pyc
-*.occonf
-!packaging/examples/profile.occonf
 .env
 
 /.venv/

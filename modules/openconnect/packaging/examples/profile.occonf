@@ -1,0 +1,8 @@
+{
+  "schema": 1,
+  "server": "https://vpn.example.com/",
+  "protocol": "anyconnect",
+  "username": "YOUR_USERNAME",
+  "password": "REPLACE_WITH_PASSWORD",
+  "enabled": true
+}

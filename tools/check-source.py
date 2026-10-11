@@ -91,7 +91,11 @@ def check_tracked_paths():
     if not (PROJECT_ROOT / ".git").exists():
         return
     output = subprocess.check_output(["git", "ls-files", "-z"], cwd=PROJECT_ROOT)
-    for name in output.decode().split("\0"):
+    tracked = output.decode().split("\0")
+    example = "modules/openconnect/packaging/examples/profile.occonf"
+    assert example in tracked, f"missing tracked distribution example: {example}"
+
+    for name in tracked:
         assert not name.startswith(FORBIDDEN_TRACKED_PREFIXES) and name != "PLAN.md", (
             name
         )
