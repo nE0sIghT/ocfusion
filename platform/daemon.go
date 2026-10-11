@@ -61,10 +61,6 @@ func daemon() error {
 	stopUploadProbe := startUploadProbe()
 	defer stopUploadProbe()
 
-	mailboxDone := make(chan struct{})
-	defer close(mailboxDone)
-	go serveMailbox(mailboxDone)
-
 	os.WriteFile(ram+"/pid", []byte(fmt.Sprint(os.Getpid())), 0600)
 	defer os.Remove(ram + "/pid")
 	os.Remove(socket)

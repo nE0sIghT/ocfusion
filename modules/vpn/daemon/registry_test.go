@@ -16,7 +16,7 @@ func fixtureBroker(t *testing.T) (*Broker, map[string]string) {
 	oldRoot, oldTransport, oldRunner := root, transportPath, runner
 	root = t.TempDir()
 	transportPath = filepath.Join(t.TempDir(), "transport.json")
-	os.WriteFile(transportPath, []byte(`{"unit":4,"vpnc_idx":7}`), 0600)
+	os.WriteFile(transportPath, []byte(`{"unit":4,"vpnc_idx":7,"key":"vpn_client4_custom"}`), 0600)
 	t.Cleanup(func() {
 		root, transportPath, runner = oldRoot, oldTransport, oldRunner
 	})
@@ -79,6 +79,7 @@ func TestIndependentVPNConsumers(t *testing.T) {
 
 func TestNativeCapacity(t *testing.T) {
 	broker, values := fixtureBroker(t)
+	values["vpnc_clientlist"] = ""
 	for _, profile := range []string{"one", "two", "three", "four", "five"} {
 		if _, err := broker.handle(Request{API: 1, Client: "consumer", Profile: profile, Operation: "claim"}); err != nil {
 			t.Fatal(err)
@@ -102,7 +103,7 @@ func TestMigrationPreserves029Resources(t *testing.T) {
 		t.Fatal(err)
 	}
 	migrated := registry.Items["openconnect-default"]
-	if migrated.Unit != old.Unit || migrated.Index != old.Index || migrated.Table != old.Table || migrated.Priority != old.Priority || migrated.Interface != "ocvpn0" || !migrated.Shared {
+	if migrated.Unit != old.Unit || migrated.Index != old.Index || migrated.Table != old.Table || migrated.Priority != old.Priority || migrated.Interface != "ocvpn0" || migrated.Shared {
 		t.Fatal("migration changed resources", migrated)
 	}
 	if err := writeConnections(registry); err != nil {
@@ -196,18 +197,75 @@ func TestMalformedMigrationLeavesSourceUntouched(t *testing.T) {
 	}
 }
 
-func TestSharedConnectionRemovalKeepsMailbox(t *testing.T) {
+func TestSharedBindingMigrationPreservesNetworksAndClearsMailbox(t *testing.T) {
+	_, values := fixtureBroker(t)
+	old := Manifest{Schema: 1, Unit: 4, Index: 7, Table: 51998, Priority: 90, Firmware: "test_102_build"}
+	saveJSON(filepath.Join(root, "connection.json"), old)
+	values["vpn_client4_custom"] = "# OCF-STATUS1 previous"
+	native := values["vpnc_clientlist"]
+	values["sdn_rl"] = "unchanged network bindings"
+
+	if err := install(); err != nil {
+		t.Fatal(err)
+	}
+
+	registry, err := readConnections()
+	if err != nil || registry.Items["openconnect-default"].Shared || registry.Items["openconnect-default"].Index != 7 || values["vpn_client4_custom"] != "" || values["vpnc_clientlist"] != native || values["sdn_rl"] != "unchanged network bindings" {
+		t.Fatal("migration changed binding or kept mailbox", registry, values, err)
+	}
+
+	values["vpn_client4_custom"] = "administrator content"
+	if err := install(); err != nil || values["vpn_client4_custom"] != "administrator content" {
+		t.Fatal("repeat migration changed administrator content", err)
+	}
+}
+
+func TestFreshAllocationDoesNotRequirePlatformTransport(t *testing.T) {
 	broker, values := fixtureBroker(t)
-	values["vpn_client4_custom"] = "platform-mailbox"
-	response, err := broker.handle(Request{API: 1, Client: "openconnect", Profile: "default", Operation: "claim"})
+	os.Remove(transportPath)
+	values["vpnc_clientlist"] = ""
+
+	response, err := broker.handle(Request{API: 1, Client: "other-vpn", Profile: "office", Operation: "claim"})
+	if err != nil || response.Manifest.Shared || response.Manifest.Unit != 1 {
+		t.Fatal("native binding depends on platform transport", response, err)
+	}
+}
+
+func TestMigrationOfShared03Connection(t *testing.T) {
+	broker, values := fixtureBroker(t)
+	manifest := Manifest{
+		Schema: 1, ID: "connection-7", Client: "openconnect", Profile: "default",
+		Unit: 4, Index: 7, Table: 51998, Priority: 90, Interface: "ocvpn0",
+		Name: fusionName, Shared: true, Firmware: "test_102_build",
+	}
+	registry := Connections{Schema: 1, Items: map[string]Manifest{manifest.ID: manifest}}
+	if err := writeConnections(registry); err != nil {
+		t.Fatal(err)
+	}
+
+	native := values["vpnc_clientlist"]
+	if err := install(); err != nil {
+		t.Fatal(err)
+	}
+
+	migrated, err := readConnections()
 	if err != nil {
 		t.Fatal(err)
 	}
-	native := values["vpnc_clientlist"]
-	if _, err := broker.handle(Request{API: 1, Client: "openconnect", Profile: "default", Connection: response.Manifest.ID, Operation: "release"}); err != nil {
-		t.Fatal(err)
+
+	expected := manifest
+	expected.Shared = false
+	if !reflect.DeepEqual(migrated.Items[manifest.ID], expected) || values["vpnc_clientlist"] != native {
+		t.Fatal("existing connection resources changed", migrated, values)
 	}
-	if values["vpn_client4_custom"] != "platform-mailbox" || values["vpnc_clientlist"] != native || len(broker.registry.Items) != 0 {
-		t.Fatal("shared removal damaged platform transport")
+
+	broker = newBroker(migrated)
+	response, err := broker.handle(Request{API: 1, Client: "openconnect", Profile: "default", Operation: "claim"})
+	if err != nil || response.Manifest.Unit != 4 || response.Manifest.Index != 7 || values["vpnc_clientlist"] != native {
+		t.Fatal("existing default allocated another binding", response, err)
+	}
+
+	if _, err := broker.handle(Request{API: 1, Client: "openconnect", Profile: "default", Connection: manifest.ID, Operation: "release"}); err != nil || strings.Contains(values["vpnc_clientlist"], ">7>") {
+		t.Fatal("transferred binding still owned by platform", values, err)
 	}
 }

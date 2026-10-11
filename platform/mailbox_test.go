@@ -2,73 +2,49 @@
 package main
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"os"
 	"strings"
 	"testing"
 	"time"
 )
 
-func TestGenericMailboxCommitsOnlyCompleteVerifiedUploads(t *testing.T) {
-	previousRAM := ram
-	previousCommand := runModuleCommand
+func TestDirectConfigurationBoundsAndCleanup(t *testing.T) {
+	previousRAM, previousCommand := ram, runModuleCommand
 	ram = t.TempDir()
 	t.Cleanup(func() {
-		ram = previousRAM
-		runModuleCommand = previousCommand
+		ram, runModuleCommand = previousRAM, previousCommand
 	})
 
-	committed := false
-	raw := []byte(`{"secret":"` + strings.Repeat("x", 6000) + `"}`)
+	calls := 0
+	config := json.RawMessage(`{"secret":"` + strings.Repeat("x", 6000) + `"}`)
 	runModuleCommand = func(args ...string) (json.RawMessage, error) {
-		if args[0] != "config" || args[1] != "example" {
-			t.Fatal(args)
-		}
-
+		calls++
 		data, err := os.ReadFile(args[2])
-		if err != nil || string(data) != string(raw) {
-			t.Fatal("invalid committed content", err)
+		if args[0] != "config" || args[1] != "example" || err != nil || string(data) != string(config) {
+			t.Fatal("configuration changed", args, err)
 		}
 
-		committed = true
 		return json.RawMessage(`{"ok":true}`), nil
 	}
 
-	digest := sha256.Sum256(raw)
-	upload := strings.Repeat("a", 32)
 	mailbox := &webMailbox{}
-	counter := 0
-	send := func(request webRequest, want bool) {
-		counter++
-		request.ID = fmt.Sprintf("%032x", counter)
-		data, _ := json.Marshal(request)
-		_, ok, _ := mailbox.apply(data, time.Now())
-		if ok != want {
-			t.Fatalf("action %s: %v %s", request.Action, ok, mailbox.LastMessage)
-		}
+	request := webRequest{ID: strings.Repeat("a", 32), Action: "module.configure", Module: "example", Config: config}
+	raw, _ := json.Marshal(request)
+	if _, ok, _ := mailbox.apply(raw, time.Now()); !ok {
+		t.Fatal(mailbox.LastMessage)
 	}
 
-	send(webRequest{Action: "upload.begin", Module: "example", Upload: upload, Size: len(raw), SHA256: hex.EncodeToString(digest[:])}, true)
-	send(webRequest{Action: "upload.finish", Upload: upload}, false)
-	if committed {
-		t.Fatal("partial upload committed")
+	if _, err := os.Stat(ram + "/web-config.json"); !os.IsNotExist(err) {
+		t.Fatal("private configuration retained")
 	}
 
-	for offset := 0; offset < len(raw); offset += 1024 {
-		end := min(offset+1024, len(raw))
-		send(webRequest{Action: "upload.chunk", Upload: upload, Offset: offset, Data: raw[offset:end]}, true)
+	request.ID = strings.Repeat("b", 32)
+	request.Config = json.RawMessage(`{"secret":"` + strings.Repeat("x", 16384) + `"}`)
+	raw, _ = json.Marshal(request)
+	if _, ok, _ := mailbox.apply(raw, time.Now()); ok || calls != 1 {
+		t.Fatal("oversized configuration dispatched")
 	}
-
-	send(webRequest{Action: "upload.finish", Upload: upload}, true)
-	if !committed || strings.Contains(mailbox.LastMessage, "xxxx") {
-		t.Fatal("missing commit or exposed secret")
-	}
-
-	send(webRequest{Action: "upload.begin", Module: "example", Upload: upload, Size: 16385, SHA256: hex.EncodeToString(digest[:])}, false)
-	send(webRequest{Action: "exec"}, false)
 }
 
 func TestInlineModuleCall(t *testing.T) {

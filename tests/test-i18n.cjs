@@ -33,17 +33,24 @@ const requests = [];
 
 let mailbox = {};
 
-function statusWire() {
-  return (
-    "# OCF-STATUS1 " + Buffer.from(JSON.stringify(mailbox)).toString("base64")
-  );
+function crc32(payload) {
+  let crc = 0xffffffff;
+
+  for (const byte of Buffer.from(payload)) {
+    crc ^= byte;
+
+    for (let bit = 0; bit < 8; bit++) {
+      crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
+    }
+  }
+
+  return ((crc ^ 0xffffffff) >>> 0).toString(16).padStart(8, "0");
 }
 
 function createFixtureServer() {
-  let uploadOperation = "";
-  let uploadBytes = [];
   const profiles = ["default"];
   let uploadReply = null;
+  let commandReply = null;
   return http.createServer(async (request, response) => {
     const url = new URL(request.url, "http://localhost");
     const send = (body, type) => {
@@ -118,6 +125,62 @@ function createFixtureServer() {
 
       const start = css.indexOf("\r\n\r\n") + 4;
       const packet = JSON.parse(css.slice(start).split("\r\n")[0]);
+      if (packet.protocol === "ocfusion-command-v1") {
+        assert.equal(packet.crc32, crc32(packet.payload));
+        const q = JSON.parse(packet.payload);
+        requests.push(q);
+        if (q.action === "module.call" && q.module === "openconnect") {
+          assert(
+            openconnectManifest.actions.includes(q.operation),
+            "Undeclared module action: " + q.operation,
+          );
+        }
+        if (q.action === "module.call" && q.operation === "add-profile") {
+          profiles.push(q.config.profile);
+        }
+        if (q.action === "module.call" && q.operation === "delete-profile") {
+          profiles.splice(profiles.indexOf(q.config.profile), 1);
+        }
+
+        const data =
+          q.operation === "profiles"
+            ? profiles
+            : q.operation === "settings"
+              ? {
+                  revision: "revision1",
+                  server: "https://vpn.example/",
+                  enabled: true,
+                  has_certificate: true,
+                  has_private_key: true,
+                }
+              : q.operation === "diagnose"
+                ? {
+                    state: "UP",
+                    message: "IPv4 full tunnel; Wi-Fi/VLAN bindings active",
+                    networks: [
+                      { bridge: "br55", cidr: "192.168.52.0/24", sdn_idx: "4" },
+                    ],
+                  }
+                : { ok: true };
+
+        mailbox = {
+          state: "UP",
+          networks: [],
+          request_id: q.id,
+          request_ok: true,
+          request_data: data,
+        };
+
+        const payload = JSON.stringify(mailbox);
+        commandReply = {
+          instance: packet.instance,
+          id: packet.id,
+          payload,
+          crc32: crc32(payload),
+        };
+        return send("{}", "text/html");
+      }
+
       const expected = "OCF0123456789abcdef"
         .repeat(Math.ceil(packet.size / 18))
         .slice(0, packet.size);
@@ -151,89 +214,12 @@ function createFixtureServer() {
       return send(JSON.stringify(uploadReply), "application/json");
     }
 
-    if (url.pathname === "/appGet.cgi") {
-      return send(
-        JSON.stringify({
-          vpn_client4_custom: encodeURIComponent(statusWire()),
-        }),
-        "application/json",
-      );
-    }
-
-    if (url.pathname === "/applyapp.cgi") {
-      let body = "";
-
-      for await (const part of request) {
-        body += part;
+    if (url.pathname === "/user/extensions-command-reply.json") {
+      if (!commandReply) {
+        response.statusCode = 404;
       }
 
-      const payload = JSON.parse(decodeURIComponent(body));
-      const q = JSON.parse(
-        Buffer.from(payload.vpn_client4_custom.slice(15), "base64").toString(),
-      );
-
-      requests.push(q);
-      if (q.action === "module.call" && q.module === "openconnect") {
-        assert(
-          openconnectManifest.actions.includes(q.operation),
-          "Undeclared module action: " + q.operation,
-        );
-      }
-      if (q.action === "upload.begin") {
-        uploadOperation = q.operation;
-        uploadBytes = [];
-      }
-      if (q.action === "upload.chunk") {
-        uploadBytes.push(Buffer.from(q.data, "base64"));
-      }
-      if (q.action === "upload.finish") {
-        q.operation = uploadOperation;
-        const payload = JSON.parse(Buffer.concat(uploadBytes).toString());
-        if (q.operation === "add-profile") {
-          profiles.push(payload.profile);
-        }
-        if (q.operation === "delete-profile") {
-          profiles.splice(profiles.indexOf(payload.profile), 1);
-        }
-      }
-
-      if (q.action === "module.call" && q.operation === "add-profile") {
-        profiles.push(q.config.profile);
-      }
-      if (q.action === "module.call" && q.operation === "delete-profile") {
-        profiles.splice(profiles.indexOf(q.config.profile), 1);
-      }
-
-      const data =
-        q.operation === "profiles"
-          ? profiles
-          : q.operation === "settings"
-            ? {
-                revision: "revision1",
-                server: "https://vpn.example/",
-                enabled: true,
-                has_certificate: true,
-                has_private_key: true,
-              }
-            : q.operation === "diagnose"
-              ? {
-                  state: "UP",
-                  message: "IPv4 full tunnel; Wi-Fi/VLAN bindings active",
-                  networks: [
-                    { bridge: "br55", cidr: "192.168.52.0/24", sdn_idx: "4" },
-                  ],
-                }
-              : { ok: true };
-
-      mailbox = {
-        state: "UP",
-        networks: [],
-        request_id: q.id,
-        request_ok: true,
-        request_data: data,
-      };
-
-      return send("{}", "application/json");
+      return send(JSON.stringify(commandReply), "application/json");
     }
 
     if (url.pathname === "/state.js") {
@@ -245,7 +231,7 @@ function createFixtureServer() {
 
     if (url.pathname === "/user/ocfusion.js") {
       return send(
-        'window.OCF_SETTINGS={version:"0.2.9",key:"vpn_client4_custom",language:"RU",model:"TEST-ROUTER"};',
+        'window.OCF_SETTINGS={version:"0.2.9",language:"RU",model:"TEST-ROUTER"};',
         "text/javascript",
       );
     }

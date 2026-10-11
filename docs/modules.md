@@ -119,10 +119,10 @@ An iframe can call:
 ```js
 await parent.EXTENSIONS.action('heartbeat', 'enable');
 await parent.EXTENSIONS.action('heartbeat', 'disable');
-// Public status polling does not use the command mailbox.
+// Public status polling does not use the command transport.
 const snapshot = await parent.EXTENSIONS.status('heartbeat');
 const diagnostics = snapshot.data;
-// An on-demand diagnostic action may still use the mailbox.
+// An on-demand diagnostic action may still use the command transport.
 await parent.EXTENSIONS.action('heartbeat', 'diagnose');
 // Custom actions must be declared and implemented by the module.
 const settings = await parent.EXTENSIONS.action('heartbeat', 'settings');
@@ -130,9 +130,11 @@ await parent.EXTENSIONS.call('heartbeat', 'update-settings', {interval: 10});
 await parent.EXTENSIONS.configure('heartbeat', {interval: 10});
 ```
 
-`status(id)` reads a public snapshot and checks its envelope freshness. It does not serialize with command transactions or write NVRAM. Treat null data as unavailable, never as a successful tunnel state. `action(id, operation)` returns the operation's JSON response. Standard browser operations are `enable`, `disable`, `status` and `diagnose`; other operations must be declared in the manifest's `actions`. `call(id, action, data, onProgress?)` invokes a declared action with JSON data, delivered in the entrypoint's usual stdin envelope as `config`. `configure(id, config, onProgress?)` keeps the validate/save/reload whole-object configuration contract. Optional progress callbacks receive display text. `EXTENSIONS.busy` reports an active transport transaction; calls during another transaction reject rather than overwrite the mailbox.
+`status(id)` reads a public snapshot and checks its envelope freshness. It does not serialize with command transactions or write NVRAM. Treat null data as unavailable, never as a successful tunnel state. `action(id, operation)` returns the operation's JSON response. Standard browser operations are `enable`, `disable`, `status` and `diagnose`; other operations must be declared in the manifest's `actions`. `call(id, action, data, onProgress?)` invokes a declared action with JSON data, delivered in the entrypoint's usual stdin envelope as `config`. `configure(id, config, onProgress?)` keeps the validate/save/reload whole-object configuration contract. Optional progress callbacks receive display text. `EXTENSIONS.busy` reports an active transport transaction; calls during another transaction reject rather than overwrite this panel's active request.
 
-The browser transport uses the ASUS session, bounded NVRAM mailbox, nonce acknowledgements and chunked uploads. Calls with up to 1024 bytes of JSON use a bounded inline request and work over HTTP as well as HTTPS. Larger calls and configuration uploads require HTTPS for the browser SHA-256 implementation. Configuration/action data is limited to 16 KiB. Browser JSON responses are limited to 2048 bytes after JSON compaction, and must fit the complete 4 KiB ASUS mailbox response; larger responses reject. Entrypoints retain their 32 KiB CLI output bound, so browser-facing actions should return a small object. Requests expire rather than acknowledging a stale status. Entry failure rejects the Promise with a generic message; stderr and raw errors are not exposed.
+The browser transport uses the ASUS session, native `splash_page.cgi` multipart upload into a private RAM file and a RAM JSON reply. Requests and replies contain a random request ID, receiver instance and CRC32/IEEE of their exact UTF-8 payload strings. Requests expire after at most one minute. A bad checksum is discarded before dispatch; a matching HTTP upload response alone is not acknowledgement. Calls/configuration data are limited to 16 KiB and sent in one request, without chunks or browser Web Crypto. Calls up to 1024 bytes work over HTTP and HTTPS; larger calls/configuration require HTTPS to protect private data in transit. Browser JSON action responses remain limited to 2048 bytes after compaction; the CLI output bound remains 32 KiB. Entry failure rejects the Promise with a generic message; stderr and raw errors are not exposed.
+
+The shared inbox/reply can be overwritten by concurrent tabs. Each panel rejects overlapping local transactions, but there is no cross-tab locking or delivery guarantee. A timeout means an unknown outcome, not a confirmed failure; modifying commands are not automatically retried. Modules should use revision checks for configuration updates and idempotent actions where appropriate. CRC32 checks accidental corruption and does not replace ASUS authentication or HTTPS.
 
 There is no browser archive installer or automatic secret redaction. A module implements its own settings/read/PATCH actions if needed, declares them in `actions` and returns only safe public fields. Configuration file paths remain private; do not expose secrets in UI assets or diagnostics.
 
@@ -193,7 +195,7 @@ Send one JSON object per connection to `/tmp/ocfusion-vpn/control.sock`, mode 06
 
 Use the interface returned by the provider rather than a fixed name. Responses contain `ok`, connection `manifest`, `networks` and selected `dns`. Failures return `ok: false` and `error`; redact errors before exposing them to the browser. Credentials never go to the provider.
 
-Renew each active connection with `apply` at least every 3 seconds. After 12 seconds without a heartbeat the provider closes that connection while keeping its guards. A bridge cannot belong to multiple connections. Remove native network assignments before `release`. Releasing a connection never removes the platform mailbox reservation.
+Renew each active connection with `apply` at least every 3 seconds. After 12 seconds without a heartbeat the provider closes that connection while keeping its guards. A bridge cannot belong to multiple connections. Remove native network assignments before `release`. Releasing a connection removes only its own native binding; web transport has no Fusion reservation.
 
 OpenConnect settings actions use `{ "profile": "office", "data": {...} }` as the module action configuration. `profiles` lists IDs; `add-profile` and `delete-profile` create/remove profiles; `settings`, `update-settings`, `import-profile`, `diagnose`, `connect`, `disconnect` and `reconnect` target the selected profile. The default profile preserves the 0.2.9 installation and cannot be deleted individually.
 

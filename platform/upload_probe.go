@@ -8,6 +8,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"hash/crc32"
 	"io"
 	"os"
 	"path/filepath"
@@ -25,6 +27,7 @@ type uploadProbe struct {
 	Resource string `json:"resource"`
 	Target   string `json:"target"`
 	Instance string `json:"instance"`
+	mailbox  *webMailbox
 }
 
 type uploadProbeRequest struct {
@@ -33,6 +36,8 @@ type uploadProbeRequest struct {
 	ID       string `json:"id"`
 	Size     int    `json:"size"`
 	Payload  string `json:"payload"`
+	CRC32    string `json:"crc32"`
+	Expires  int64  `json:"expires_at"`
 }
 
 func uploadProbePayload(size int) string {
@@ -64,7 +69,7 @@ func (p uploadProbe) removeLink() {
 }
 
 func prepareUploadProbe() (uploadProbe, int, error) {
-	p := uploadProbe{Target: filepath.Join(ram, "upload-probe", "inbox")}
+	p := uploadProbe{Target: filepath.Join(ram, "upload-probe", "inbox"), mailbox: &webMailbox{}}
 	ownerPath := filepath.Join(base, "upload-probe.json")
 	var previous uploadProbe
 	if data, err := os.ReadFile(ownerPath); err == nil && json.Unmarshal(data, &previous) == nil {
@@ -122,6 +127,7 @@ func prepareUploadProbe() (uploadProbe, int, error) {
 	}
 
 	os.Remove(filepath.Join(webRoot, "extensions-upload-reply.json"))
+	os.Remove(filepath.Join(webRoot, "extensions-command-reply.json"))
 	if err = p.publish("READY"); err != nil {
 		syscall.Close(fd)
 		p.removeLink()
@@ -132,8 +138,43 @@ func prepareUploadProbe() (uploadProbe, int, error) {
 	return p, fd, nil
 }
 
-// Only a fixed synthetic pattern is accepted. This diagnostic cannot dispatch
-// module operations, echo credentials or turn the stock uploader into a shell.
+// Diagnostic echoes stay synthetic. Commands use a separate checked envelope
+// and only fixed, declared module operations.
+func payloadCRC(payload string) string {
+	return fmt.Sprintf("%08x", crc32.ChecksumIEEE([]byte(payload)))
+}
+
+func (p uploadProbe) command(request uploadProbeRequest) {
+	if len(request.Payload) > 24576 || request.CRC32 != payloadCRC(request.Payload) {
+		return
+	}
+
+	now := time.Now()
+	if request.Expires < now.UnixMilli() || request.Expires > now.Add(time.Minute).UnixMilli() {
+		return
+	}
+
+	var command webRequest
+	if json.Unmarshal([]byte(request.Payload), &command) != nil || command.ID != request.ID {
+		return
+	}
+
+	if p.mailbox == nil {
+		return
+	}
+
+	p.mailbox.apply([]byte(request.Payload), now)
+	payload, _ := json.Marshal(map[string]any{
+		"request_id": p.mailbox.LastID, "request_ok": p.mailbox.LastOK,
+		"request_message": p.mailbox.LastMessage, "request_data": p.mailbox.LastData,
+	})
+	response, _ := json.Marshal(map[string]any{
+		"instance": p.Instance, "id": request.ID, "payload": string(payload),
+		"crc32": payloadCRC(string(payload)),
+	})
+	atomicWrite(filepath.Join(webRoot, "extensions-command-reply.json"), response, 0644)
+}
+
 func (p uploadProbe) consume() {
 	info, err := os.Lstat(p.Target)
 	if err != nil || !info.Mode().IsRegular() || info.Size() == 0 {
@@ -154,7 +195,17 @@ func (p uploadProbe) consume() {
 		return
 	}
 
-	if request.Protocol != "ocfusion-upload-probe-v1" || request.Instance != p.Instance || !validNonce(request.ID) || request.Size < 1 || request.Size > uploadProbeLimit {
+	if request.Instance != p.Instance || !validNonce(request.ID) {
+		return
+	}
+
+	if request.Protocol == "ocfusion-command-v1" {
+		p.command(request)
+
+		return
+	}
+
+	if request.Protocol != "ocfusion-upload-probe-v1" || request.Size < 1 || request.Size > uploadProbeLimit {
 		return
 	}
 
@@ -223,5 +274,6 @@ func startUploadProbe() func() {
 		os.Truncate(p.Target, 0)
 		p.publish("STOPPED")
 		os.Remove(filepath.Join(webRoot, "extensions-upload-reply.json"))
+		os.Remove(filepath.Join(webRoot, "extensions-command-reply.json"))
 	}
 }

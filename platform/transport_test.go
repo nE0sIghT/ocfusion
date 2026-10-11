@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestPlatformPublishesAndAllocatesTransportWithoutModules(t *testing.T) {
+func TestPlatformPublishesWithoutNativeVPNReservation(t *testing.T) {
 	previousBase := base
 	previousRAM := ram
 	previousWeb := webRoot
@@ -49,8 +49,8 @@ func TestPlatformPublishesAndAllocatesTransportWithoutModules(t *testing.T) {
 	}
 
 	transport, err := loadTransport()
-	if err != nil || transport.Unit == 0 || transport.Index == 0 {
-		t.Fatal("transport depends on a module", transport, err)
+	if err != nil || transport.Unit != 0 || transport.Index != 0 || values["vpnc_clientlist"] != "" {
+		t.Fatal("platform reserved a native VPN slot", transport, err)
 	}
 
 	if err := verifyPlatformAssets(bundle); err != nil {

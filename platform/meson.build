@@ -16,7 +16,6 @@ platform_go = files(
     'process.go',
     'registry.go',
     'stock.go',
-    'stock_mailbox.go',
     'stock_web.go',
     'transport.go',
     'upload_probe.go',

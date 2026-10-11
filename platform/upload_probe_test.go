@@ -218,3 +218,72 @@ func TestUploadProbeOwnershipAndRestart(t *testing.T) {
 		t.Fatal("foreign replacement removed")
 	}
 }
+
+func TestCommandCRCExpiryAndReplies(t *testing.T) {
+	uploadProbeFixture(t)
+	previous := runModuleCommand
+	t.Cleanup(func() {
+		runModuleCommand = previous
+	})
+
+	calls := 0
+	runModuleCommand = func(args ...string) (json.RawMessage, error) {
+		calls++
+
+		return json.RawMessage(`{"label":"Привет"}`), nil
+	}
+
+	p, fd, err := prepareUploadProbe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer syscall.Close(fd)
+	defer p.removeLink()
+
+	payload := `{"id":"0123456789abcdef0123456789abcdef","action":"module.action","module":"example","operation":"settings"}`
+	request := uploadProbeRequest{
+		Protocol: "ocfusion-command-v1", Instance: p.Instance,
+		ID: "0123456789abcdef0123456789abcdef", Payload: payload,
+		CRC32: payloadCRC(payload), Expires: time.Now().Add(30 * time.Second).UnixMilli(),
+	}
+	path := filepath.Join(webRoot, "extensions-command-reply.json")
+	send := func() {
+		raw, _ := json.Marshal(request)
+		os.WriteFile(p.Target, raw, 0600)
+		p.consume()
+	}
+
+	request.CRC32 = "00000000"
+	send()
+	if calls != 0 {
+		t.Fatal("corrupt request dispatched")
+	}
+
+	request.CRC32 = payloadCRC(payload)
+	request.Expires = time.Now().Add(-time.Minute).UnixMilli()
+	send()
+	if calls != 0 {
+		t.Fatal("expired request dispatched")
+	}
+
+	request.Expires = time.Now().Add(30 * time.Second).UnixMilli()
+	send()
+	var reply struct {
+		ID      string `json:"id"`
+		Payload string `json:"payload"`
+		CRC32   string `json:"crc32"`
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil || json.Unmarshal(raw, &reply) != nil || calls != 1 || reply.ID != request.ID || reply.CRC32 != payloadCRC(reply.Payload) || !strings.Contains(reply.Payload, "Привет") {
+		t.Fatal("invalid checked reply", string(raw), calls, err)
+	}
+
+	send()
+	if calls != 1 {
+		t.Fatal("immediate duplicate executed twice")
+	}
+
+	if payloadCRC("123456789") != "cbf43926" || payloadCRC("Привет") != "a8eab199" {
+		t.Fatal("CRC32 IEEE/UTF-8 mismatch")
+	}
+}

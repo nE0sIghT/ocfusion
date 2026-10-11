@@ -40,7 +40,7 @@ for (const directory of ["web", "modules/openconnect/ui", "modules/vpn/ui"]) {
 }
 
 const panelScript = fs.readFileSync(__dirname + "/../web/panel.js", "utf8");
-const mailboxKey = "vpn_client4_custom";
+
 const nodeIds = [
   "result",
   "status",
@@ -85,12 +85,26 @@ function createNodes() {
   return nodes;
 }
 
-function createMailbox(acknowledge) {
-  let status = { state: "UP", networks: [] };
-  const requests = [];
-  const chunks = [];
+function crc32(payload) {
+  let crc = 0xffffffff;
 
-  async function fetch(url, options) {
+  for (const byte of Buffer.from(payload)) {
+    crc ^= byte;
+
+    for (let bit = 0; bit < 8; bit++) {
+      crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
+    }
+  }
+
+  return ((crc ^ 0xffffffff) >>> 0).toString(16).padStart(8, "0");
+}
+
+function createMailbox(acknowledge) {
+  let reply = null;
+  const requests = [];
+  const instance = "0123456789abcdef0123456789abcdef";
+
+  async function fetch(url, options = {}) {
     if (url.startsWith("/user/extensions-modules.json")) {
       return {
         ok: true,
@@ -102,58 +116,56 @@ function createMailbox(acknowledge) {
       };
     }
 
-    if (options.method !== "POST") {
-      const encoded = Buffer.from(JSON.stringify(status)).toString("base64");
-
+    if (url.startsWith("/user/extensions-upload-probe.json")) {
       return {
         ok: true,
         json: async () => ({
-          [mailboxKey]: encodeURIComponent("# OCF-STATUS1 " + encoded),
+          state: "READY",
+          resource: "ocf_probe_0123456789abcdef",
+          instance,
         }),
       };
     }
 
-    const form = JSON.parse(decodeURIComponent(options.body));
-
-    assert.equal(form.rc_service, "");
-    assert.equal(form.action_mode, "apply");
-
-    const envelope = form[mailboxKey];
-
-    assert(envelope.length < 4096);
-    assert(envelope.startsWith("# EXT-REQUEST1 "));
-
-    const request = JSON.parse(
-      Buffer.from(envelope.slice(15), "base64").toString(),
-    );
-
-    requests.push(request);
-
-    if (request.action === "upload.chunk") {
-      chunks.push(Buffer.from(request.data, "base64"));
+    if (url.startsWith("/user/extensions-command-reply.json")) {
+      return { ok: true, text: async () => JSON.stringify(reply) };
     }
 
-    status = {
-      state: "UP",
-      networks: [],
-      request_id: acknowledge ? request.id : "a".repeat(32),
+    assert.equal(url, "/splash_page.cgi");
+    assert.equal(options.method, "POST");
+    const packet = JSON.parse(await options.body.get("splash_page_css").text());
+
+    assert.equal(packet.crc32, crc32(packet.payload));
+    const request = JSON.parse(packet.payload);
+
+    requests.push(request);
+    const id = acknowledge ? request.id : "a".repeat(32);
+    const payload = JSON.stringify({
+      request_id: id,
       request_ok: true,
       request_data: { result: "accepted" },
+    });
+
+    reply = {
+      id,
+      instance,
+      payload,
+      crc32: acknowledge === "corrupt" ? "00000000" : crc32(payload),
     };
 
     return { ok: true, text: async () => "" };
   }
 
-  return { fetch, requests, chunks };
+  return { fetch, requests };
 }
 
 function createContext(nodes, mailbox) {
   return {
     window: {
-      OCF_SETTINGS: { unit: 4, index: 7, key: mailboxKey, version: "0.2.1" },
+      OCF_SETTINGS: { version: "0.3" },
       addEventListener() {},
     },
-    location: { hash: "" },
+    location: { hash: "", protocol: "https:" },
     document: {
       forms: {},
       createElement: () => ({}),
@@ -164,6 +176,10 @@ function createContext(nodes, mailbox) {
       querySelectorAll: () => [],
     },
     crypto: crypto.webcrypto,
+    FormData,
+    Blob,
+    AbortController,
+    clearTimeout() {},
     TextEncoder,
     TextDecoder,
     Uint8Array,
@@ -174,8 +190,10 @@ function createContext(nodes, mailbox) {
     atob: (value) => Buffer.from(value, "base64").toString("binary"),
     btoa: (value) => Buffer.from(value, "binary").toString("base64"),
     setInterval() {},
-    setTimeout(callback) {
-      callback();
+    setTimeout(callback, milliseconds) {
+      if (milliseconds !== 30000) {
+        callback();
+      }
     },
     fetch: mailbox.fetch,
   };
@@ -217,7 +235,7 @@ async function testProfileUpload(acknowledge, operation = "") {
     error = caught;
   }
 
-  if (!acknowledge) {
+  if (!acknowledge || acknowledge === "corrupt") {
     // A stale UP response must not acknowledge a newly submitted request.
     assert.equal(mailbox.requests.length, 1);
     assert(error && error.message.includes("did not acknowledge"));
@@ -225,18 +243,16 @@ async function testProfileUpload(acknowledge, operation = "") {
     return;
   }
 
-  assert.equal(mailbox.requests[0].action, "upload.begin");
-  assert.equal(mailbox.requests.at(-1).action, "upload.finish");
-  assert.equal(Buffer.concat(mailbox.chunks).toString(), profile);
+  assert.equal(mailbox.requests.length, 1);
   assert.equal(
-    mailbox.requests[0].sha256,
-    crypto.createHash("sha256").update(profile).digest("hex"),
+    mailbox.requests[0].action,
+    operation ? "module.call" : "module.configure",
   );
+  assert.equal(JSON.stringify(mailbox.requests[0].config), profile);
   assert.equal(error, undefined);
   assert.equal(reply.result, "accepted");
 
   if (operation) {
-    assert.equal(mailbox.requests[0].kind, "module.call");
     assert.equal(mailbox.requests[0].operation, operation);
     assert.equal(mailbox.requests[0].module, "example");
   }
@@ -325,14 +341,44 @@ async function testPublicStatusReads() {
   assert.equal((await context.window.EXTENSIONS.status("example")).data, null);
 }
 
+async function testHTTPWithoutWebCrypto() {
+  const nodes = createNodes();
+  const mailbox = createMailbox(true);
+  const context = createContext(nodes, mailbox);
+
+  context.location.protocol = "http:";
+  context.crypto = {
+    getRandomValues: (bytes) => crypto.webcrypto.getRandomValues(bytes),
+  };
+  vm.runInNewContext(panelScript, context);
+  await vm.runInNewContext("loadModules()", context);
+
+  assert.equal(vm.runInNewContext('crc32("123456789")', context), "cbf43926");
+  assert.equal(vm.runInNewContext('crc32("Привет")', context), "a8eab199");
+  const result = await context.window.EXTENSIONS.call("example", "settings", {
+    label: "Привет",
+  });
+
+  assert.equal(result.result, "accepted");
+  await assert.rejects(
+    context.window.EXTENSIONS.configure("example", {
+      secret: "x".repeat(2000),
+    }),
+    /HTTPS/,
+  );
+  assert.equal(mailbox.requests.length, 1);
+}
+
 async function main() {
+  await testHTTPWithoutWebCrypto();
   await testPublicStatusReads();
   await testUnavailablePlatform();
   await testProfileUpload(true);
   await testProfileUpload(false);
+  await testProfileUpload("corrupt");
   await testProfileUpload(true, "update-settings");
   console.log(
-    "PASS: >4KiB chunk upload, hash, bounded stock mailbox, nonce acknowledgement; stale UP cannot acknowledge",
+    "PASS: direct >4KiB RAM upload, CRC32, nonce acknowledgement and readiness; stale replies cannot acknowledge",
   );
 }
 

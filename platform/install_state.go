@@ -96,7 +96,7 @@ func restoreState(backup string) error {
 		return err
 	}
 
-	if transport, err := loadTransport(); err == nil && snapshot.Native {
+	if transport, err := loadTransport(); err == nil && snapshot.Native && transport.Key != "" {
 		nvset(transport.Key, snapshot.Custom[transport.Key])
 	}
 
@@ -134,6 +134,10 @@ func removePlatformTransport() error {
 
 	if err != nil {
 		return err
+	}
+
+	if transport.Unit == 0 {
+		return os.Rename(filepath.Join(base, "transport.json"), filepath.Join(base, "transport.removed.json"))
 	}
 
 	records := []string{}

@@ -34,6 +34,9 @@ func readConnections() (Connections, error) {
 				if id != item.ID || !identifier.MatchString(id) || !identifier.MatchString(item.Client) || !identifier.MatchString(item.Profile) || !ifaceRE.MatchString(item.Interface) || item.Unit < 1 || item.Unit > 5 || item.Index < 5 || item.Index > 20 || item.Table < 1000 || item.Priority < 50 {
 					return registry, errors.New("invalid connection record")
 				}
+				item.Shared = false
+				registry.Items[id] = item
+
 				keys := []string{fmt.Sprintf("unit:%d", item.Unit), fmt.Sprintf("index:%d", item.Index), fmt.Sprintf("table:%d", item.Table), fmt.Sprintf("priority:%d", item.Priority), "interface:" + item.Interface, "owner:" + item.Client + "/" + item.Profile}
 				for _, key := range keys {
 					if used[key] {
@@ -64,7 +67,7 @@ func readConnections() (Connections, error) {
 	existing.Profile = "default"
 	existing.Interface = "ocvpn0"
 	existing.Name = fusionName
-	existing.Shared = true
+	existing.Shared = false
 	registry.Items[existing.ID] = existing
 
 	return registry, nil
@@ -104,43 +107,20 @@ func allocateConnection(registry Connections, client, profile string) (Manifest,
 
 	raw := nvget("vpnc_clientlist")
 	units, indices := occupiedNative(raw)
-	var transport struct {
-		Unit  int `json:"unit"`
-		Index int `json:"vpnc_idx"`
-	}
-	data, err := os.ReadFile(transportPath)
-	if err != nil {
-		return manifest, err
-	}
-	if err = json.Unmarshal(data, &transport); err != nil {
-		return manifest, err
+	for unit := 1; unit <= 5; unit++ {
+		if !units[unit] && nvget(fmt.Sprintf("vpn_client%d_addr", unit)) == "" && nvget(fmt.Sprintf("vpn_client%d_custom", unit)) == "" && !strings.Contains(","+nvget("vpn_clientx_eas")+",", ","+strconv.Itoa(unit)+",") {
+			manifest.Unit = unit
+			break
+		}
 	}
 
-	sharedAvailable := true
-	for _, item := range registry.Items {
-		if item.Unit == transport.Unit {
-			sharedAvailable = false
+	for index := 5; index <= 20; index++ {
+		if !indices[index] {
+			manifest.Index = index
+			break
 		}
 	}
-	if sharedAvailable {
-		manifest.Unit = transport.Unit
-		manifest.Index = transport.Index
-		manifest.Shared = true
-		manifest.Name = fusionName
-	} else {
-		for unit := 1; unit <= 5; unit++ {
-			if !units[unit] && nvget(fmt.Sprintf("vpn_client%d_addr", unit)) == "" && nvget(fmt.Sprintf("vpn_client%d_custom", unit)) == "" && !strings.Contains(","+nvget("vpn_clientx_eas")+",", ","+strconv.Itoa(unit)+",") {
-				manifest.Unit = unit
-				break
-			}
-		}
-		for index := 5; index <= 20; index++ {
-			if !indices[index] {
-				manifest.Index = index
-				break
-			}
-		}
-	}
+
 	if manifest.Unit == 0 || manifest.Index == 0 {
 		return manifest, errors.New("no free native VPN profile slot")
 	}
@@ -183,30 +163,25 @@ func allocateConnection(registry Connections, client, profile string) (Manifest,
 		return manifest, errors.New("native VPN profiles changed during allocation")
 	}
 
-	if !manifest.Shared {
-		manifest.Name = "OCFusion " + client + "/" + profile
-		row := fmt.Sprintf("%s>OpenVPN>%d>>>0>%d>>>0>0>Web", manifest.Name, manifest.Unit, manifest.Index)
-		updated := row
-		if raw != "" {
-			updated = raw + "<" + row
-		}
-		if err = nvset("vpnc_clientlist", updated); err != nil {
-			return manifest, err
-		}
-		if _, err = runner("nvram", "commit"); err != nil {
-			nvset("vpnc_clientlist", raw)
-			runner("nvram", "commit")
-			return manifest, err
-		}
+	manifest.Name = "OCFusion " + client + "/" + profile
+	row := fmt.Sprintf("%s>OpenVPN>%d>>>0>%d>>>0>0>Web", manifest.Name, manifest.Unit, manifest.Index)
+	updated := row
+	if raw != "" {
+		updated = raw + "<" + row
+	}
+	if err := nvset("vpnc_clientlist", updated); err != nil {
+		return manifest, err
+	}
+	if _, err := runner("nvram", "commit"); err != nil {
+		nvset("vpnc_clientlist", raw)
+		runner("nvram", "commit")
+		return manifest, err
 	}
 
 	return manifest, nil
 }
 
 func removeNative(manifest Manifest) error {
-	if manifest.Shared {
-		return nil
-	}
 	if err := verifyIdentity(manifest); err != nil {
 		return err
 	}

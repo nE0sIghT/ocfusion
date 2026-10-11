@@ -39,78 +39,25 @@ function setPlatformState(state) {
   navigate();
 }
 
-const decode = (s) =>
-  JSON.parse(
-    new TextDecoder().decode(Uint8Array.from(atob(s), (c) => c.charCodeAt(0))),
-  );
-
-const bytes64 = (b) =>
-  btoa(Array.from(b, (n) => String.fromCharCode(n)).join(""));
-
-const encode = (s) => bytes64(new TextEncoder().encode(s));
-
 const nonce = () =>
   Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) =>
     b.toString(16).padStart(2, "0"),
   ).join("");
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function read() {
-  if (!cfg) {
-    throw Error("Panel parameters missing. Reinstall the distribution.");
+function crc32(payload) {
+  let crc = 0xffffffff;
+
+  for (const byte of new TextEncoder().encode(payload)) {
+    crc ^= byte;
+
+    for (let bit = 0; bit < 8; bit++) {
+      crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
+    }
   }
 
-  const response = await fetch(
-    "/appGet.cgi?hook=nvram_char_to_ascii(" +
-      cfg.key +
-      "," +
-      cfg.key +
-      ")&_=" +
-      Date.now(),
-    { credentials: "same-origin", cache: "no-store" },
-  );
-
-  if (!response.ok) {
-    throw Error("ASUS API: " + response.status);
-  }
-
-  const obj = await response.json();
-
-  if (typeof obj[cfg.key] !== "string") {
-    throw Error("Configuration field unavailable");
-  }
-
-  return decodeURIComponent(obj[cfg.key]);
-}
-
-async function write(value) {
-  if (new TextEncoder().encode(value).length > 4096) {
-    throw Error("Request exceeds the ASUS field size");
-  }
-
-  const payload = { action_mode: "apply", rc_service: "" };
-
-  payload[cfg.key] = value;
-
-  const response = await fetch("/applyapp.cgi", {
-    method: "POST",
-    credentials: "same-origin",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-    },
-    body: encodeURIComponent(JSON.stringify(payload)),
-  });
-
-  if (!response.ok) {
-    throw Error("ASUS API: " + response.status);
-  }
-
-  await response.text();
-}
-
-function render() {
-  document.getElementById("api-error").hidden = true;
+  return ((crc ^ 0xffffffff) >>> 0).toString(16).padStart(8, "0");
 }
 
 async function request(action, data = {}) {
@@ -118,40 +65,125 @@ async function request(action, data = {}) {
     throw Error("OCFusion services are not ready. Check the platform status.");
   }
 
+  const configResponse = await fetch(
+    "/user/extensions-upload-probe.json?_=" + Date.now(),
+    {
+      credentials: "same-origin",
+      cache: "no-store",
+    },
+  );
+  const config = await configResponse.json();
+
+  if (
+    !configResponse.ok ||
+    config.state !== "READY" ||
+    !/^ocf_probe_[a-f0-9]{16}$/.test(config.resource) ||
+    !/^[a-f0-9]{32}$/.test(config.instance)
+  ) {
+    throw Error("OCFusion services are not ready. Check the platform status.");
+  }
+
   const id = nonce();
-  const wire =
-    "# EXT-REQUEST1 " + encode(JSON.stringify({ id, action, ...data }));
+  const payload = JSON.stringify({ id, action, ...data });
 
-  await write(wire);
+  if (new TextEncoder().encode(payload).length > 24576) {
+    throw Error("Configuration exceeds 16 KiB");
+  }
 
-  for (let i = 0; i < 20; i++) {
-    await sleep(1000);
+  const serverDate = configResponse.headers?.get("Date");
+  const now = serverDate ? Date.parse(serverDate) : Date.now();
+  const packet = JSON.stringify({
+    protocol: "ocfusion-command-v1",
+    instance: config.instance,
+    id,
+    payload,
+    crc32: crc32(payload),
+    expires_at: now + 60000,
+  });
+  const form = new FormData();
+
+  form.append("splash_page_id", config.resource);
+  form.append(
+    "splash_page_css",
+    new Blob([packet], { type: "text/plain" }),
+    "request.css",
+  );
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000);
+
+  try {
+    const response = await fetch("/splash_page.cgi", {
+      method: "POST",
+      credentials: "same-origin",
+      body: form,
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      throw Error("ASUS API: " + response.status);
+    }
+
+    await response.text();
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  for (let attempt = 0; attempt < 300; attempt++) {
+    await sleep(100);
 
     if (!platformReady) {
-      throw Error(
-        "OCFusion services are not ready. Check the platform status.",
-      );
+      break;
     }
 
-    const value = await read();
+    const response = await fetch(
+      "/user/extensions-command-reply.json?_=" + Date.now(),
+      {
+        credentials: "same-origin",
+        cache: "no-store",
+      },
+    );
 
-    if (!value.startsWith("# OCF-STATUS1 ")) {
+    if (!response.ok) {
       continue;
     }
 
-    const st = decode(value.slice(14));
+    const text = await response.text();
 
-    if (st.request_id !== id) {
+    if (text.length > 16384) {
       continue;
     }
 
-    render(st);
+    let envelope;
 
-    if (!st.request_ok) {
-      throw Error(st.request_message || "Service rejected the request");
+    try {
+      envelope = JSON.parse(text);
+    } catch {
+      continue;
     }
 
-    return st;
+    if (
+      envelope.id !== id ||
+      envelope.instance !== config.instance ||
+      typeof envelope.payload !== "string" ||
+      envelope.crc32 !== crc32(envelope.payload)
+    ) {
+      continue;
+    }
+
+    const result = JSON.parse(envelope.payload);
+
+    if (result.request_id !== id) {
+      continue;
+    }
+
+    document.getElementById("api-error").hidden = true;
+
+    if (!result.request_ok) {
+      throw Error(result.request_message || "Service rejected the request");
+    }
+
+    return result;
   }
 
   throw Error(
@@ -176,39 +208,18 @@ async function uploadConfig(
     throw Error("Configuration exceeds 16 KiB");
   }
 
-  if (!crypto.subtle) {
+  if (bytes.length > 1024 && location.protocol !== "https:") {
     throw Error("Open the panel over HTTPS to upload configuration.");
   }
 
-  const hash = Array.from(
-    new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)),
-    (b) => b.toString(16).padStart(2, "0"),
-  ).join("");
-  const upload = nonce();
+  onProgress("Uploading configuration: 0%");
+  const config = JSON.parse(new TextDecoder().decode(bytes));
+  const action = kind === "module.call" ? "module.call" : "module.configure";
+  const reply = await request(action, { module, operation, config });
 
-  await request("upload.begin", {
-    upload,
-    module,
-    size: bytes.length,
-    sha256: hash,
-    kind,
-    operation,
-  });
+  onProgress("Uploading configuration: 100%");
 
-  for (let offset = 0; offset < bytes.length; offset += 1024) {
-    onProgress(
-      "Uploading configuration: " +
-        Math.round((offset / bytes.length) * 100) +
-        "%",
-    );
-    await request("upload.chunk", {
-      upload,
-      offset,
-      data: bytes64(bytes.slice(offset, offset + 1024)),
-    });
-  }
-
-  return (await request("upload.finish", { upload })).request_data;
+  return reply.request_data;
 }
 
 async function publicStatus(module) {
