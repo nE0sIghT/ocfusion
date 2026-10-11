@@ -2,6 +2,8 @@
 "use strict";
 
 const OCF_TRANSLATIONS = {
+  "Communication diagnostics unavailable. Reload the page.":
+    "Диагностика обмена недоступна. Перезагрузите страницу.",
   "Public status unavailable": "Публичный статус пока недоступен",
   "Communication diagnostics": "Диагностика обмена",
   "Test available channels without changing VPN settings.":

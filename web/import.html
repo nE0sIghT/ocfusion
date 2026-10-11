@@ -103,8 +103,12 @@
             <article class="ext-card">
               <h2>Communication diagnostics</h2>
               <p>Test available channels without changing VPN settings.</p>
-              <button id="transport-test" type="button">Run diagnostics</button>
-              <p id="transport-result" role="status"></p>
+              <button id="transport-test" type="button" disabled>
+                Run diagnostics
+              </button>
+              <p id="transport-result" role="status">
+                Communication diagnostics unavailable. Reload the page.
+              </p>
               <p>
                 Check both JSON links in a private window without signing in.
                 The browser cannot reliably test authentication using its
@@ -211,7 +215,6 @@
       </div>
     </div>
     <script src="/user/extensions-panel.js"></script>
-    <script src="/user/extensions-diagnostics.js"></script>
     <script src="/user/ocfusion-i18n.js"></script>
   </body>
 </html>

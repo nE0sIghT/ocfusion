@@ -112,7 +112,7 @@
             /^[A-Za-z_-]{1,16}$/.test(data.ocfusion_template),
           ),
         (text) =>
-          text.includes("<%")
+          text.includes("<" + "%")
             ? "STATIC_TEMPLATE_ONLY"
             : "UNSUPPORTED_OR_BLOCKED",
       ],
@@ -165,6 +165,9 @@
     result.textContent = "Diagnostics complete. Copy the report to share it.";
     run.disabled = false;
   });
+
+  run.disabled = false;
+  result.textContent = "";
 
   auth.addEventListener("change", renderReport);
   document

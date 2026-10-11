@@ -360,7 +360,7 @@ async function testModuleUI(browser, address, language) {
   );
   if (language === "RU") {
     assert.equal(
-      await page.locator("#transport-test").textContent(),
+      (await page.locator("#transport-test").textContent()).trim(),
       "Запустить диагностику",
     );
   }
@@ -427,6 +427,32 @@ async function testModuleUI(browser, address, language) {
   await page.close();
 }
 
+async function testDiagnosticScriptFailure(browser, address) {
+  const page = await browser.newPage();
+
+  await page.addInitScript(() => {
+    window.TEST_LANGUAGE = "EN";
+  });
+  await page.route("**/user/extensions-diagnostics.js?*", (route) =>
+    route.fulfill({
+      contentType: "text/javascript",
+      body: "(() => {",
+    }),
+  );
+
+  const failure = page.waitForEvent("pageerror");
+
+  await page.goto(address + "/user/extensions.html#system");
+  await failure;
+  assert.equal(await page.locator("#transport-test").isDisabled(), true);
+  assert(
+    (await page.locator("#transport-result").textContent()).includes(
+      "Communication diagnostics unavailable",
+    ),
+  );
+  await page.close();
+}
+
 async function testFusion(browser, address, language) {
   const page = await browser.newPage();
 
@@ -470,6 +496,8 @@ async function main() {
     for (const language of ["EN", "RU", "DE"]) {
       await testModuleUI(browser, address, language);
     }
+
+    await testDiagnosticScriptFailure(browser, address);
 
     for (const language of ["EN", "RU"]) {
       await testFusion(browser, address, language);

@@ -20,6 +20,25 @@ for (const filename of [
   );
 }
 
+// Stock ASUS template markers are interpreted even inside JavaScript strings.
+for (const directory of ["web", "modules/openconnect/ui", "modules/vpn/ui"]) {
+  for (const filename of fs.readdirSync(__dirname + "/../" + directory)) {
+    if (!filename.endsWith(".js")) {
+      continue;
+    }
+
+    const source = fs.readFileSync(
+      __dirname + "/../" + directory + "/" + filename,
+      "utf8",
+    );
+
+    assert(
+      !source.includes("<%"),
+      "ASUS template marker in runtime JavaScript: " + filename,
+    );
+  }
+}
+
 const panelScript = fs.readFileSync(__dirname + "/../web/panel.js", "utf8");
 const mailboxKey = "vpn_client4_custom";
 const nodeIds = [
@@ -137,6 +156,8 @@ function createContext(nodes, mailbox) {
     location: { hash: "" },
     document: {
       forms: {},
+      createElement: () => ({}),
+      head: { appendChild() {} },
       querySelector: () => null,
       addEventListener() {},
       getElementById: (id) => nodes[id],
