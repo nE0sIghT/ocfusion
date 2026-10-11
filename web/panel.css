@@ -130,6 +130,14 @@ body.bg {
   color: #ee8c89;
   border-color: #8c4444;
 }
+.ext-shell p {
+  margin: 12px 0;
+  line-height: 1.6;
+}
+.ext-shell p[role="status"],
+.ext-shell p[role="alert"] {
+  margin-top: 18px;
+}
 .ext-shell a {
   color: var(--ext-accent);
 }
