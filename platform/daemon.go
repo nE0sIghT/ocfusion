@@ -58,6 +58,9 @@ func daemon() error {
 		publishWeb()
 	}
 
+	stopUploadProbe := startUploadProbe()
+	defer stopUploadProbe()
+
 	mailboxDone := make(chan struct{})
 	defer close(mailboxDone)
 	go serveMailbox(mailboxDone)

@@ -43,6 +43,7 @@ function createFixtureServer() {
   let uploadOperation = "";
   let uploadBytes = [];
   const profiles = ["default"];
+  let uploadReply = null;
   return http.createServer(async (request, response) => {
     const url = new URL(request.url, "http://localhost");
     const send = (body, type) => {
@@ -85,21 +86,69 @@ function createFixtureServer() {
       );
     }
 
-    if (url.pathname === "/user/ocfusion-probe.cgi") {
-      return send("#!/bin/sh\nprintf 'probe'", "text/plain");
-    }
-    if (url.pathname === "/user/ocfusion-probe.asp") {
+    if (url.pathname === "/user/extensions-upload-probe.json") {
       return send(
-        JSON.stringify({ ocfusion_template: "EN" }),
+        JSON.stringify({
+          state: "READY",
+          resource: "ocf_probe_0123456789abcdef",
+          instance: "0123456789abcdef0123456789abcdef",
+          max_payload_bytes: 65536,
+        }),
         "application/json",
       );
     }
 
-    if (
-      url.pathname === "/appGet.cgi" &&
-      url.searchParams.get("hook") === "nvram_get(preferred_lang)"
-    ) {
-      return send(JSON.stringify({ preferred_lang: "EN" }), "application/json");
+    if (url.pathname === "/splash_page.cgi") {
+      const parts = [];
+
+      for await (const part of request) {
+        parts.push(part);
+      }
+
+      const text = Buffer.concat(parts).toString();
+      const fields = text.split(/------[^\r\n]+\r\n/);
+      const css = fields.find((field) =>
+        field.includes('name="splash_page_css"'),
+      );
+      assert(css, "CSS multipart field missing");
+      assert(
+        text.indexOf('name="splash_page_id"') <
+          text.indexOf('name="splash_page_css"'),
+      );
+
+      const start = css.indexOf("\r\n\r\n") + 4;
+      const packet = JSON.parse(css.slice(start).split("\r\n")[0]);
+      const expected = "OCF0123456789abcdef"
+        .repeat(Math.ceil(packet.size / 18))
+        .slice(0, packet.size);
+      assert.equal(packet.protocol, "ocfusion-upload-probe-v1");
+      assert.equal(packet.payload, expected);
+
+      uploadReply = {
+        instance: packet.instance,
+        id: packet.id,
+        result: "PASS",
+        received_bytes: packet.size,
+        payload: packet.payload,
+        sha256: require("crypto")
+          .createHash("sha256")
+          .update(packet.payload)
+          .digest("hex"),
+        response_storage: "RAM",
+      };
+
+      return send(
+        "<script>parent.call_back_to_save_config(1);</script>",
+        "text/html",
+      );
+    }
+
+    if (url.pathname === "/user/extensions-upload-reply.json") {
+      if (!uploadReply) {
+        response.statusCode = 404;
+      }
+
+      return send(JSON.stringify(uploadReply), "application/json");
     }
 
     if (url.pathname === "/appGet.cgi") {
@@ -174,9 +223,7 @@ function createFixtureServer() {
                     { bridge: "br55", cidr: "192.168.52.0/24", sdn_idx: "4" },
                   ],
                 }
-              : q.action === "platform.ping"
-                ? { pong: true, response_storage: "RAM" }
-                : { ok: true };
+              : { ok: true };
 
       mailbox = {
         state: "UP",
@@ -354,10 +401,6 @@ async function testModuleUI(browser, address, language) {
   );
 
   await page.locator('a[data-page="system"]').click();
-  assert.equal(
-    await page.locator("#transport-module-json").getAttribute("href"),
-    "/user/extensions-status/openconnect.json",
-  );
   if (language === "RU") {
     assert.equal(
       (await page.locator("#transport-test").textContent()).trim(),
@@ -376,23 +419,17 @@ async function testModuleUI(browser, address, language) {
       await page.locator("#transport-report").inputValue(),
     );
 
-    assert.equal(
-      report.tests.find((test) => test.channel === "ram_json").result,
-      "PASS",
+    assert.equal(report.channel, "stock_multipart_to_ram");
+    assert.deepEqual(
+      report.tests.map((test) => test.payload_bytes),
+      [1024, 8192, 32768, 65536],
     );
-    assert.equal(
-      report.tests.find((test) => test.channel === "custom_cgi").result,
-      "STATIC_FILE_ONLY",
+    assert(
+      report.tests.every((test) => test.result === "PASS" && test.echo_matches),
     );
-    assert.equal(
-      report.tests.find((test) => test.channel === "stock_template").result,
-      "PASS",
-    );
-    assert.equal(
-      report.tests.find((test) => test.channel === "nvram_mailbox").result,
-      "PASS",
-    );
-    assert.equal(report.authentication.result, "NOT_CHECKED");
+    assert.equal(report.largest_passed_payload_bytes, 65536);
+    assert.equal(report.absolute_maximum_tested, false);
+    assert(!requests.some((request) => request.action === "platform.ping"));
   }
 
   // External and shipped modules use the same generated menu and iframe route.
@@ -447,9 +484,62 @@ async function testDiagnosticScriptFailure(browser, address) {
   assert.equal(await page.locator("#transport-test").isDisabled(), true);
   assert(
     (await page.locator("#transport-result").textContent()).includes(
-      "Communication diagnostics unavailable",
+      "Upload diagnostics unavailable",
     ),
   );
+  await page.close();
+}
+
+async function testUploadDiagnosticFailures(browser, address) {
+  const page = await browser.newPage();
+
+  await page.addInitScript(() => {
+    window.TEST_LANGUAGE = "EN";
+  });
+  await page.route("**/user/extensions-upload-probe.json?*", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: '{"state":"STOPPED"}',
+    }),
+  );
+  await page.goto(address + "/user/extensions.html#system");
+  await page.locator("#transport-test").click();
+  await page
+    .locator("#transport-result")
+    .filter({ hasText: "Upload receiver unavailable" })
+    .waitFor();
+  assert.equal(
+    JSON.parse(await page.locator("#transport-report").inputValue()).receiver,
+    "UNAVAILABLE",
+  );
+  await page.unroute("**/user/extensions-upload-probe.json?*");
+
+  let staleReplies = 0;
+  await page.route("**/user/extensions-upload-reply.json?*", async (route) => {
+    const response = await route.fetch();
+    const data = await response.json();
+
+    if (staleReplies++ === 0) {
+      data.id = "00000000000000000000000000000000";
+    } else {
+      data.payload = "corrupt echo";
+    }
+
+    await route.fulfill({ response, json: data });
+  });
+  await page.locator("#transport-test").click();
+  await page
+    .locator("#transport-result")
+    .filter({ hasText: "Diagnostics complete" })
+    .waitFor();
+
+  const report = JSON.parse(
+    await page.locator("#transport-report").inputValue(),
+  );
+
+  assert(report.tests.every((test) => test.result === "INTEGRITY_FAILED"));
+  assert(staleReplies > report.tests.length, "Stale nonce was accepted");
+  assert.equal(report.largest_passed_payload_bytes, 0);
   await page.close();
 }
 
@@ -498,6 +588,7 @@ async function main() {
     }
 
     await testDiagnosticScriptFailure(browser, address);
+    await testUploadDiagnosticFailures(browser, address);
 
     for (const language of ["EN", "RU"]) {
       await testFusion(browser, address, language);

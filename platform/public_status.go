@@ -43,24 +43,3 @@ func (m *Manager) publishModuleStatus(id, state string) {
 	os.MkdirAll(filepath.Dir(destination), 0755)
 	atomicWrite(destination, raw, 0644)
 }
-
-// Fixed, input-free probes identify stock handler behavior. They neither expose
-// private files nor install a listener or accept commands from the browser.
-func publishTransportProbes() error {
-	probes := map[string]string{
-		"ocfusion-probe.cgi": "#!/bin/sh\n# SPDX-License-Identifier: GPL-3.0-or-later\nprintf 'Content-Type: application/json\\r\\n\\r\\n{\"ocfusion_cgi_executed\":true}\\n'\n",
-		"ocfusion-probe.asp": `{"ocfusion_template":"<% nvram_get("preferred_lang"); %>"}`,
-	}
-
-	for name, contents := range probes {
-		mode := os.FileMode(0644)
-		if filepath.Ext(name) == ".cgi" {
-			mode = 0755
-		}
-		if err := atomicWrite(filepath.Join(webRoot, name), []byte(contents), mode); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}

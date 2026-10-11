@@ -4,172 +4,189 @@
 (() => {
   const run = document.getElementById("transport-test");
   const report = document.getElementById("transport-report");
-  const auth = document.getElementById("transport-auth");
   const result = document.getElementById("transport-result");
+  const sizes = [1024, 8192, 32768, 65536];
+  const pattern = "OCF0123456789abcdef";
   let latest = { tests: [] };
 
   function renderReport() {
-    latest.authentication = {
-      method: "manual_private_window",
-      result: auth.value,
-    };
     report.value = JSON.stringify(latest, null, 2);
   }
 
-  async function probe(
-    path,
-    validate,
-    classify = () => "UNSUPPORTED_OR_BLOCKED",
-  ) {
-    const started = performance.now();
+  async function fetchWithTimeout(path, options = {}, timeout = 5000) {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 5000);
+    const timer = setTimeout(() => controller.abort(), timeout);
 
     try {
       const response = await fetch(path, {
         credentials: "same-origin",
         cache: "no-store",
+        ...options,
         signal: controller.signal,
       });
       const text = await response.text();
-      const accepted = response.ok && text.length < 32768 && validate(text);
 
-      return {
-        result: accepted
-          ? "PASS"
-          : response.ok
-            ? classify(text)
-            : "UNSUPPORTED_OR_BLOCKED",
-        http_status: response.status,
-        redirected: response.redirected,
-        content_type: response.headers.get("Content-Type"),
-        server_date: response.headers.get("Date"),
-        elapsed_ms: Math.round(performance.now() - started),
-      };
-    } catch (error) {
-      return { result: "UNAVAILABLE_OR_TIMEOUT" };
+      if (text.length > 70000) {
+        throw Error("Response exceeds diagnostic limit");
+      }
+
+      return { response, text };
     } finally {
       clearTimeout(timer);
     }
   }
 
-  function jsonMatches(text, check) {
+  async function roundTrip(config, size) {
+    const started = performance.now();
+    const bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+
+    const id = Array.from(bytes, (byte) =>
+      byte.toString(16).padStart(2, "0"),
+    ).join("");
+    const payload = pattern
+      .repeat(Math.ceil(size / pattern.length))
+      .slice(0, size);
+    const envelope = JSON.stringify({
+      protocol: "ocfusion-upload-probe-v1",
+      instance: config.instance,
+      id,
+      size,
+      payload,
+    });
+    const form = new FormData();
+    form.append("splash_page_id", config.resource);
+    form.append(
+      "splash_page_css",
+      new Blob([envelope], { type: "text/plain" }),
+      "probe.css",
+    );
+
+    const row = {
+      payload_bytes: size,
+      request_json_bytes: new TextEncoder().encode(envelope).length,
+      result: "FAILED",
+    };
+
     try {
-      return check(JSON.parse(text));
+      const { response } = await fetchWithTimeout(
+        "/splash_page.cgi",
+        { method: "POST", body: form },
+        20000,
+      );
+      row.http_status = response.status;
+      row.redirected = response.redirected;
+      row.upload_ms = Math.round(performance.now() - started);
+
+      if (!response.ok) {
+        row.result = "UPLOAD_REJECTED";
+
+        return row;
+      }
+
+      const deadline = performance.now() + 10000;
+
+      while (performance.now() < deadline) {
+        const reply = await fetchWithTimeout(
+          "/user/extensions-upload-reply.json?_=" + Date.now(),
+        );
+        let data = null;
+
+        if (reply.response.ok) {
+          try {
+            data = JSON.parse(reply.text);
+          } catch (error) {
+            // A login page or stock HTML callback is not a protocol reply.
+          }
+        }
+
+        if (data?.id === id && data.instance === config.instance) {
+          row.echo_matches = data.payload === payload;
+          row.received_bytes = data.received_bytes;
+          row.response_json_bytes = new TextEncoder().encode(reply.text).length;
+          row.response_storage = data.response_storage;
+          row.server_sha256 = data.sha256;
+          row.result =
+            data.result === "PASS" &&
+            row.echo_matches &&
+            data.received_bytes === size &&
+            data.response_storage === "RAM"
+              ? "PASS"
+              : "INTEGRITY_FAILED";
+
+          return row;
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+
+      row.result = "NO_MATCHING_RAM_REPLY";
     } catch (error) {
-      return false;
+      row.result = "UNAVAILABLE_OR_TIMEOUT";
+    } finally {
+      row.round_trip_ms = Math.round(performance.now() - started);
     }
+
+    return row;
   }
 
   run.addEventListener("click", async () => {
     run.disabled = true;
-    result.textContent = "Running communication diagnostics...";
+    result.textContent = "Testing upload round trips...";
     latest = {
       version: cfg ? cfg.version : "",
       scheme: location.protocol,
       router: cfg ? cfg.model : "",
-      browser_capabilities: {
-        secure_context: window.isSecureContext,
-        sha256: Boolean(crypto.subtle),
-        websocket: typeof WebSocket === "function",
-        event_source: typeof EventSource === "function",
-      },
+      channel: "stock_multipart_to_ram",
       tests: [],
     };
-
-    const tests = [
-      [
-        "ram_json",
-        "/user/extensions-modules.json",
-        (text) =>
-          jsonMatches(
-            text,
-            (data) =>
-              Array.isArray(data.modules) && typeof data.state === "string",
-          ),
-      ],
-      [
-        "stock_read_api",
-        "/appGet.cgi?hook=nvram_get(preferred_lang)",
-        (text) =>
-          jsonMatches(text, (data) => typeof data.preferred_lang === "string"),
-      ],
-      [
-        "custom_cgi",
-        "/user/ocfusion-probe.cgi",
-        (text) =>
-          jsonMatches(text, (data) => data.ocfusion_cgi_executed === true),
-        (text) =>
-          text.startsWith("#!/bin/sh")
-            ? "STATIC_FILE_ONLY"
-            : "UNSUPPORTED_OR_BLOCKED",
-      ],
-      [
-        "stock_template",
-        "/user/ocfusion-probe.asp",
-        (text) =>
-          jsonMatches(text, (data) =>
-            /^[A-Za-z_-]{1,16}$/.test(data.ocfusion_template),
-          ),
-        (text) =>
-          text.includes("<" + "%")
-            ? "STATIC_TEMPLATE_ONLY"
-            : "UNSUPPORTED_OR_BLOCKED",
-      ],
-    ];
-
-    for (const [channel, path, validate, classify] of tests) {
-      latest.tests.push({
-        channel,
-        ...(await probe(path, validate, classify)),
-      });
-      renderReport();
-    }
-
-    for (let attempt = 0; pending && attempt < 40; attempt++) {
-      await sleep(250);
-    }
-
-    const started = performance.now();
-
-    if (pending || !platformReady) {
-      latest.tests.push({
-        channel: "nvram_mailbox",
-        result: "BUSY_OR_UNAVAILABLE",
-      });
-    } else {
-      busy(true);
-
-      try {
-        const response = await request("platform.ping");
-
-        latest.tests.push({
-          channel: "nvram_mailbox",
-          result:
-            response.request_data?.pong === true ? "PASS" : "INVALID_REPLY",
-          elapsed_ms: Math.round(performance.now() - started),
-          response_storage: response.request_data?.response_storage,
-        });
-      } catch (error) {
-        latest.tests.push({ channel: "nvram_mailbox", result: "FAILED" });
-      } finally {
-        busy(false);
-      }
-    }
-
-    latest.tests.push({
-      channel: "reverse_proxy",
-      result: "NOT_CONFIGURED_NOT_TESTED",
-    });
     renderReport();
-    result.textContent = "Diagnostics complete. Copy the report to share it.";
-    run.disabled = false;
+
+    try {
+      const bootstrap = await fetchWithTimeout(
+        "/user/extensions-upload-probe.json?_=" + Date.now(),
+      );
+      const config = JSON.parse(bootstrap.text);
+
+      if (
+        !bootstrap.response.ok ||
+        config.state !== "READY" ||
+        !/^ocf_probe_[a-f0-9]{16}$/.test(config.resource) ||
+        !/^[a-f0-9]{32}$/.test(config.instance) ||
+        config.max_payload_bytes !== 65536
+      ) {
+        throw Error("Upload receiver unavailable");
+      }
+
+      latest.receiver = config.state;
+      latest.test_limit_bytes = config.max_payload_bytes;
+
+      for (const size of sizes) {
+        latest.tests.push(await roundTrip(config, size));
+        renderReport();
+      }
+
+      latest.largest_passed_payload_bytes = Math.max(
+        0,
+        ...latest.tests
+          .filter((test) => test.result === "PASS")
+          .map((test) => test.payload_bytes),
+      );
+      latest.absolute_maximum_tested = false;
+      result.textContent = "Diagnostics complete. Copy the report to share it.";
+    } catch (error) {
+      latest.receiver = "UNAVAILABLE";
+      result.textContent =
+        "Upload receiver unavailable. Reinstall the current distribution and reload the page.";
+    } finally {
+      renderReport();
+      run.disabled = false;
+    }
   });
 
   run.disabled = false;
   result.textContent = "";
 
-  auth.addEventListener("change", renderReport);
   document
     .getElementById("transport-copy")
     .addEventListener("click", async () => {

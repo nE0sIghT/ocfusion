@@ -114,20 +114,3 @@ func TestInlineModuleCall(t *testing.T) {
 		t.Fatal("invalid module accepted")
 	}
 }
-
-func TestPlatformPingDoesNotInvokeModules(t *testing.T) {
-	previous := runModuleCommand
-	t.Cleanup(func() {
-		runModuleCommand = previous
-	})
-	runModuleCommand = func(args ...string) (json.RawMessage, error) {
-		t.Fatal("ping invoked a module", args)
-		return nil, nil
-	}
-
-	mailbox := &webMailbox{}
-	raw := []byte(`{"id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","action":"platform.ping"}`)
-	if _, ok, _ := mailbox.apply(raw, time.Now()); !ok || !strings.Contains(string(mailbox.LastData), `"pong":true`) {
-		t.Fatal("ping failed", mailbox.LastMessage)
-	}
-}

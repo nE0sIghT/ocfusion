@@ -101,48 +101,18 @@
             </article>
 
             <article class="ext-card">
-              <h2>Communication diagnostics</h2>
-              <p>Test available channels without changing VPN settings.</p>
+              <h2>Upload channel diagnostics</h2>
+              <p>
+                Test a round trip through the ASUS uploader and RAM replies with
+                1, 8, 32 and 64 KiB payloads. VPN and captive portal settings
+                are unchanged.
+              </p>
               <button id="transport-test" type="button" disabled>
                 Run diagnostics
               </button>
               <p id="transport-result" role="status">
-                Communication diagnostics unavailable. Reload the page.
+                Upload diagnostics unavailable. Reload the page.
               </p>
-              <p>
-                Check both JSON links in a private window without signing in.
-                The browser cannot reliably test authentication using its
-                current session.
-              </p>
-              <p>
-                <a
-                  href="/user/extensions-modules.json"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  >Open public status JSON</a
-                >
-              </p>
-              <p>
-                <a
-                  id="transport-module-json"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  hidden
-                  >Open module status JSON</a
-                >
-              </p>
-              <div class="ext-field">
-                <label for="transport-auth"
-                  >Access without authentication</label
-                >
-                <select id="transport-auth">
-                  <option value="NOT_CHECKED">Not checked</option>
-                  <option value="LOGIN_REQUIRED">Login required</option>
-                  <option value="JSON_ACCESSIBLE">
-                    JSON accessible without login
-                  </option>
-                </select>
-              </div>
               <p>
                 <button id="transport-copy" class="ext-secondary" type="button">
                   Copy report

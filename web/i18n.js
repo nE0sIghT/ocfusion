@@ -2,24 +2,19 @@
 "use strict";
 
 const OCF_TRANSLATIONS = {
-  "Communication diagnostics unavailable. Reload the page.":
-    "Диагностика обмена недоступна. Перезагрузите страницу.",
+  "Upload diagnostics unavailable. Reload the page.":
+    "Диагностика загрузки недоступна. Перезагрузите страницу.",
   "Public status unavailable": "Публичный статус пока недоступен",
-  "Communication diagnostics": "Диагностика обмена",
-  "Test available channels without changing VPN settings.":
-    "Проверка каналов обмена без изменения настроек VPN.",
+  "Upload channel diagnostics": "Диагностика канала загрузки",
+  "Test a round trip through the ASUS uploader and RAM replies with 1, 8, 32 and 64 KiB payloads. VPN and captive portal settings are unchanged.":
+    "Проверка двунаправленного обмена через загрузчик ASUS и ответы в RAM с данными размером 1, 8, 32 и 64 КиБ. Настройки VPN и captive portal не меняются.",
   "Run diagnostics": "Запустить диагностику",
-  "Check both JSON links in a private window without signing in. The browser cannot reliably test authentication using its current session.":
-    "Откройте обе ссылки JSON в приватном окне без входа. Проверка авторизации из текущей сессии браузера ненадёжна.",
-  "Open module status JSON": "Открыть JSON статуса модуля",
-  "Open public status JSON": "Открыть JSON публичного статуса",
-  "Access without authentication": "Доступ без авторизации",
-  "Not checked": "Не проверено",
-  "Login required": "Требуется вход",
-  "JSON accessible without login": "JSON доступен без входа",
+  "Testing upload round trips...":
+    "Проверяем двунаправленный обмен через загрузчик...",
+  "Upload receiver unavailable. Reinstall the current distribution and reload the page.":
+    "Приёмник загрузки недоступен. Переустановите текущий дистрибутив и перезагрузите страницу.",
   "Copy report": "Копировать отчёт",
   "Diagnostic report": "Отчёт диагностики",
-  "Running communication diagnostics...": "Проверяем каналы обмена...",
   "Diagnostics complete. Copy the report to share it.":
     "Диагностика завершена. Скопируйте отчёт для передачи.",
   "Report copied.": "Отчёт скопирован.",

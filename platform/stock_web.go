@@ -130,8 +130,8 @@ func publishWeb() error {
 		}
 	}
 
-	if e = publishTransportProbes(); e != nil {
-		return e
+	for _, name := range []string{"ocfusion-probe.cgi", "ocfusion-probe.asp"} {
+		os.Remove(filepath.Join(dir, name))
 	}
 
 	js := fmt.Sprintf("window.OCF_SETTINGS={unit:%d,index:%d,key:%q,version:%q,language:%q,model:%q};\n", m.Unit, m.Index, m.Key, version, nvget("preferred_lang"), nvget("productid"))

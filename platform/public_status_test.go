@@ -68,22 +68,6 @@ func TestPublicStatusPublication(t *testing.T) {
 	}
 }
 
-func TestProbeFilesAreFixedAndInputFree(t *testing.T) {
-	previous := webRoot
-	webRoot = t.TempDir()
-	t.Cleanup(func() {
-		webRoot = previous
-	})
-
-	if err := publishTransportProbes(); err != nil {
-		t.Fatal(err)
-	}
-	cgi, _ := os.ReadFile(filepath.Join(webRoot, "ocfusion-probe.cgi"))
-	if strings.Contains(string(cgi), "$QUERY_STRING") || !strings.Contains(string(cgi), "ocfusion_cgi_executed") {
-		t.Fatal("unexpected CGI probe", string(cgi))
-	}
-}
-
 func TestModulePublishesThroughManagerProvidedPath(t *testing.T) {
 	oldBase, oldRAM, oldWeb := base, ram, webRoot
 	base, ram, webRoot = t.TempDir(), t.TempDir(), t.TempDir()

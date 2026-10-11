@@ -130,8 +130,8 @@ Report problems through [GitHub Issues](https://github.com/nE0sIghT/ocfusion/iss
 
 See [architecture](architecture.md) for implementation details and [module development](modules.md) for the module interfaces.
 
-## Communication diagnostics
+## Upload channel diagnostics
 
-Open the OCFusion panel using its icon in the ASUS header, then select System and Run diagnostics. The tests do not change VPN settings. Copy the report to share the observed channels and timings.
+Open the OCFusion panel using its icon in the ASUS header, then select System and Run diagnostics. The test sends synthetic data through the native ASUS uploader and checks a complete RAM echo with a matching request ID. It tries 1, 8, 32 and 64 KiB payloads, reports integrity and timing for each size, and identifies the largest passing size. This range is a practical test limit, not the firmware's absolute maximum.
 
-For the authentication check, open both the platform and module status JSON links in a separate private browser session without signing in. Record whether ASUS requires login for both links or returns JSON for either link using the selector in the diagnostic card. The automatic tests use your current ASUS session and do not prove anonymous access is blocked.
+The probe does not modify VPN or captive portal settings and accepts no module commands or credentials. Copy the report to share the result. The active module command channel remains unchanged.

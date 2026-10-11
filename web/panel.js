@@ -356,18 +356,6 @@ async function loadModules() {
 
     installedModules = data.modules;
 
-    const statusLink = document.getElementById("transport-module-json");
-    const statusModule = installedModules.find((module) => module.ui);
-
-    if (statusLink) {
-      statusLink.hidden = !statusModule;
-
-      if (statusModule && /^[a-z][a-z0-9-]{0,31}$/.test(statusModule.id)) {
-        statusLink.href =
-          "/user/extensions-status/" + statusModule.id + ".json";
-      }
-    }
-
     for (const id of ["module-list", "module-overview", "module-menu"]) {
       const container = document.getElementById(id);
 
