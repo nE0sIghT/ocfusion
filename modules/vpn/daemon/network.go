@@ -29,12 +29,16 @@ func xt(tool, table, op, chain string, args ...string) error {
 	}
 
 	action := "-I"
+	if op == "add" && table == "mangle" && chain == "OUTPUT" {
+		action = "-A"
+	}
+
 	if op == "del" {
 		action = "-D"
 	}
 
 	cmd := append(prefix, action, chain)
-	if op == "add" {
+	if op == "add" && action == "-I" {
 		cmd = append(cmd, "1")
 	}
 

@@ -117,7 +117,8 @@
         "RPM_PACKAGE_RELEASE": "ocfusion1"
       },
       "patches": [
-        "modules/openconnect/patches/0001-managed-hook-environment.patch"
+        "modules/openconnect/patches/0001-managed-hook-environment.patch",
+        "modules/openconnect/patches/0002-managed-otp-channel.patch"
       ],
       "remove_before_make": [
         "version.c",

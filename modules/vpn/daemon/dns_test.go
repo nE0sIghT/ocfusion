@@ -2,6 +2,7 @@
 package main
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -81,5 +82,36 @@ func TestDNSConntrackDeletionIsLocalAndScoped(t *testing.T) {
 	deleteLocalDNSFlows(DNSEndpoint{Address: "198.51.100.1", Protocol: "tcp", Port: 853})
 	if len(calls) != 1 || !strings.Contains(calls[0], "--orig-src 192.0.2.10 --orig-dst 198.51.100.1 --dport 853") {
 		t.Fatal(calls)
+	}
+}
+
+func TestDNSCleanupFailureIsRetried(t *testing.T) {
+	previous := runner
+	t.Cleanup(func() { runner = previous })
+	fail := true
+	runner = func(tool string, args ...string) (string, error) {
+		if strings.Contains(strings.Join(args, " "), "-D OUTPUT") && fail {
+			return "", errors.New("fixture deletion failed")
+		}
+		return "", nil
+	}
+
+	dns := DNSRouter{active: "ocvpn0", mark: "0x10000000/0x10000000", endpoints: []DNSEndpoint{{Address: "192.0.2.1", Port: 53, Protocol: "udp"}}}
+	if dns.reset() == nil || dns.status.Path != "ERROR" || dns.active == "" {
+		t.Fatal("cleanup failure lost retry state")
+	}
+	fail = false
+	if dns.reset() != nil || dns.active != "" {
+		t.Fatal("cleanup retry failed")
+	}
+}
+
+func TestDNSMarkExcludesConnectionRestoreMasks(t *testing.T) {
+	if unusedDNSMark("-j CONNMARK --restore-mark") != "" {
+		t.Fatal("unmasked connection restore can erase socket marks")
+	}
+
+	if unusedDNSMark("-j CONNMARK --restore-mark --nfmask 0x7 --ctmask 0x7") == "" {
+		t.Fatal("limited restore should leave high bits available")
 	}
 }

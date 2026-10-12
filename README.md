@@ -8,7 +8,8 @@ OCFusion is a platform for extending stock ASUSWRT functionality without flashin
 
 ## Available modules
 
-- **OpenConnect** - adds OpenConnect VPN support, with connection settings and status in the OCFusion panel. A selected connection can carry DNS requests for the router and all networks, with automatic WAN fallback when disconnected.
+- **OpenConnect** - adds OpenConnect VPN support with multiple connection profiles, password and certificate authentication, and manual OTP or automatic TOTP. A selected connection can carry DNS requests for the router and all networks, with automatic WAN fallback when disconnected.
+- **AdGuard Home** - adds DNS filtering with filter lists, custom rules, exceptions and per-client controls. Filtering is disabled by default. It inherits ASUS DNS settings and follows the selected VPN/WAN DNS path, or uses custom upstreams including DoT and DoH. It also works without OpenConnect.
 
 ## Compatibility
 
@@ -24,7 +25,7 @@ The simplest installation uses a USB drive prepared on a Linux computer. Use an 
 2. Extract the archive, then prepare the mounted USB partition (replace `/media/user/USB`):
 
    ```sh
-   tar -xzf ocfusion-0.3.1-aarch64.tar.gz
+   tar -xzf ocfusion-0.4-aarch64.tar.gz
    ./ocfusion/install.sh --prepare-usb /media/user/USB
    ```
 
@@ -43,6 +44,7 @@ See [installation, updates and troubleshooting](INSTALLATION.md). Reinstalling p
 - Manage extensions from a web panel integrated with the ASUS interface.
 - Connect to OpenConnect VPN servers using the included module.
 - Optionally use a VPN connection for router DNS, with automatic WAN fallback.
+- Filter DNS using AdGuard Home while keeping native ASUS DNS settings by default.
 - English and Russian UI, following the router's language setting.
 
 ## Screenshots
@@ -83,4 +85,4 @@ OCFusion is free software licensed under the **GNU General Public License, versi
 
 Third-party components retain their own licenses. The runtime distribution includes their required license notices.
 
-Patches to third-party OSS projects are distributed under the licenses of those projects. The OpenConnect patch is licensed under the **GNU Lesser General Public License, version 2.1**.
+Patches to third-party OSS projects are distributed under the licenses of those projects. The OpenConnect patches use the **GNU Lesser General Public License, version 2.1**. AdGuard Home patches use the **GNU General Public License, version 3**; dnsproxy patches use the **Apache License, version 2.0**.

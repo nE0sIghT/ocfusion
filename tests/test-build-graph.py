@@ -69,6 +69,21 @@ def main():
             [*C_TARGETS, "ocfusion-openconnect", "ocfusion-vpn"],
         )
 
+    with changed_mtime(PROJECT_ROOT / "modules/adguard-home/daemon/config.go"):
+        assert_targets(
+            build_plan(arguments.build_dir),
+            ["ocfusion-adguard-home", "runtime-stage", "runtime"],
+            [*C_TARGETS, "AdGuardHome", "extd", "ocfusion-openconnect"],
+        )
+    with changed_mtime(
+        PROJECT_ROOT / "modules/adguard-home/patches/0002-dnsproxy-marked-dialers.patch"
+    ):
+        assert_targets(
+            build_plan(arguments.build_dir),
+            ["AdGuardHome", "runtime-stage", "runtime"],
+            [*C_TARGETS, "ocfusion-adguard-home", "extd"],
+        )
+
     with changed_mtime(PROJECT_ROOT / "platform/manager.go"):
         assert_targets(
             build_plan(arguments.build_dir),

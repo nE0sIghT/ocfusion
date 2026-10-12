@@ -11,6 +11,7 @@ import (
 var identifier = regexp.MustCompile(`^[a-z][a-z0-9-]{0,31}$`)
 
 type Broker struct {
+	resolver *ResolverLease
 	registry Connections
 	services map[string]*Service
 	dns      DNSRouter
@@ -29,6 +30,10 @@ func newBroker(registry Connections) *Broker {
 func (b *Broker) handle(request Request) (Response, error) {
 	if request.API != 1 || !identifier.MatchString(request.Client) {
 		return Response{}, errors.New("invalid VPN owner or API")
+	}
+
+	if request.Operation == "resolver-info" || request.Operation == "resolver-register" || request.Operation == "resolver-release" {
+		return b.resolverRequest(request)
 	}
 
 	if request.Operation == "dns-state" {
@@ -114,6 +119,12 @@ func (b *Broker) handle(request Request) (Response, error) {
 		}
 		runner("ip", "route", "del", "unreachable", "default", "metric", "32760", "table", strconv.Itoa(service.manifest.Table))
 		delete(b.services, request.Connection)
+		if b.dns.policy.Client == request.Client && b.dns.policy.Profile == request.Profile {
+			if err := b.dns.selectPolicy(DNSPolicy{}); err != nil {
+				return Response{}, err
+			}
+		}
+		b.dns.reconcile(b.services)
 
 		return Response{OK: true, Manifest: service.manifest}, nil
 	}
@@ -150,11 +161,15 @@ func (b *Broker) reconcile() {
 	}
 
 	b.dns.reconcile(b.services)
+	b.reconcileResolver()
 	saveJSON(filepath.Join(runDir, "status.json"), map[string]any{"connections": statuses, "dns": b.dns.status})
 }
 
 func (b *Broker) down() {
 	b.dns.reset()
+	if b.resolver != nil {
+		resolverCapture(b.resolver.Registration, "del")
+	}
 	for _, service := range b.services {
 		service.down()
 	}

@@ -23,6 +23,9 @@ var runDir = "/tmp/ocfusion"
 var ifaceRE = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_.-]{0,14}$`)
 
 type Profile struct {
+	OTPMode     string   `json:"otp_mode,omitempty"`
+	OTPSecret   string   `json:"otp_secret,omitempty"`
+	OTPField    string   `json:"otp_field,omitempty"`
 	NativeDNS   bool     `json:"native_dns,omitempty"`
 	Schema      int      `json:"schema"`
 	Server      string   `json:"server"`
@@ -121,6 +124,10 @@ func parseProfile(b []byte) (Profile, error) {
 		if ip := net.ParseIP(s); ip == nil || ip.To4() == nil {
 			return p, errors.New("dns must contain IPv4 addresses")
 		}
+	}
+
+	if err := validateOTP(p); err != nil {
+		return p, err
 	}
 
 	canonical, _ := json.MarshalIndent(p, "", "  ")

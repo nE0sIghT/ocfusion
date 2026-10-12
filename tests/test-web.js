@@ -16,7 +16,13 @@ for (const filename of ["import.html", "panel.js", "i18n.js"]) {
 }
 
 // Stock ASUS template markers are interpreted even inside JavaScript strings.
-for (const directory of ["web", "platform", "modules/openconnect/ui", "modules/vpn/ui"]) {
+for (const directory of [
+  "web",
+  "platform",
+  "modules/openconnect/ui",
+  "modules/vpn/ui",
+  "modules/adguard-home/ui",
+]) {
   for (const filename of fs.readdirSync(__dirname + "/../" + directory)) {
     if (!filename.endsWith(".js")) {
       continue;

@@ -29,6 +29,13 @@ const modules = [
     ui: "/user/extensions-modules/heartbeat/ui/index.html",
   },
 ];
+modules.push({
+  id: "adguard-home",
+  name: "AdGuard Home",
+  version: "0.4",
+  state: "RUNNING",
+  ui: "/user/extensions-modules/adguard-home/ui/index.html",
+});
 const requests = [];
 
 let mailbox = {};
@@ -92,6 +99,19 @@ function createFixtureServer() {
       );
     }
 
+    if (url.pathname === "/user/extensions-status/adguard-home.json") {
+      return send(
+        JSON.stringify({
+          module: "adguard-home",
+          state: "RUNNING",
+          updated_at: Date.now(),
+          data_updated_at: Date.now(),
+          data: { state: "DISABLED", dns_path: "WAN" },
+        }),
+        "application/json",
+      );
+    }
+
     if (url.pathname === "/user/extensions-command.json") {
       return send(
         JSON.stringify({
@@ -142,7 +162,22 @@ function createFixtureServer() {
         }
 
         const data =
-          q.operation === "profiles"
+          q.module === "adguard-home" && q.operation === "settings"
+            ? {
+                revision: 0,
+                enabled: false,
+                upstreams: [],
+                rules: [],
+                filters: [],
+                clients: [],
+              }
+            : q.module === "adguard-home" && q.operation === "catalog"
+              ? [{name: "AdGuard DNS filter", url: "https://adguardteam.github.io/HostlistsRegistry/assets/filter_1.txt", homepage: "https://github.com/AdguardTeam/AdGuardSDNSFilter", description: "Ads and trackers, including Russian-language sites"}]
+            : q.module === "adguard-home" && q.operation === "filter-status"
+              ? {filters: [], updating: false}
+            : q.module === "adguard-home" && q.operation === "statistics"
+              ? { num_dns_queries: 3, num_blocked_filtering: 1 }
+            : q.operation === "profiles"
             ? profiles
             : q.operation === "settings"
               ? {
@@ -221,6 +256,10 @@ function createFixtureServer() {
       if (relative.startsWith("openconnect/ui/")) {
         filename =
           "modules/openconnect/ui/" + relative.slice("openconnect/ui/".length);
+      }
+
+      if (relative.startsWith("adguard-home/ui/")) {
+        filename = "modules/adguard-home/ui/" + relative.slice("adguard-home/ui/".length);
       }
 
       if (relative.startsWith("heartbeat/ui/")) {
@@ -372,6 +411,44 @@ async function testModuleUI(browser, address, language) {
     ),
     "Status polling used the command mailbox",
   );
+
+  if (language === "EN") {
+    await frame.locator("#settings-save:not([disabled])").waitFor();
+    await frame.locator("body").evaluate(() => {
+      renderConnection({
+        state: "WAIT_OTP",
+        message: "Enter one-time code",
+        networks: [],
+        otp: {
+          id: "fixture-challenge",
+          expires: Math.floor(Date.now() / 1000) + 120,
+        },
+      });
+    });
+    await frame.locator("#otp-code").fill("123456");
+    await frame.locator("#otp-submit").click();
+    await frame.locator("#otp-result").filter({hasText: "Code accepted"}).waitFor();
+    assert.equal(await frame.locator("#otp-code").inputValue(), "");
+    assert(requests.some((q) =>
+      q.operation === "submit-otp" &&
+      q.config.data.challenge === "fixture-challenge" &&
+      q.config.data.code === "123456",
+    ));
+  }
+
+  await page.locator('#module-menu a[href="#module-adguard-home"]').click();
+  await frame.locator("#fields:not([disabled])").waitFor();
+  assert.equal((await frame.locator('button[type="submit"]').textContent()).trim(),
+    ru ? "Сохранить настройки" : "Save settings");
+  await frame.locator("#tab-lists").click();
+  await frame.locator("#catalog input").check();
+  await frame.locator("#tab-protection").click();
+  await frame.locator("#stats").click();
+  await frame.locator("#statistics").filter({hasText: "3"}).waitFor();
+  await frame.locator("#enabled").check();
+  await frame.locator('button[type="submit"]').click();
+  await frame.locator("#result").filter({hasText: ru ? "Настройки сохранены" : "Settings saved"}).waitFor();
+  assert(requests.some((q) => q.action === "module.configure" && q.module === "adguard-home"));
 
   await page.locator('a[data-page="system"]').click();
   assert.equal(await page.locator("#transport-test").count(), 0);

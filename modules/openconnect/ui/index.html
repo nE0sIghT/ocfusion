@@ -82,6 +82,13 @@
             Reconnect
           </button>
           <p id="action-result" role="status"></p>
+          <div id="otp-challenge" hidden>
+            <label for="otp-code">One-time code</label>
+            <input id="otp-code" inputmode="numeric" autocomplete="one-time-code" maxlength="8" />
+            <button id="otp-submit" type="button">Submit code</button>
+            <button id="otp-cancel" class="ext-secondary" type="button">Cancel code</button>
+            <p id="otp-result" role="status"></p>
+          </div>
         </article>
         <article class="ext-card">
           <div class="ext-card-heading">
@@ -186,6 +193,31 @@
                   >
                 </div>
               </div>
+              <details class="ext-certificates">
+                <summary>One-time passwords</summary>
+                <div class="ext-fields">
+                  <div class="ext-field">
+                    <label for="otp-mode">OTP mode</label>
+                    <select id="otp-mode">
+                      <option value="">Disabled</option>
+                      <option value="manual">Manual code</option>
+                      <option value="totp">Automatic TOTP</option>
+                    </select>
+                  </div>
+                  <div class="ext-field">
+                    <label for="otp-field">OTP field (optional)</label>
+                    <input id="otp-field" maxlength="64" placeholder="secondary_password" />
+                    <small>AnyConnect / ocserv. Set password for a certificate-plus-OTP form.</small>
+                  </div>
+                  <div class="ext-field ext-wide">
+                    <label for="otp-secret">New TOTP secret</label>
+                    <input id="otp-secret" type="password" autocomplete="new-password" />
+                    <small id="otp-secret-state"></small>
+                    <label class="ext-check"><input id="clear-otp-secret" type="checkbox" />Remove saved TOTP secret</label>
+                    <small>Base32 or otpauth URI. Automatic TOTP uses six digits and requires synchronized time.</small>
+                  </div>
+                </div>
+              </details>
               <details class="ext-certificates" id="certificate-settings">
                 <summary>Certificates and server verification</summary>
                 <p class="ext-description">

@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "id": "adguard-home",
+  "name": "AdGuard Home",
+  "version": "@VERSION@",
+  "module_api": 1,
+  "entrypoint": "bin/ocfusion-adguard-home",
+  "ui": "ui/index.html",
+  "dependencies": [{"id": "vpn", "api": 1}],
+  "actions": ["settings", "statistics", "catalog", "filter-status", "refresh-filters"],
+  "capabilities": ["network.dns", "dns.filtering"],
+  "resources": {"dns.filter": "router"}
+}

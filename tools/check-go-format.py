@@ -11,7 +11,12 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 def main():
     sources = sorted(
         path
-        for module in ("modules/openconnect/daemon", "modules/vpn/daemon", "platform")
+        for module in (
+            "modules/openconnect/daemon",
+            "modules/vpn/daemon",
+            "modules/adguard-home/daemon",
+            "platform",
+        )
         for path in (PROJECT_ROOT / module).glob("*.go")
     )
     result = subprocess.check_output(["gofmt", "-l", *map(str, sources)], text=True)

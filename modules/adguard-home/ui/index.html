@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>AdGuard Home - OCFusion</title>
+    <link rel="stylesheet" href="/index_style.css" />
+    <link rel="stylesheet" href="/form_style.css" />
+    <link rel="stylesheet" href="/user/extensions-panel.css" />
+    <link rel="stylesheet" href="layout.css" />
+  </head>
+  <body class="bg">
+    <main class="ext-shell ext-module">
+      <div class="ext-card-heading">
+        <h1>AdGuard Home</h1>
+        <span id="state" class="ext-badge" role="status">Loading…</span>
+      </div>
+      <p>
+        Block advertising and tracking domains for devices using router DNS.
+      </p>
+      <nav class="agh-tabs" role="tablist" aria-label="AdGuard Home">
+        <button
+          id="tab-protection"
+          type="button"
+          role="tab"
+          aria-controls="panel-protection"
+          aria-selected="true"
+          class="tabClicked"
+        >
+          Protection
+        </button>
+        <button
+          id="tab-lists"
+          type="button"
+          role="tab"
+          aria-controls="panel-lists"
+          aria-selected="false"
+          tabindex="-1"
+          class="tab"
+        >
+          Filter lists
+        </button>
+        <button
+          id="tab-advanced"
+          type="button"
+          role="tab"
+          aria-controls="panel-advanced"
+          aria-selected="false"
+          tabindex="-1"
+          class="tab"
+        >
+          Advanced
+        </button>
+      </nav>
+      <form id="settings">
+        <fieldset id="fields" disabled>
+          <section
+            id="panel-protection"
+            role="tabpanel"
+            aria-labelledby="tab-protection"
+          >
+            <article class="ext-card">
+              <h2>Protection</h2>
+              <label class="ext-check"
+                ><input id="enabled" type="checkbox" />Enable DNS
+                filtering</label
+              >
+              <p id="dns-path" role="status"></p>
+              <p>
+                ASUS DNS settings are used unless you configure custom DNS
+                servers.
+              </p>
+            </article>
+            <article class="ext-card">
+              <div class="ext-card-heading">
+                <h2>Statistics</h2>
+                <button id="stats" type="button" class="ext-secondary">
+                  Refresh statistics
+                </button>
+              </div>
+              <dl id="statistics" class="agh-statistics">
+                <div>
+                  <dt>DNS queries</dt>
+                  <dd id="queries">0</dd>
+                </div>
+                <div>
+                  <dt>Blocked</dt>
+                  <dd id="blocked">0</dd>
+                </div>
+                <div>
+                  <dt>Average response</dt>
+                  <dd id="response-time">0 ms</dd>
+                </div>
+              </dl>
+              <p>
+                DNS filtering blocks domains; it cannot remove individual page
+                elements.
+              </p>
+            </article>
+          </section>
+          <section
+            id="panel-lists"
+            role="tabpanel"
+            aria-labelledby="tab-lists"
+            hidden
+          >
+            <article class="ext-card">
+              <div class="ext-card-heading">
+                <h2>Filter lists</h2>
+                <button
+                  id="refresh-filters"
+                  type="button"
+                  class="ext-secondary"
+                >
+                  Update now
+                </button>
+              </div>
+              <p>
+                Selected lists download automatically and update every 24 hours
+                while protection is enabled.
+              </p>
+              <div id="catalog"></div>
+              <p id="filter-result" role="status"></p>
+              <p>
+                One general-purpose list is usually enough. Additional lists may
+                overlap.
+              </p>
+            </article>
+          </section>
+          <section
+            id="panel-advanced"
+            role="tabpanel"
+            aria-labelledby="tab-advanced"
+            hidden
+          >
+            <article class="ext-card">
+              <h2>Advanced settings</h2>
+              <div class="ext-fields">
+                <div class="ext-field ext-wide">
+                  <label for="filters">Custom filter lists</label
+                  ><textarea id="filters" rows="3"></textarea
+                  ><small>One HTTPS URL per line.</small>
+                </div>
+                <div class="ext-field ext-wide">
+                  <label for="rules">Custom filter rules and exceptions</label
+                  ><textarea id="rules" rows="4"></textarea
+                  ><small
+                    >One AdGuard rule per line. Use @@ for exceptions.</small
+                  >
+                </div>
+                <div class="ext-field ext-wide">
+                  <label for="clients">Client filtering overrides</label
+                  ><textarea id="clients" rows="3"></textarea
+                  ><small>One IP or CIDR followed by on or off per line.</small>
+                </div>
+              </div>
+              <details>
+                <summary>DNS servers and diagnostics</summary>
+                <div class="ext-field">
+                  <label for="upstreams">Custom upstreams (optional)</label
+                  ><textarea id="upstreams" rows="4"></textarea
+                  ><small
+                    >One IP, tls://host or https://host/dns-query per line. Add
+                    a connection IP after a space to preserve TLS hostname
+                    without bootstrap lookup. Empty inherits ASUS.</small
+                  >
+                </div>
+                <label class="ext-check"
+                  ><input id="query-log" type="checkbox" />Keep a bounded query
+                  log in RAM</label
+                >
+              </details>
+            </article>
+          </section>
+          <div class="agh-save">
+            <button id="save" type="submit">Save settings</button
+            ><button id="reload" class="ext-secondary" type="button">
+              Reload
+            </button>
+            <p id="result" role="status"></p>
+          </div>
+        </fieldset>
+      </form>
+    </main>
+    <script src="app.js"></script>
+    <script src="translations.js"></script>
+    <script src="/user/ocfusion-i18n.js"></script>
+  </body>
+</html>

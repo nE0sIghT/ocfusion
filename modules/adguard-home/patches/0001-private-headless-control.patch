@@ -1,0 +1,85 @@
+--- a/main.go
++++ b/main.go
+@@ -1,4 +1,4 @@
+-//go:build !next
++//go:build !next && !ocfusion
+ 
+ package main
+ 
+--- a/internal/home/web.go
++++ b/internal/home/web.go
+@@ -6,8 +6,10 @@
+ 	"fmt"
+ 	"io/fs"
+ 	"log/slog"
++	"net"
+ 	"net/http"
+ 	"net/netip"
++	"os"
+ 	"runtime"
+ 	"sync"
+ 	"time"
+@@ -276,11 +278,13 @@
+ 
+ 	mux := conf.mux
+ 	// if not configured, redirect / to /install.html, otherwise redirect /install.html to /
+-	mux.Handle("/", httputil.Wrap(
+-		clientFS,
+-		httputil.MiddlewareFunc(w.postInstallHandler),
+-		httputil.MiddlewareFunc(gziphandler.GzipHandler),
+-	))
++	if os.Getenv("OCF_CONTROL_SOCKET") == "" {
++		mux.Handle("/", httputil.Wrap(
++			clientFS,
++			httputil.MiddlewareFunc(w.postInstallHandler),
++			httputil.MiddlewareFunc(gziphandler.GzipHandler),
++		))
++	}
+ 
+ 	// add handlers for /install paths, we only need them when we're not configured yet
+ 	if conf.firstRun {
+@@ -383,7 +387,26 @@
+ 
+ 			logger.InfoContext(ctx, "starting plain server", "addr", web.httpServer.Addr)
+ 
+-			errs <- web.httpServer.ListenAndServe()
++			socket := os.Getenv("OCF_CONTROL_SOCKET")
++			if socket == "" {
++				errs <- web.httpServer.ListenAndServe()
++				return
++			}
++
++			os.Remove(socket)
++			listener, err := net.Listen("unix", socket)
++			if err != nil {
++				errs <- err
++				return
++			}
++
++			if err = os.Chmod(socket, 0600); err != nil {
++				listener.Close()
++				errs <- err
++				return
++			}
++
++			errs <- web.httpServer.Serve(listener)
+ 		}()
+ 
+ 		err := <-errs
+--- /dev/null
++++ b/main_ocfusion.go
+@@ -0,0 +1,14 @@
++//go:build ocfusion
++
++package main
++
++import (
++	"testing/fstest"
++	_ "time/tzdata"
++
++	"github.com/AdguardTeam/AdGuardHome/internal/home"
++)
++
++func main() {
++	home.Main(fstest.MapFS{})
++}

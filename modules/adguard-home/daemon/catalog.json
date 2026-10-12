@@ -1,0 +1,21 @@
+[
+  {
+    "name": "AdGuard DNS filter",
+    "url": "https://adguardteam.github.io/HostlistsRegistry/assets/filter_1.txt",
+    "description": "Ads and trackers, including Russian-language sites",
+    "homepage": "https://github.com/AdguardTeam/AdGuardSDNSFilter",
+    "recommended": true
+  },
+  {
+    "name": "HaGeZi Normal",
+    "url": "https://adguardteam.github.io/HostlistsRegistry/assets/filter_34.txt",
+    "description": "Ads, trackers and malicious domains",
+    "homepage": "https://github.com/hagezi/dns-blocklists"
+  },
+  {
+    "name": "OISD Small",
+    "url": "https://adguardteam.github.io/HostlistsRegistry/assets/filter_5.txt",
+    "description": "Ads and trackers with a focus on compatibility",
+    "homepage": "https://oisd.nl/"
+  }
+]

@@ -12,6 +12,7 @@ foreach name : [
     'libxml2-2.15.4.tar.xz',
     'openconnect-9.21.tar.gz',
     'cacert-2026-09-25.pem',
+    'AdGuardHome-v0.107.79.tar.gz',
 ]
     downloads += {
         name: custom_target(
@@ -73,6 +74,7 @@ foreach component : components
     if name == 'openconnect'
         inputs += files(
             '../modules/openconnect/patches/0001-managed-hook-environment.patch',
+            '../modules/openconnect/patches/0002-managed-otp-channel.patch',
         )
 
         output = 'openconnect'

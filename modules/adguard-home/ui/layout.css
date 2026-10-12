@@ -1,0 +1,49 @@
+.agh-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 20px 0;
+  border-bottom: 1px solid var(--ext-line);
+}
+.agh-tabs button {
+  float: none;
+  margin: 0;
+}
+.agh-tabs [aria-selected="true"] {
+  border-bottom: 3px solid var(--ext-accent);
+}
+.agh-list {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--ext-line);
+}
+.agh-list p {
+  margin: 6px 0;
+}
+.agh-list-status {
+  color: #aaa;
+}
+.agh-statistics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 30px;
+}
+.agh-statistics dd {
+  margin: 8px 0;
+  font-size: 24px;
+}
+.agh-save {
+  margin: 20px 0;
+}
+#fields {
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+.ext-module button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.ext-module button[aria-busy="true"] {
+  opacity: 0.8;
+  cursor: progress;
+}

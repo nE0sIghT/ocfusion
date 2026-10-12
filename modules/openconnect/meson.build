@@ -2,6 +2,7 @@ runtime_go = files(
     'daemon/go.mod',
     'daemon/client_output.go',
     'daemon/config.go',
+    'daemon/otp.go',
     'daemon/daemon.go',
     'daemon/install.go',
     'daemon/main.go',

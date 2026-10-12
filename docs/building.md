@@ -2,9 +2,9 @@
 
 ## Inputs and tools
 
-OCFusion uses Meson 1.12.1 and Ninja 1.13.2 to orchestrate three Go modules, static C dependencies, web assets and packaging. Go 1.27.2 builds the router services; GCC 14.2.0 cross-compiles C for AArch64. All runtime dependencies are fetched by immutable URL and verified against `third_party/sources.lock.json`. No firmware image, prebuilt router executable or MVP directory is required.
+OCFusion uses Meson 1.12.1 and Ninja 1.13.2 to orchestrate four Go modules, static C dependencies, web assets and packaging. Go 1.27.2 builds the router services; GCC 14.2.0 cross-compiles C for AArch64. All runtime dependencies are fetched by immutable URL and verified against `third_party/sources.lock.json`. No firmware image, prebuilt router executable or MVP directory is required.
 
-Install Go 1.27.2, native C/C++ compilers, AArch64 GCC 14.2.0 and its binutils/Linux headers, make, autoconf, automake, libtool, pkg-config, Python 3.12 or newer, Perl, patch, xz and Node.js. The cross compiler must be available as `aarch64-linux-gnu-gcc`. The matching Debian packages are listed in `build-env/Dockerfile`. Set `OCF_KERNEL_HEADERS` when cross headers are installed outside `/usr/aarch64-linux-gnu/include`.
+Install Go 1.27.2, native C/C++ compilers, AArch64 GCC 14.2.0 and its binutils/Linux headers, make, autoconf, automake, libtool, pkg-config, Python 3.12 or newer, Perl, patch, xz and Node.js. The cross compiler must be available as `aarch64-linux-gnu-gcc`. The matching Debian packages are listed in `build-env/Dockerfile`. If cross headers are installed outside `/usr/aarch64-linux-gnu/include`, set `OCF_KERNEL_HEADERS` to their include directory.
 
 On an x86-64 Linux computer, install the hash-pinned build tools:
 
@@ -25,9 +25,9 @@ meson compile -C build/meson bundle
 meson test -C build/meson --suite unit --suite example --suite client --print-errorlogs
 ```
 
-The root `meson.build` configures the project and includes component build files from `third_party/`, `platform/`, `modules/vpn/`, `modules/openconnect/`, `packaging/` and `tests/`. Upstream configure options, compiler environment and install targets are in [third_party/build.json](../third_party/build.json); pinned downloads remain in `sources.lock.json`.
+The root `meson.build` configures the project and includes component build files from `third_party/`, `platform/`, `modules/vpn/`, `modules/openconnect/`, `modules/adguard-home/`, `packaging/` and `tests/`. Upstream configure options, compiler environment and install targets are in [third_party/build.json](../third_party/build.json); pinned downloads remain in `sources.lock.json`.
 
-Meson owns the dependency graph. Separate targets build musl, zlib, OpenSSL, libxml2, OpenConnect, the supervisor and the module manager. A small adapter invokes the original upstream configure/make commands for one C project at a time. It does not orchestrate other projects. The OpenConnect target applies the tracked patch before compilation. Upstream build logs are in `build/meson/logs/`.
+Meson owns the dependency graph. Separate targets build musl, zlib, OpenSSL, libxml2, OpenConnect, the supervisor and the module manager. A small adapter invokes the original upstream configure/make commands for one C project at a time. It does not orchestrate other projects. The OpenConnect target applies its tracked patches before compilation. AdGuard Home is built from the locked upstream archive and its go.sum-pinned dependencies with private-control and DNS-dialer patches. Its native DNS integration fixture is also built from source for the client suite. Dependency licenses are collected into the runtime notices. Upstream build logs are in `build/meson/logs/`.
 
 Changing supervisor Go source rebuilds only that executable and runtime staging. Changing the OpenConnect patch rebuilds the client and staging, while preserving its libraries. Updating the CA input restages the trust bundle without recompiling C. A repeated unchanged compile does no work. Verify these invariants after a complete build:
 
@@ -82,12 +82,12 @@ Keep a build directory associated with its compiler environment; use a separate 
 
 ## Outputs, reproducibility and CI
 
-Release versions come from Git tags such as `v0.3.1`. Untagged commits use a development suffix. For a local test build or an extracted source archive without Git metadata, pass `-Drelease_version=0.3.1` to `meson setup`. The full source commit is embedded in owned executables and shown in the panel System section. Executable version output uses its first 7 hexadecimal characters. Source archives retain it in generated `.git-revision` metadata so rebuilding without Git preserves this identifier.
+Release versions come from Git tags such as `v0.4`. Untagged commits use a development suffix. For a local test build or an extracted source archive without Git metadata, pass `-Drelease_version=0.4` to `meson setup`. The full source commit is embedded in owned executables and shown in the panel System section. Executable version output uses its first 7 hexadecimal characters. Source archives retain it in generated `.git-revision` metadata so rebuilding without Git preserves this identifier.
 
 The resolved version supplies all executables and archive names; no tracked version file needs updating. Runtime staging is under `build/meson/runtime/ocfusion`; source templates remain unchanged. The `bundle` target creates in `dist/`:
 
-- `ocfusion-0.3.1-aarch64.tar.gz`
-- `ocfusion-0.3.1-source.tar.gz`, with project sources, patches and dependency locks
+- `ocfusion-0.4-aarch64.tar.gz`
+- `ocfusion-0.4-source.tar.gz`, with project sources, patches and dependency locks
 - `SHA256SUMS`
 
 Downloads, build trees, firmware, PLAN.md and contrib are excluded from the source archive. The CA snapshot is Mozilla's trust store converted by the official curl project, not a separate curl trust policy.
@@ -96,7 +96,7 @@ SOURCE_DATE_EPOCH controls sorted archives with normalized ownership, modes and 
 
 PRs run Meson host/browser checks, a source-built ARM64 bundle and incremental graph checks. Tags `v*` run the same workflow, derive the version from the release tag and publish a release with archives/checksums. Actions are pinned by full commit SHA.
 
-The source archive extracts into `ocfusion-<version>/` (for example, `ocfusion-0.3.1/`), following the conventional package-name/version layout.
+The source archive extracts into `ocfusion-<version>/` (for example, `ocfusion-0.4/`), following the conventional package-name/version layout.
 
 ## Build commands
 

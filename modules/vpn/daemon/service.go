@@ -22,24 +22,26 @@ type Tunnel struct {
 }
 
 type Request struct {
-	NativeDNS  bool    `json:"native_dns,omitempty"`
-	PreferDNS  bool    `json:"prefer_dns,omitempty"`
-	API        int     `json:"api"`
-	Operation  string  `json:"operation"`
-	Client     string  `json:"client"`
-	Profile    string  `json:"profile"`
-	Connection string  `json:"connection,omitempty"`
-	Tunnel     *Tunnel `json:"tunnel,omitempty"`
+	Resolver   *ResolverRegistration `json:"resolver,omitempty"`
+	NativeDNS  bool                  `json:"native_dns,omitempty"`
+	PreferDNS  bool                  `json:"prefer_dns,omitempty"`
+	API        int                   `json:"api"`
+	Operation  string                `json:"operation"`
+	Client     string                `json:"client"`
+	Profile    string                `json:"profile"`
+	Connection string                `json:"connection,omitempty"`
+	Tunnel     *Tunnel               `json:"tunnel,omitempty"`
 }
 
 type Response struct {
-	DNSStatus   *DNSStatus `json:"dns_status,omitempty"`
-	Connections []Manifest `json:"connections,omitempty"`
-	OK          bool       `json:"ok"`
-	Manifest    Manifest   `json:"manifest"`
-	Networks    []Network  `json:"networks"`
-	DNS         string     `json:"dns,omitempty"`
-	Error       string     `json:"error,omitempty"`
+	Resolver    *ResolverRegistration `json:"resolver,omitempty"`
+	DNSStatus   *DNSStatus            `json:"dns_status,omitempty"`
+	Connections []Manifest            `json:"connections,omitempty"`
+	OK          bool                  `json:"ok"`
+	Manifest    Manifest              `json:"manifest"`
+	Networks    []Network             `json:"networks"`
+	DNS         string                `json:"dns,omitempty"`
+	Error       string                `json:"error,omitempty"`
 }
 
 type Service struct {
@@ -218,6 +220,7 @@ func serveUntil(stop <-chan struct{}) error {
 		return errors.New("VPN provider already running")
 	}
 
+	recoverResolverCapture()
 	recoverDNSRouting()
 
 	path := filepath.Join(runDir, "control.sock")

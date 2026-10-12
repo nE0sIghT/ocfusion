@@ -11,12 +11,15 @@ import (
 // Use an explicit public projection. Request replies, import metadata and raw
 // daemon errors never belong in a web-readable snapshot.
 type PublicProfileStatus struct {
-	Profile    string    `json:"profile"`
-	State      string    `json:"state"`
-	Message    string    `json:"message"`
-	FusionName string    `json:"fusion_name"`
-	Index      int       `json:"vpnc_idx"`
-	Networks   []Network `json:"networks"`
+	DNSPath    string        `json:"dns_path,omitempty"`
+	DNSReason  string        `json:"dns_reason,omitempty"`
+	OTP        *OTPChallenge `json:"otp,omitempty"`
+	Profile    string        `json:"profile"`
+	State      string        `json:"state"`
+	Message    string        `json:"message"`
+	FusionName string        `json:"fusion_name"`
+	Index      int           `json:"vpnc_idx"`
+	Networks   []Network     `json:"networks"`
 }
 
 func publicProfileStatus(id string) PublicProfileStatus {
@@ -62,6 +65,7 @@ func publicStatusProjection(id string, st Status) PublicProfileStatus {
 		"NO_PROFILE":      "Import a valid OpenConnect profile",
 		"WAIT_NETWORK":    "Check the assigned Wi-Fi/VLAN networks and SSH diagnostics.",
 		"AUTH_REQUIRED":   "Authentication/TLS failed; correct profile and import again",
+		"WAIT_OTP":        "Enter the one-time code",
 		"WAIT_TIME":       "Wait for router NTP before TLS",
 		"DISABLED":        "Profile disabled; bound networks remain blocked",
 		"CONNECTING":      "Connecting to the VPN server.",
@@ -80,6 +84,21 @@ func publicStatusProjection(id string, st Status) PublicProfileStatus {
 		result.State = "UNKNOWN"
 		result.Message = "Check SSH diagnostics for details."
 		return result
+	}
+
+	if st.DNSPath == "VPN" || st.DNSPath == "WAN" || st.DNSPath == "ERROR" {
+		result.DNSPath = st.DNSPath
+		switch st.DNSReason {
+		case "VPN unavailable", "native IPv6 DNS requires WAN":
+			result.DNSReason = st.DNSReason
+		case "":
+		default:
+			result.DNSReason = "Check DNS routing diagnostics"
+		}
+	}
+
+	if st.State == "WAIT_OTP" {
+		result.OTP = st.OTP
 	}
 
 	result.State = st.State

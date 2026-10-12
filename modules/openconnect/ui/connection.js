@@ -1,5 +1,29 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+let otpChallengeID = "";
+
 function renderConnection(st) {
+  if (st.dns_path) {
+    const status = document.getElementById("dns-status");
+    status.textContent = st.dns_path === "VPN" ? "DNS uses VPN."
+      : st.dns_path === "WAN" ? "DNS uses WAN." : "Check DNS routing diagnostics";
+    if (st.dns_reason) {
+      const detail = document.createElement("span");
+      detail.textContent = st.dns_reason;
+      status.append(document.createTextNode(" "), detail);
+    }
+  }
+
+  const challenge = st.otp;
+  const activeID = challenge ? challenge.id : "";
+
+  if (activeID !== otpChallengeID) {
+    document.getElementById("otp-code").value = "";
+    document.getElementById("otp-result").textContent = "";
+  }
+
+  otpChallengeID = activeID;
+  document.getElementById("otp-challenge").hidden = !activeID;
+
   const { request_data, ...diagnostics } = st;
 
   view.textContent = JSON.stringify(diagnostics, null, 2);
@@ -141,3 +165,32 @@ loadProfiles()
   });
 
 setInterval(refreshConnection, 5000);
+
+for (const operation of ["submit-otp", "cancel-otp"]) {
+  const buttonID = operation === "submit-otp" ? "otp-submit" : "otp-cancel";
+
+  document.getElementById(buttonID).addEventListener("click", async () => {
+    if (pending || !otpChallengeID) {
+      return;
+    }
+
+    const output = document.getElementById("otp-result");
+    const code = document.getElementById("otp-code").value;
+    document.getElementById("otp-code").value = "";
+    busy(true);
+
+    try {
+      await parent.EXTENSIONS.call(moduleID, operation, {
+        profile: selectedProfile,
+        data: { challenge: otpChallengeID, code },
+      });
+      output.textContent = operation === "cancel-otp"
+        ? "OTP challenge cancelled."
+        : "Code accepted by the worker. Waiting for server authentication.";
+    } catch (error) {
+      output.textContent = error.message;
+    } finally {
+      busy(false);
+    }
+  });
+}

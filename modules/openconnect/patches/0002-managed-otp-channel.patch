@@ -1,0 +1,98 @@
+--- a/main.c
++++ b/main.c
+@@ -50,6 +50,7 @@
+ #else
+ #include <pwd.h>
+ #include <termios.h>
++#include <poll.h>
+ #endif
+ 
+ #include <stdio.h>
+@@ -2825,6 +2826,47 @@
+  *  = 0, when form was parsed and POST required
+  *  = 1, when response was cancelled by user
+  */
++
++#ifndef _WIN32
++static char *ocf_manual_otp(void)
++{
++    struct pollfd descriptor = { .fd = 4, .events = POLLIN };
++    char code[10];
++    size_t length = 0;
++
++    if (write(3, "otp\n", 4) != 4) {
++        return NULL;
++    }
++
++    while (length < sizeof(code) - 1) {
++        if (poll(&descriptor, 1, 120000) <= 0) {
++            return NULL;
++        }
++
++        if (read(4, &code[length], 1) != 1) {
++            return NULL;
++        }
++
++        if (code[length] == '\n') {
++            break;
++        }
++
++        if (code[length] < '0' || code[length] > '9') {
++            return NULL;
++        }
++
++        length++;
++    }
++
++    if (length != 6 && length != 8) {
++        return NULL;
++    }
++
++    code[length] = 0;
++    return strdup(code);
++}
++#endif
++
+ static int process_auth_form_cb(void *_vpninfo,
+ 				struct oc_auth_form *form)
+ {
+@@ -2902,6 +2944,26 @@
+ 			empty = 0;
+ 
+ 		} else if (opt->type == OC_FORM_OPT_PASSWORD) {
++#ifndef _WIN32
++            const char *managed = getenv("OCF_OTP_MODE");
++            const char *field = getenv("OCF_OTP_FIELD");
++            int is_otp = field && !strcmp(opt->name, field);
++
++            if (!field || !field[0]) {
++                is_otp = !strcmp(opt->name, "secondary_password") ||
++                    (form->auth_id && !strcmp(form->auth_id, "challenge"));
++            }
++
++            if (managed && !strcmp(managed, "manual") && is_otp) {
++                opt->_value = ocf_manual_otp();
++                if (!opt->_value) {
++                    goto err;
++                }
++
++                empty = 0;
++                continue;
++            }
++#endif
+ 			if (password) {
+ 				opt->_value = password;
+ 				password = NULL;
+--- a/auth.c
++++ b/auth.c
+@@ -1025,7 +1025,9 @@
+ 	}
+ #endif
+ 	/* Otherwise it's an OATH token of some kind. */
+-	if (!strcmp(opt->name, "secondary_password") ||
++    const char *managed_field = getenv("OCF_OTP_FIELD");
++    if ((managed_field && managed_field[0] && !strcmp(opt->name, managed_field)) ||
++        !strcmp(opt->name, "secondary_password") ||
+ 	    (form->auth_id && !strcmp(form->auth_id, "challenge")))
+ 		return can_gen_tokencode(vpninfo, form, opt);
+ 

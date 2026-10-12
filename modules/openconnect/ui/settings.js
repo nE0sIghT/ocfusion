@@ -20,6 +20,8 @@ function fillSettings(s) {
     "vpn-servercert": s.servercert,
     "vpn-dns": (s.dns || []).join(", "),
     "vpn-mtu": s.mtu || "",
+    "otp-mode": s.otp_mode,
+    "otp-field": s.otp_field,
   };
 
   for (const [id, value] of Object.entries(values)) {
@@ -54,6 +56,10 @@ function fillSettings(s) {
       ? "Saved on the router."
       : "Not configured.";
   }
+
+  document.getElementById("otp-secret").value = "";
+  document.getElementById("clear-otp-secret").checked = false;
+  document.getElementById("otp-secret-state").textContent = s.has_otp_secret ? "Saved on the router." : "Not configured.";
 
   settingsLoaded = true;
   settingsFields.disabled = false;
@@ -136,6 +142,8 @@ settingsForm.addEventListener("submit", async (event) => {
 
     const fields = {
       native_dns: document.getElementById("vpn-native-dns").checked,
+      otp_mode: document.getElementById("otp-mode").value,
+      otp_field: document.getElementById("otp-field").value.trim(),
       server,
       protocol: document.getElementById("vpn-protocol").value,
       username: document.getElementById("vpn-username").value,
@@ -146,6 +154,17 @@ settingsForm.addEventListener("submit", async (event) => {
       no_dtls: !document.getElementById("vpn-dtls").checked,
       enabled: document.getElementById("vpn-enabled").checked,
     };
+    const tokenSecret = document.getElementById("otp-secret").value.trim();
+    const clearToken = document.getElementById("clear-otp-secret").checked;
+
+    if (tokenSecret && clearToken) {
+      throw Error("Choose either secret replacement or removal.");
+    }
+
+    if (tokenSecret || clearToken) {
+      fields.otp_secret = tokenSecret || null;
+    }
+
     const password = document.getElementById("vpn-password").value;
     const auth = document.getElementById("vpn-auth").value;
     const previousAuth =

@@ -15,6 +15,9 @@ import (
 var errProfileChanged = errors.New("profile changed; reload settings")
 
 type profileSettings struct {
+	OTPMode        string   `json:"otp_mode"`
+	OTPField       string   `json:"otp_field"`
+	HasOTPSecret   bool     `json:"has_otp_secret"`
 	NativeDNS      bool     `json:"native_dns"`
 	Profile        string   `json:"profile"`
 	FusionName     string   `json:"fusion_name"`
@@ -56,14 +59,14 @@ func readSettings() (json.RawMessage, error) {
 		return nil, e
 	}
 
-	settings := profileSettings{NativeDNS: p.NativeDNS, Schema: 1, Revision: revision, Server: p.Server, Protocol: p.Protocol, Username: p.Username, Authgroup: p.Authgroup, ServerCert: p.ServerCert, DNS: p.DNS, MTU: p.MTU, NoDTLS: p.NoDTLS, Enabled: p.Enabled, HasPassword: p.Password != "", HasCA: p.CA != "", HasCertificate: p.Certificate != "", HasPrivateKey: p.PrivateKey != ""}
+	settings := profileSettings{OTPMode: p.OTPMode, OTPField: p.OTPField, HasOTPSecret: p.OTPSecret != "", NativeDNS: p.NativeDNS, Schema: 1, Revision: revision, Server: p.Server, Protocol: p.Protocol, Username: p.Username, Authgroup: p.Authgroup, ServerCert: p.ServerCert, DNS: p.DNS, MTU: p.MTU, NoDTLS: p.NoDTLS, Enabled: p.Enabled, HasPassword: p.Password != "", HasCA: p.CA != "", HasCertificate: p.Certificate != "", HasPrivateKey: p.PrivateKey != ""}
 	settings.Profile = profileID
 	if manifest, err := loadManifest(); err == nil {
 		settings.FusionName = manifest.Name
 	}
 
 	b, e := json.Marshal(settings)
-	// Response must fit alongside status in the reserved stock 4KiB mailbox.
+	// Keep private settings within the bounded platform action response.
 	if len(b) > 2048 {
 		return nil, errors.New("settings response too large; use SSH import")
 	}
@@ -112,7 +115,7 @@ func patchProfile(raw []byte) error {
 	var fields map[string]json.RawMessage
 	json.Unmarshal(b, &fields)
 
-	allowed := map[string]bool{"native_dns": true, "server": true, "protocol": true, "username": true, "authgroup": true, "servercert": true, "dns": true, "mtu": true, "no_dtls": true, "enabled": true, "password": true, "ca_pem": true, "certificate_pem": true, "private_key_pem": true}
+	allowed := map[string]bool{"otp_mode": true, "otp_secret": true, "otp_field": true, "native_dns": true, "server": true, "protocol": true, "username": true, "authgroup": true, "servercert": true, "dns": true, "mtu": true, "no_dtls": true, "enabled": true, "password": true, "ca_pem": true, "certificate_pem": true, "private_key_pem": true}
 	if len(patch.Fields) == 0 {
 		return errors.New("no settings to save")
 	}

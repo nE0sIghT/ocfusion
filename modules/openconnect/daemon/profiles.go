@@ -110,6 +110,8 @@ func profileAction(action string, input io.Reader) (any, error) {
 		if err := os.RemoveAll(root); err != nil {
 			return nil, err
 		}
+	case "submit-otp", "cancel-otp":
+		return submitOTP(envelope.Config.Data, action == "cancel-otp")
 	case "dns-state", "dns-vpn", "dns-wan":
 		operation := "dns-state"
 		if action != "dns-state" {

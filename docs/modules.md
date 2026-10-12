@@ -1,6 +1,6 @@
 # Module development - API 1
 
-This document describes the implemented OCFusion 0.3 module contract. Modules are separate trusted executables, not Go plugins. Install them through the router's administrator SSH account. They run with administrator privileges; resource/capability declarations are not a security sandbox.
+This document describes the implemented OCFusion 0.4 module contract. Modules are separate trusted executables, not Go plugins. Install them through the router's administrator SSH account. They run with administrator privileges; resource/capability declarations are not a security sandbox.
 
 ## Package
 
@@ -231,7 +231,7 @@ Currently only `/VPN/vpnc.html` is supported. Contributions are loaded for enabl
 The VPN provider owns one global router DNS policy. `dns-select` takes the caller's
 `client` and `profile` and `prefer_dns: true` to prefer that connection. Setting
 `prefer_dns: false` clears only that owner's selection. `dns-state` requires `api`
-and `client` and returns `dns_status` with `policy`, `path` (VPN or WAN) and an
+and `client` and returns `dns_status` with `policy`, `path` (VPN, WAN or ERROR during failed cleanup) and an
 optional fallback `reason`. Selection persists across restarts.
 
 A selected connection may operate without SDN assignments. `apply` accepts
@@ -243,3 +243,33 @@ restores WAN DNS independently of forwarding guards on assigned networks.
 
 IPv6 upstream configurations currently use WAN fallback because managed tunnels
 carry IPv4. Changes restart stock stubby connections without restarting DHCP.
+
+## Router DNS filter registration
+
+A resolver module declares a dependency on `vpn` API 1 and uses the same private socket with its module ID as `client`. These operations do not need a `profile` or allocate Fusion resources:
+
+| Operation | Effect |
+| --- | --- |
+| `resolver-info` | Return available IPv4 bridge addresses/CIDRs and the provider-owned socket mark |
+| `resolver-register` | Capture router-address TCP/UDP DNS for this owner; include `resolver: {"port": 53535}` |
+| `resolver-release` | Restore native DNS capture for this owner |
+| `dns-state` | Read the global DNS policy and active path |
+
+Only one filter owns capture at a time. Start listening before registration and renew at least every three seconds; capture expires after twelve seconds without renewal. Release capture before stopping the resolver. Re-register after provider restart. Resources are recovered from private RAM records after an unclean provider exit.
+
+Capture preserves client IP and covers bridge router addresses plus router-local `127.0.0.1:53`. Backend sockets must set the returned single-bit `SO_MARK` so requests to native resolvers bypass capture. The provider steers that mark through the selected IPv4 VPN when available. A resolver must recreate remote upstream sockets when `dns-state` changes, and prevent IPv6 custom upstreams from bypassing an active IPv4 DNS path.
+
+AdGuard Home inherits per-network native DNS using client/CIDR upstream mapping. Its administrator API is available only on a private mode-0600 Unix socket; the module exposes settings and bounded aggregate statistics through normal platform actions. It does not expose the upstream administrator UI or a new HTTP listener.
+
+The module's `catalog` action returns curated DNS filter subscriptions.
+`filter-status` returns bounded rule counts, successful update dates and error
+flags. `refresh-filters` queues an asynchronous update of saved lists. Downloads
+start automatically and repeat every 24 hours while protection is enabled;
+failed downloads retain loaded rules. Cache and statistics use RAM and lists
+are downloaded again after reboot. Manual list URLs and rules remain available.
+
+## OpenConnect OTP actions
+
+Private profiles accept `otp_mode` (`none`, `manual`, `totp`), `otp_secret` and an optional `otp_field`. Settings responses return only `has_otp_secret`; update-settings supports replace/clear with the usual profile revision check.
+
+A public `WAIT_OTP` snapshot contains only `otp: {"id":"...","expires":1234567890}`. Submit through `submit-otp` using the normal profile action envelope with `data: {"challenge":"...","code":"123456"}`; `cancel-otp` uses the same challenge ID. Codes are bounded and delivered once to the matching live worker over a private control socket and structured client pipes. Never publish a code or token secret in status.

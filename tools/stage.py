@@ -84,6 +84,8 @@ def main():
     parser.add_argument("--client", type=Path, required=True)
     parser.add_argument("--supervisor", type=Path, required=True)
     parser.add_argument("--vpn-service", type=Path, required=True)
+    parser.add_argument("--adguard", type=Path, required=True)
+    parser.add_argument("--adguard-adapter", type=Path, required=True)
     parser.add_argument("--manager", type=Path, required=True)
     parser.add_argument("--ca", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
@@ -98,7 +100,7 @@ def main():
     shutil.copytree(PROJECT_ROOT / "packaging/scripts", runtime_tree / "scripts")
     shutil.copytree(PROJECT_ROOT / "packaging/init", runtime_tree / "init")
     shutil.copytree(PROJECT_ROOT / "web", runtime_tree / "web")
-    for module_id in ("vpn", "openconnect"):
+    for module_id in ("vpn", "openconnect", "adguard-home"):
         copy_module_assets(runtime_tree, module_id)
     (runtime_tree / "bin").mkdir()
 
@@ -110,9 +112,14 @@ def main():
         (arguments.supervisor, "modules/openconnect/bin/ocfusion-openconnect"),
         (arguments.vpn_service, "modules/vpn/bin/ocfusion-vpn"),
         (arguments.manager, "bin/extd"),
+        (arguments.adguard, "modules/adguard-home/bin/AdGuardHome"),
+        (arguments.adguard_adapter, "modules/adguard-home/bin/ocfusion-adguard-home"),
     ]:
         shutil.copy(executable, runtime_tree / name)
-    shutil.copy(arguments.ca, runtime_tree / "modules/openconnect/ca-bundle.crt")
+    for module_id in ("openconnect", "adguard-home"):
+        shutil.copy(
+            arguments.ca, runtime_tree / "modules" / module_id / "ca-bundle.crt"
+        )
     combine_notices(runtime_tree, arguments.build_dir)
     arguments.output.write_text(version + "\n")
 

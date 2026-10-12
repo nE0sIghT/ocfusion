@@ -13,6 +13,8 @@
     "asus.fusion.sdn"
   ],
   "actions": [
+    "submit-otp",
+    "cancel-otp",
     "dns-state",
     "dns-vpn",
     "dns-wan",

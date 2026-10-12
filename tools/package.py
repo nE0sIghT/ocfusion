@@ -40,6 +40,8 @@ SOURCE_FILES = (
     "package-lock.json",
 )
 EXECUTABLES = (
+    "modules/adguard-home/bin/AdGuardHome",
+    "modules/adguard-home/bin/ocfusion-adguard-home",
     "modules/openconnect/bin/openconnect",
     "modules/openconnect/bin/ocfusion-openconnect",
     "modules/vpn/bin/ocfusion-vpn",

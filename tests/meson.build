@@ -1,5 +1,5 @@
 # Host tests never execute ARM64 binaries and do not require a cross compiler.
-foreach module : ['modules/openconnect/daemon', 'modules/vpn/daemon', 'platform']
+foreach module : ['modules/openconnect/daemon', 'modules/vpn/daemon', 'modules/adguard-home/daemon', 'platform']
     test(
         module + '-race',
         go,
@@ -105,6 +105,51 @@ if get_option('runtime')
             build_root / 'src/openconnect-9.21/script.c',
         ],
         depends: openconnect,
+        suite: 'client',
+        timeout: 120,
+    )
+endif
+
+if get_option('runtime')
+    test(
+        'managed-otp',
+        python,
+        args: [
+            files('test-otp-client.py'),
+            '--source', build_root / 'src/openconnect-9.21/main.c',
+        ],
+        depends: openconnect,
+        suite: 'client',
+        timeout: 30,
+    )
+
+    adguard_fixture = custom_target(
+        'adguard-home-native',
+        input: downloads['AdGuardHome-v0.107.79.tar.gz'],
+        output: 'AdGuardHome-native',
+        depend_files: [
+            adguard_builder,
+            files('../modules/adguard-home/patches/0001-private-headless-control.patch'),
+            files('../modules/adguard-home/patches/0002-dnsproxy-marked-dialers.patch'),
+            files('../modules/adguard-home/patches/0003-filter-update-status.patch'),
+        ],
+        command: [
+            python, adguard_builder,
+            '--archive', '@INPUT@',
+            '--go', go.full_path(),
+            '--output', '@OUTPUT@',
+            '--build-root', build_root / 'adguard-fixture',
+            '--architecture', 'amd64',
+        ],
+    )
+
+    test(
+        'adguard-home-dns',
+        go,
+        args: ['test', '-race', '-run', 'TestSourceBuiltAdGuard', './...'],
+        workdir: source_root / 'modules/adguard-home/daemon',
+        env: {'OCF_ADGUARD_BINARY': adguard_fixture.full_path()},
+        depends: adguard_fixture,
         suite: 'client',
         timeout: 120,
     )

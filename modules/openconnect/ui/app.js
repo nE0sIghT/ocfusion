@@ -48,7 +48,7 @@ function busy(value) {
   button.disabled = value || !file.files.length;
   document
     .querySelectorAll(
-      "[data-action],#settings-save,#settings-reload,#profile-select,#profile-name,#profile-add,#profile-delete,#profile-new,#profile-cancel",
+      "[data-action],#settings-save,#settings-reload,#profile-select,#profile-name,#profile-add,#profile-delete,#profile-new,#profile-cancel,#otp-submit,#otp-cancel,#dns-vpn,#dns-wan",
     )
     .forEach((node) => {
       node.disabled =

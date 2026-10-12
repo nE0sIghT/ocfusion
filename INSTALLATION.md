@@ -2,7 +2,7 @@
 
 ## Requirements
 
-Use an AArch64 router with stock ASUSWRT. See [tested compatibility](../README.md#compatibility); other routers have not been tested.
+Use an AArch64 router with stock ASUSWRT. See [tested compatibility](README.md#compatibility); other routers have not been tested.
 
 Use an ext4 USB partition with at least 128 MiB free space and 16 MiB free JFFS space on the router. Leave the drive connected during operation. Stock ASUS Apps autorun must be enabled, and another USB drive must not already own the Apps root. Preparation does not format or partition the drive.
 
@@ -22,21 +22,21 @@ Both methods install OCFusion on the USB drive. Choose whether to prepare it on 
 3. Safely eject the drive, connect it to the router and wait for installation to finish. If installation does not start, reboot with the drive connected.
 4. Sign in to the ASUS web interface and click the OCFusion icon <img src="web/icon.png" alt="OCFusion" width="24" height="24"> in the top-right header.
 
-If installation fails, read `/tmp/ocfusion-install.log` through SSH. The prepared-USB installation path still needs its first physical-device validation.
+If installation fails, read `/tmp/ocfusion-install.log` through SSH.
 
 ### Run through router SSH
 
 Download the runtime archive from [Releases](https://github.com/nE0sIghT/ocfusion/releases) and enable SSH in ASUS administration. Transfer the runtime archive to the USB drive. If SCP is unavailable, use SSH streaming from your computer:
 
 ```sh
-ssh admin@192.168.50.1 'cat > /tmp/mnt/sda/ocfusion-0.3.1-aarch64.tar.gz' < ocfusion-0.3.1-aarch64.tar.gz
+ssh admin@192.168.50.1 'cat > /tmp/mnt/sda/ocfusion-0.4-aarch64.tar.gz' < ocfusion-0.4-aarch64.tar.gz
 ```
 
 Replace the login, router address and USB mount path. On the router:
 
 ```sh
 cd /tmp/mnt/sda
-tar -xzf ocfusion-0.3.1-aarch64.tar.gz
+tar -xzf ocfusion-0.4-aarch64.tar.gz
 cd ocfusion
 /bin/sh install.sh
 ```
@@ -76,6 +76,30 @@ In the ASUS settings for the desired SDN Wi-Fi/VLAN network, select the **OCFusi
 
 The panel follows the ASUS language setting and supports English and Russian. Other languages use English. Save form edits before switching languages because the page reloads.
 
+## Router DNS and VPN
+
+In OpenConnect, select **Use this VPN for DNS** to send the router's external DNS requests through that profile while connected. The setting applies to the whole router and all networks. Native ASUS DNS settings, including DoT, remain in use. When the VPN disconnects, DNS returns to WAN; this option is not a DNS kill switch. **Use WAN for DNS** clears that profile's selection.
+
+Local names and cached answers remain available. Switching paths restarts encrypted upstream connections and can interrupt queries already in flight. Applications retry normally. Native IPv6 upstream configurations currently use WAN and show that reason in DNS status; the managed tunnel is IPv4.
+
+For a VPN network that should keep using the router resolver independently of the global selection, enable **Use ASUS DNS settings for assigned networks** in the connection settings. Otherwise the existing tunnel-DNS behavior remains available.
+
+## AdGuard Home
+
+Open **AdGuard Home** in the panel and enable DNS filtering. Filtering starts disabled. Empty custom-upstream settings inherit ASUS DNS for each network; AdGuard transparently follows the selected VPN/WAN policy. No OpenConnect profile is needed to run filtering.
+
+Add HTTPS filter-list URLs or AdGuard rules, one per line. Use `@@` exceptions and optional client IP/CIDR entries followed by `on` or `off`. Native DHCP and the router's resolver remain active. Disable filtering to restore direct native DNS handling.
+
+Optional custom upstreams accept an IP, `tls://host` or `https://host/dns-query`. Add a connection IP after a space when needed; the hostname is retained for TLS verification. Custom upstreams override inherited ASUS upstreams. While VPN DNS is selected, custom IPv6 connections are rejected rather than sent outside the IPv4 tunnel. Query logs, caches and statistics are bounded RAM data and do not survive restart.
+
+## One-time codes
+
+OpenConnect's **OTP mode** supports AnyConnect/ocserv. Choose manual input or automatic TOTP. Manual mode displays a code field when the server requests a supported OTP field; submit a six- or eight-digit code within two minutes. Codes are used once. Cancellation or failed manual authentication requires a new connection attempt.
+
+Automatic mode accepts a base32 secret or an `otpauth://totp/` URI. It supports six digits, SHA1/SHA256/SHA512 and periods of 15 to 120 seconds. Router time must be synchronized. A blank secret field keeps the saved secret; use its removal checkbox to clear it.
+
+The usual field is `secondary_password` or a challenge form. For another server form, enter its explicit OTP field name. Combined password-and-code fields and OTP on other VPN protocols are not supported in this release.
+
 ## Status and troubleshooting
 
 Check connection status in the panel or through SSH:
@@ -87,6 +111,7 @@ Check connection status in the panel or through SSH:
 
 - `UP`: the VPN connection and Wi-Fi/VLAN assignments are active.
 - `CONNECTING`: connection is in progress.
+- `WAIT_OTP`: enter the requested one-time code.
 - `AUTH_REQUIRED`: check server trust, client credentials and router time.
 - `WAIT_NETWORK`: check the VPN assignment in ASUS network settings.
 - `STOPPED`: the service has stopped.
@@ -128,4 +153,4 @@ After removal, safely eject USB and reboot. Other ASUS Apps files are left in pl
 
 Report problems through [GitHub Issues](https://github.com/nE0sIghT/ocfusion/issues). Include the router model, firmware, OCFusion version, installation output and sanitized status/doctor output. Do not include private keys, passwords, profile files, cookies or secret query parameters.
 
-See [architecture](architecture.md) for implementation details and [module development](modules.md) for the module interfaces.
+See [architecture](docs/architecture.md) for implementation details and [module development](docs/modules.md) for the module interfaces.

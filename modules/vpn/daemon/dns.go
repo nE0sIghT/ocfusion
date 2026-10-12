@@ -174,12 +174,14 @@ func discoverDNS() ([]DNSEndpoint, error) {
 	return result, nil
 }
 
+var restoreMaskPattern = regexp.MustCompile(`--nfmask\s+(0x[0-9a-fA-F]+|[0-9]+)`)
+
 var markPattern = regexp.MustCompile(`(?:fwmark|--set-xmark|--set-mark|--mark)\s+(0x[0-9a-fA-F]+|[0-9]+)(?:/(0x[0-9a-fA-F]+|[0-9]+))?`)
 
-func unusedDNSMark(rules string) string {
+func usedDNSMask(rules string) uint64 {
 	used := uint64(0)
 	for _, match := range markPattern.FindAllStringSubmatch(rules, -1) {
-		value, _ := strconv.ParseUint(match[1], 0, 32)
+		value := uint64(0xffffffff)
 		if match[2] != "" {
 			value, _ = strconv.ParseUint(match[2], 0, 32)
 		}
@@ -187,6 +189,24 @@ func unusedDNSMark(rules string) string {
 		used |= value
 	}
 
+	for _, line := range strings.Split(rules, "\n") {
+		if !strings.Contains(line, "--restore-mark") {
+			continue
+		}
+
+		mask := uint64(0xffffffff)
+		if match := restoreMaskPattern.FindStringSubmatch(line); match != nil {
+			mask, _ = strconv.ParseUint(match[1], 0, 32)
+		}
+
+		used |= mask
+	}
+
+	return used
+}
+
+func unusedDNSMark(rules string) string {
+	used := usedDNSMask(rules)
 	for bit := uint64(1 << 28); bit >= 1<<16; bit >>= 1 {
 		if used&bit == 0 {
 			return fmt.Sprintf("0x%x/0x%x", bit, bit)
@@ -197,10 +217,6 @@ func unusedDNSMark(rules string) string {
 }
 
 func (d *DNSRouter) allocate() error {
-	if d.mark != "" {
-		return nil
-	}
-
 	rules, err := runner("ip", "rule", "show")
 	if err != nil {
 		return err
@@ -209,6 +225,28 @@ func (d *DNSRouter) allocate() error {
 	mangle, err := runner("iptables", "-t", "mangle", "-S")
 	if err != nil {
 		return err
+	}
+
+	if d.mark != "" {
+		foreign := []string{}
+		for _, line := range strings.Split(mangle, "\n") {
+			if !strings.Contains(line, "ocfusion:dns-route") {
+				foreign = append(foreign, line)
+			}
+		}
+		for _, line := range strings.Split(rules, "\n") {
+			if !strings.Contains(line, "fwmark "+d.mark+" lookup "+d.table) {
+				foreign = append(foreign, line)
+				if strings.HasPrefix(strings.TrimSpace(line), d.priority+":") {
+					return errors.New("DNS routing priority was claimed by another owner")
+				}
+			}
+		}
+		bit, _ := strconv.ParseUint(strings.Split(d.mark, "/")[0], 0, 32)
+		if usedDNSMask(strings.Join(foreign, "\n"))&bit != 0 {
+			return errors.New("DNS routing mark was claimed by another owner")
+		}
+		return nil
 	}
 
 	d.mark = unusedDNSMark(rules + "\n" + mangle)
@@ -244,20 +282,28 @@ func (d *DNSRouter) endpointRule(endpoint DNSEndpoint, operation string) error {
 	return xt("iptables", "mangle", operation, "OUTPUT", "-d", endpoint.Address, "-p", endpoint.Protocol, "--dport", strconv.Itoa(endpoint.Port), "-m", "addrtype", "!", "--dst-type", "LOCAL", "-m", "comment", "--comment", "ocfusion:dns-route", "-j", "MARK", "--set-xmark", d.mark)
 }
 
-func (d *DNSRouter) reset() {
+func (d *DNSRouter) reset() error {
+	var failure error
 	for _, endpoint := range d.endpoints {
-		d.endpointRule(endpoint, "del")
+		failure = errors.Join(failure, d.endpointRule(endpoint, "del"))
 	}
 
 	if d.active != "" {
-		xt("iptables", "nat", "del", "POSTROUTING", "-o", d.active, "-m", "mark", "--mark", d.mark, "-m", "comment", "--comment", "ocfusion:dns-nat", "-j", "MASQUERADE")
+		failure = errors.Join(failure, xt("iptables", "nat", "del", "POSTROUTING", "-o", d.active, "-m", "mark", "--mark", d.mark, "-m", "comment", "--comment", "ocfusion:dns-nat", "-j", "MASQUERADE"))
 		runner("ip", "rule", "del", "fwmark", d.mark, "lookup", d.table, "priority", d.priority)
 		runner("ip", "route", "del", "default", "dev", d.active, "table", d.table)
+	}
+
+	if failure != nil {
+		d.status.Path = "ERROR"
+		d.status.Reason = "DNS rule cleanup failed; retrying"
+		return failure
 	}
 
 	d.active = ""
 	d.endpoints = nil
 	os.Remove(filepath.Join(runDir, "dns-routing.json"))
+	return nil
 }
 
 func (d *DNSRouter) reconcile(services map[string]*Service) {
@@ -271,7 +317,13 @@ func (d *DNSRouter) reconcile(services map[string]*Service) {
 
 	if desired == "" {
 		if d.active != "" {
-			d.reset()
+			for _, endpoint := range d.endpoints {
+				deleteLocalDNSFlows(endpoint)
+			}
+
+			if d.reset() != nil {
+				return
+			}
 			runner("service", "restart_stubby")
 		}
 
@@ -304,7 +356,9 @@ func (d *DNSRouter) reconcile(services map[string]*Service) {
 
 	changed := desired != d.active || fmt.Sprint(endpoints) != fmt.Sprint(d.endpoints)
 	if changed {
-		d.reset()
+		if d.reset() != nil {
+			return
+		}
 		d.active = desired
 		d.endpoints = endpoints
 		if err := d.saveResources(); err != nil {

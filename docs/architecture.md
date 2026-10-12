@@ -12,6 +12,7 @@ OCFusion runs beside stock ASUSWRT. ASUS owns the radios, Wi-Fi/VLAN topology, S
 | `modules/openconnect/daemon/` | VPN profiles and credentials, OpenConnect supervision, authentication, DTLS and tunnel events |
 | `modules/openconnect/packaging/` | Module manifest/lifecycle adapter, tunnel hook and profile example |
 | `modules/openconnect/ui/` | Client settings, status, actions and translations |
+| `modules/adguard-home/` | DNS filtering adapter, private upstream control, UI and source patches |
 | `modules/vpn/ui/` | Managed Fusion notice script |
 | `packaging/` | Router installation, USB preparation/bootstrap and ASUS Apps entrypoints |
 | `tools/`, `meson.build` | Pinned-source builds, runtime staging, archive generation and release upload |
@@ -32,6 +33,7 @@ The platform owns shared web publication, the stock header icon, language/model 
 | `/jffs/ocfusion-update-backup` | Temporary transaction backup of platform and declared module state |
 | `/tmp/ocfusion-platform` | Private Unix control socket, verified module snapshots and process state |
 | `/tmp/ocfusion` | OpenConnect RAM executable, materialized credentials/CA, tunnel events and client status |
+| `/tmp/ocfusion-adguard-home` | Private AdGuard control socket, generated configuration and bounded working data |
 | `/tmp/ocfusion-vpn` | Private VPN API socket and network status |
 | `/tmp/var/wwwext` | Published common panel, module metadata and UI assets |
 
@@ -65,6 +67,26 @@ OpenConnect's settings action returns public fields and secret-presence flags. I
 The platform does not allocate a native VPN profile for web transport. The VPN provider owns connection records by module/profile and allocates native bindings, interfaces and routing resources independently. The managed binding's switch stays OFF. Firmware version changes do not block existing connections. ASUS owns Wi-Fi/VLAN/SDN topology. The VPN provider discovers assigned bridges and installs policy routes and forwarding/NAT/DNS rules. A tunnel default route is paired with an unreachable fallback; assigned IPv6 traffic is blocked. Server-advertised split exclusions are ignored for the managed IPv4 full tunnel.
 
 The managed OpenConnect patch keeps its hook environment bounded when a server advertises a large route list. OpenConnect normalizes hook events into interface/address/MTU/DNS parameters and sends them to the VPN provider. The client reports UP only after the provider acknowledges application. Each connection has independent runtime state and rules. The provider independently expires client heartbeats, detects loss of the tunnel interface and reconciles network rules. Client authentication credentials and server trust are separate: public roots plus an optional additional CA validate the server, while the client certificate/key authenticate the client.
+
+## Global DNS and filtering
+
+The VPN provider owns a persistent global DNS preference keyed by module/profile. It discovers the stock dnsmasq/stubby upstream endpoints and reserves a free mark bit, rule priority and route table. Router OUTPUT DNS is routed through the selected live tunnel and NATed there. The native resolver configuration stays authoritative. Loss of the connection removes steering and restores ordinary WAN DNS. IPv6 native upstream configurations explicitly remain on WAN in this IPv4 implementation. Existing per-network VPN forwarding guards are independent of this global DNS policy.
+
+The independent AdGuard Home module registers a short resolver lease with the provider without allocating a Fusion profile. The provider captures queries addressed to router DNS, preserving client source IP. AdGuard listens on a separate DNS port and uses marked backend sockets to avoid recursive capture. By default, per-network client mappings send allowed requests to that network's native resolver. Explicit custom DNS/DoT/DoH upstreams use the same mark and recreate connections on a VPN/WAN transition.
+
+The module ships a small curated catalog of DNS-compatible filter subscriptions.
+A new installation selects AdGuard DNS filter while leaving protection disabled.
+Stable URL-derived list IDs preserve cached content when selection order
+changes. AdGuard downloads lists and updates them every 24 hours; failed
+downloads retain the prior rules and expose a failure flag without advancing the
+successful-update timestamp. The list cache stays in RAM and is downloaded again
+after reboot. Manual updates use an asynchronous private request so downloads do
+not block the platform command channel. The upstream administrator API remains
+private.
+
+AdGuard is source-built with tracked patches for a headless entrypoint, private Unix administrator HTTP control and marked DNS dialers. Its native public administrator UI, DHCP and TCP administrator listeners are disabled. The normal authenticated module UI is used. Configuration is platform-owned private module data; caches, query logs and statistics are bounded RAM data. Filter capture is removed on disable, lease expiry or provider recovery. No OpenConnect dependency is required.
+
+Manual OpenConnect OTP uses a structured pipe from the patched authentication callback and a private per-worker Unix socket. The worker publishes only a random challenge ID and expiry. Responses are bounded, generation-bound and one-use. Automatic TOTP uses native OpenConnect token generation from a private RAM secret file and requires synchronized router time.
 
 ## Updates and removal
 

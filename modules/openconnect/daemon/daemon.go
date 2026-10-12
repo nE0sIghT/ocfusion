@@ -16,7 +16,12 @@ import (
 	"time"
 )
 
+var tunDevice = "/dev/net/tun"
+
 type Status struct {
+	DNSPath        string          `json:"dns_path,omitempty"`
+	DNSReason      string          `json:"dns_reason,omitempty"`
+	OTP            *OTPChallenge   `json:"otp,omitempty"`
 	Profile        string          `json:"profile"`
 	FusionName     string          `json:"fusion_name"`
 	Version        string          `json:"version"`
@@ -32,6 +37,7 @@ type Status struct {
 	RequestData    json.RawMessage `json:"request_data,omitempty"`
 }
 type Child struct {
+	otp        *OTPControl
 	cmd        *exec.Cmd
 	done       chan error
 	generation string
@@ -44,7 +50,7 @@ func launch(p Profile, m Manifest) (*Child, error) {
 		return nil, e
 	}
 
-	if _, err := os.Stat("/dev/net/tun"); err != nil {
+	if _, err := os.Stat(tunDevice); err != nil {
 		return nil, errors.New("VPN service has not prepared TUN")
 	}
 
@@ -110,22 +116,78 @@ func launch(p Profile, m Manifest) (*Child, error) {
 		args = append(args, "--passwd-on-stdin")
 	}
 
+	if p.OTPMode == "totp" {
+		if err := atomicWrite(filepath.Join(runDir, "token.secret"), []byte(nativeTokenSecret(p.OTPSecret)+"\n"), 0600); err != nil {
+			return nil, err
+		}
+
+		args = append(args, "--token-mode", "totp", "--token-secret", "@"+filepath.Join(runDir, "token.secret"))
+	} else {
+		os.Remove(filepath.Join(runDir, "token.secret"))
+	}
+
 	args = append(args, p.Server)
 	generation := strconv.FormatInt(time.Now().UnixNano(), 10)
 	c := exec.Command(filepath.Join(runDir, "openconnect"), args...)
-	c.Env = append(os.Environ(), "OCF_GENERATION="+generation, "OCF_MANAGED_ROUTES=1")
+	c.Env = append(os.Environ(), "OCF_GENERATION="+generation, "OCF_MANAGED_ROUTES=1", "OCF_OTP_MODE="+p.OTPMode, "OCF_OTP_FIELD="+p.OTPField)
 	c.Stdin = strings.NewReader(p.Password + "\n")
 	pipe, e := c.StdoutPipe()
 	if e != nil {
+		os.Remove(filepath.Join(runDir, "token.secret"))
 		return nil, e
 	}
+
+	started := false
+	defer func() {
+		if !started {
+			pipe.Close()
+			os.Remove(filepath.Join(runDir, "token.secret"))
+		}
+	}()
 
 	c.Stderr = c.Stdout
 	ch := &Child{cmd: c, done: make(chan error, 1), generation: generation, authError: make(chan bool, 1), stage: make(chan string, 32)}
-	if e = c.Start(); e != nil {
+	var childFiles []*os.File
+	if p.OTPMode == "manual" {
+		requestRead, requestWrite, err := os.Pipe()
+		if err != nil {
+			return nil, err
+		}
+
+		responseRead, responseWrite, err := os.Pipe()
+		if err != nil {
+			requestRead.Close()
+			requestWrite.Close()
+			return nil, err
+		}
+
+		ch.otp, err = newOTPControl(requestRead, responseWrite)
+		if err != nil {
+			requestRead.Close()
+			requestWrite.Close()
+			responseRead.Close()
+			responseWrite.Close()
+			return nil, err
+		}
+
+		childFiles = []*os.File{requestWrite, responseRead}
+		c.ExtraFiles = childFiles
+	}
+
+	e = c.Start()
+	for _, file := range childFiles {
+		file.Close()
+	}
+
+	if e != nil {
+		if ch.otp != nil {
+			ch.otp.close()
+		}
+
 		return nil, e
 	}
 
+	started = true
 	go func() {
 		readClientLines(pipe, func(text string) {
 			line := strings.ToLower(text)
@@ -143,7 +205,12 @@ func launch(p Profile, m Manifest) (*Child, error) {
 				}
 			}
 		})
-		ch.done <- c.Wait()
+		err := c.Wait()
+		os.Remove(filepath.Join(runDir, "token.secret"))
+		if ch.otp != nil {
+			ch.otp.close()
+		}
+		ch.done <- err
 	}()
 
 	return ch, nil
@@ -215,6 +282,25 @@ func daemon() error {
 	var importOK bool
 	publish := func() {
 		st := Status{Profile: profileID, FusionName: m.Name, Version: version, State: state, Message: message, Index: m.Index, Networks: ns, ImportID: importID, ImportOK: importOK}
+		if child != nil && child.otp != nil {
+			st.OTP = child.otp.snapshot()
+			if st.OTP != nil {
+				st.State = "WAIT_OTP"
+				st.Message = "Enter the one-time code"
+			}
+		}
+
+		if response, err := vpnCall(vpnRequest{Operation: "dns-state"}); err == nil {
+			var dns struct {
+				Path   string `json:"path"`
+				Reason string `json:"reason"`
+			}
+			if json.Unmarshal(response.DNSStatus, &dns) == nil {
+				st.DNSPath = dns.Path
+				st.DNSReason = dns.Reason
+			}
+		}
+
 		saveJSON(filepath.Join(runDir, "status.json"), st)
 	}
 	defer func() {
@@ -298,7 +384,7 @@ func daemon() error {
 
 					state = "AUTH_REQUIRED"
 					message = "Authentication/TLS failed; correct profile and import again"
-				case time.Now().Year() < 2025:
+				case time.Now().Year() < 2025 || (p.OTPMode == "totp" && nvget("ntp_ready") != "1"):
 					invalidate()
 
 					state = "WAIT_TIME"
@@ -320,6 +406,9 @@ func daemon() error {
 
 						select {
 						case <-child.done:
+							if p.OTPMode == "manual" {
+								authBlocked = true
+							}
 							child = nil
 							closeTunnel(m)
 

@@ -1,0 +1,75 @@
+--- a/internal/bootstrap/bootstrap.go
++++ b/internal/bootstrap/bootstrap.go
+@@ -4,12 +4,16 @@
+ 
+ import (
+ 	"context"
++	"encoding/json"
+ 	"fmt"
+ 	"log/slog"
+ 	"net"
+ 	"net/netip"
+ 	"net/url"
++	"os"
+ 	"slices"
++	"strconv"
++	"syscall"
+ 	"time"
+ 
+ 	"github.com/AdguardTeam/golibs/errors"
+@@ -73,7 +77,14 @@
+ 	}
+ 
+ 	// TODO(e.burkov):  Use network properly, perhaps, pass it through options.
+-	ips, err := r.LookupNetIP(ctx, NetworkIP, host)
++	var overrides map[string]string
++	json.Unmarshal([]byte(os.Getenv("OCF_DNS_HOSTS")), &overrides)
++	var ips []netip.Addr
++	if address, valid := netip.ParseAddr(overrides[host]); valid == nil {
++		ips = []netip.Addr{address}
++	} else {
++		ips, err = r.LookupNetIP(ctx, NetworkIP, host)
++	}
+ 	if err != nil {
+ 		return nil, fmt.Errorf("resolving hostname: %w", err)
+ 	}
+@@ -107,6 +118,39 @@
+ 
+ 	dialer := &net.Dialer{
+ 		Timeout: timeout,
++		Control: func(_, address string, connection syscall.RawConn) error {
++			host, _, err := net.SplitHostPort(address)
++			if err != nil {
++				return err
++			}
++
++			if os.Getenv("OCF_DNS_VPN") == "true" {
++				ip := net.ParseIP(host)
++				if ip == nil || ip.To4() == nil {
++					return fmt.Errorf("IPv6 DNS is unavailable through the IPv4 tunnel")
++				}
++			}
++
++			value := os.Getenv("OCF_DNS_MARK")
++			if value == "" {
++				return nil
++			}
++
++			mark, err := strconv.ParseUint(value, 0, 32)
++			if err != nil {
++				return err
++			}
++
++			var socketErr error
++			err = connection.Control(func(fd uintptr) {
++				socketErr = syscall.SetsockoptInt(int(fd), syscall.SOL_SOCKET, syscall.SO_MARK, int(mark))
++			})
++			if err != nil {
++				return err
++			}
++
++			return socketErr
++		},
+ 	}
+ 
+ 	return func(ctx context.Context, network Network, _ string) (conn net.Conn, err error) {
