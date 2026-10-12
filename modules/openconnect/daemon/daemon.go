@@ -283,7 +283,7 @@ func daemon() error {
 
 					state = "DISABLED"
 					message = "Profile disabled; bound networks remain blocked"
-				case len(ns) == 0:
+				case len(ns) == 0 && !dnsOnlySelected():
 					invalidate()
 
 					state = "WAIT_NETWORK"

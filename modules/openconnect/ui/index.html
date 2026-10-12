@@ -65,6 +65,13 @@
           <strong id="fusion-profile-name"></strong>
         </p>
         <article class="ext-card">
+          <h2>Router DNS</h2>
+          <p>Use this VPN for router DNS while connected. DNS falls back to WAN when unavailable.</p>
+          <button id="dns-vpn" type="button">Use this VPN for DNS</button>
+          <button id="dns-wan" class="ext-secondary" type="button">Use WAN for DNS</button>
+          <p id="dns-status" role="status"></p>
+        </article>
+        <article class="ext-card">
           <h2>Connection</h2>
           <p id="connection-state">Loading…</p>
           <button data-action="enable">Connect</button>
@@ -151,6 +158,7 @@
                   >
                 </div>
                 <div class="ext-field">
+                  <label class="ext-check"><input id="vpn-native-dns" type="checkbox" />Use ASUS DNS settings for assigned networks</label>
                   <label for="vpn-dns">VPN DNS</label
                   ><input
                     id="vpn-dns"

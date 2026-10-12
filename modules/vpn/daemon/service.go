@@ -22,6 +22,8 @@ type Tunnel struct {
 }
 
 type Request struct {
+	NativeDNS  bool    `json:"native_dns,omitempty"`
+	PreferDNS  bool    `json:"prefer_dns,omitempty"`
 	API        int     `json:"api"`
 	Operation  string  `json:"operation"`
 	Client     string  `json:"client"`
@@ -31,6 +33,7 @@ type Request struct {
 }
 
 type Response struct {
+	DNSStatus   *DNSStatus `json:"dns_status,omitempty"`
 	Connections []Manifest `json:"connections,omitempty"`
 	OK          bool       `json:"ok"`
 	Manifest    Manifest   `json:"manifest"`
@@ -40,6 +43,8 @@ type Response struct {
 }
 
 type Service struct {
+	dnsOnly   bool
+	nativeDNS bool
 	manifest  Manifest
 	owner     string
 	networks  []Network
@@ -116,7 +121,7 @@ func (s *Service) reconcile(refreshTunnel bool) error {
 			return nil
 		}
 
-		s.dns, err = applyConnect(s.manifest, s.networks, *s.event)
+		s.dns, err = applyConnection(s.manifest, s.networks, *s.event, s.nativeDNS)
 		if err != nil {
 			s.down()
 		}
@@ -161,11 +166,11 @@ func (s *Service) handle(request Request) (Response, error) {
 			return response, errors.New("invalid tunnel parameters")
 		}
 
-		if len(s.networks) == 0 {
+		if len(s.networks) == 0 && !s.dnsOnly {
 			return response, errors.New("no assigned networks")
 		}
 
-		dns, err := applyConnect(s.manifest, s.networks, *request.Tunnel)
+		dns, err := applyConnection(s.manifest, s.networks, *request.Tunnel, s.nativeDNS)
 		if err != nil {
 			s.down()
 
@@ -212,6 +217,8 @@ func serveUntil(stop <-chan struct{}) error {
 	if err = syscall.Flock(int(lock.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
 		return errors.New("VPN provider already running")
 	}
+
+	recoverDNSRouting()
 
 	path := filepath.Join(runDir, "control.sock")
 	os.Remove(path)

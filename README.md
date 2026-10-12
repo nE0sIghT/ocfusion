@@ -8,7 +8,7 @@ OCFusion is a platform for extending stock ASUSWRT functionality without flashin
 
 ## Available modules
 
-- **OpenConnect** - adds OpenConnect VPN support, with connection settings and status in the OCFusion panel.
+- **OpenConnect** - adds OpenConnect VPN support, with connection settings and status in the OCFusion panel. A selected connection can carry DNS requests for the router and all networks, with automatic WAN fallback when disconnected.
 
 ## Compatibility
 
@@ -42,6 +42,7 @@ See [installation, updates and troubleshooting](INSTALLATION.md). Reinstalling p
 - Extend stock ASUSWRT with additional modules without replacing the firmware.
 - Manage extensions from a web panel integrated with the ASUS interface.
 - Connect to OpenConnect VPN servers using the included module.
+- Optionally use a VPN connection for router DNS, with automatic WAN fallback.
 - English and Russian UI, following the router's language setting.
 
 ## Screenshots

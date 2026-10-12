@@ -33,7 +33,7 @@ case "$1" in
     reload)
         exec "$CTL" module-import
         ;;
-    settings | update-settings | diagnose | connect | disconnect | reconnect | profiles | add-profile | delete-profile | import-profile)
+    dns-state | dns-vpn | dns-wan | settings | update-settings | diagnose | connect | disconnect | reconnect | profiles | add-profile | delete-profile | import-profile)
         exec "$CTL" profile-action "$1"
         ;;
     remove)

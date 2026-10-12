@@ -13,6 +13,9 @@
     "asus.fusion.sdn"
   ],
   "actions": [
+    "dns-state",
+    "dns-vpn",
+    "dns-wan",
     "diagnose",
     "reconnect",
     "settings",

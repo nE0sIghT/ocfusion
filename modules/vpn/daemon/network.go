@@ -194,7 +194,11 @@ func setTunAddress(m Manifest, ip net.IP) error {
 	return e
 }
 
-func applyConnect(m Manifest, ns []Network, tunnel Tunnel) (retDNS string, retErr error) {
+func applyConnect(m Manifest, ns []Network, tunnel Tunnel) (string, error) {
+	return applyConnection(m, ns, tunnel, false)
+}
+
+func applyConnection(m Manifest, ns []Network, tunnel Tunnel, nativeDNS bool) (retDNS string, retErr error) {
 	if tunnel.Interface != tunnelInterface(m) {
 		return "", errors.New("unexpected TUN name")
 	}
@@ -221,7 +225,11 @@ func applyConnect(m Manifest, ns []Network, tunnel Tunnel) (retDNS string, retEr
 		}
 	}
 
-	if dns == "" {
+	if nativeDNS {
+		dns = ""
+	}
+
+	if dns == "" && !nativeDNS {
 		return "", errors.New("no IPv4 VPN DNS: supply dns in profile")
 	}
 
@@ -260,7 +268,7 @@ func applyConnect(m Manifest, ns []Network, tunnel Tunnel) (retDNS string, retEr
 	}
 
 	for _, n := range ns {
-		if e := dnsRules(m, n, dns, "add"); e != nil {
+		if e := installConnectionDNS(m, n, dns); e != nil {
 			return "", e
 		}
 
@@ -349,4 +357,12 @@ func ruleComment(m Manifest, kind string) string {
 	}
 
 	return "ocfusion:" + m.ID + ":" + kind
+}
+
+func installConnectionDNS(m Manifest, n Network, dns string) error {
+	if dns == "" {
+		return nil
+	}
+
+	return dnsRules(m, n, dns, "add")
 }

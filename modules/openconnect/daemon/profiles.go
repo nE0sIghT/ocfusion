@@ -110,6 +110,14 @@ func profileAction(action string, input io.Reader) (any, error) {
 		if err := os.RemoveAll(root); err != nil {
 			return nil, err
 		}
+	case "dns-state", "dns-vpn", "dns-wan":
+		operation := "dns-state"
+		if action != "dns-state" {
+			operation = "dns-select"
+		}
+
+		response, err := vpnCall(vpnRequest{Operation: operation, PreferDNS: action == "dns-vpn"})
+		return response.DNSStatus, err
 	case "settings":
 		return readSettings()
 	case "update-settings":

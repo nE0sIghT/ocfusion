@@ -15,6 +15,7 @@ import (
 var errProfileChanged = errors.New("profile changed; reload settings")
 
 type profileSettings struct {
+	NativeDNS      bool     `json:"native_dns"`
 	Profile        string   `json:"profile"`
 	FusionName     string   `json:"fusion_name"`
 	Schema         int      `json:"schema"`
@@ -55,7 +56,7 @@ func readSettings() (json.RawMessage, error) {
 		return nil, e
 	}
 
-	settings := profileSettings{Schema: 1, Revision: revision, Server: p.Server, Protocol: p.Protocol, Username: p.Username, Authgroup: p.Authgroup, ServerCert: p.ServerCert, DNS: p.DNS, MTU: p.MTU, NoDTLS: p.NoDTLS, Enabled: p.Enabled, HasPassword: p.Password != "", HasCA: p.CA != "", HasCertificate: p.Certificate != "", HasPrivateKey: p.PrivateKey != ""}
+	settings := profileSettings{NativeDNS: p.NativeDNS, Schema: 1, Revision: revision, Server: p.Server, Protocol: p.Protocol, Username: p.Username, Authgroup: p.Authgroup, ServerCert: p.ServerCert, DNS: p.DNS, MTU: p.MTU, NoDTLS: p.NoDTLS, Enabled: p.Enabled, HasPassword: p.Password != "", HasCA: p.CA != "", HasCertificate: p.Certificate != "", HasPrivateKey: p.PrivateKey != ""}
 	settings.Profile = profileID
 	if manifest, err := loadManifest(); err == nil {
 		settings.FusionName = manifest.Name
@@ -111,7 +112,7 @@ func patchProfile(raw []byte) error {
 	var fields map[string]json.RawMessage
 	json.Unmarshal(b, &fields)
 
-	allowed := map[string]bool{"server": true, "protocol": true, "username": true, "authgroup": true, "servercert": true, "dns": true, "mtu": true, "no_dtls": true, "enabled": true, "password": true, "ca_pem": true, "certificate_pem": true, "private_key_pem": true}
+	allowed := map[string]bool{"native_dns": true, "server": true, "protocol": true, "username": true, "authgroup": true, "servercert": true, "dns": true, "mtu": true, "no_dtls": true, "enabled": true, "password": true, "ca_pem": true, "certificate_pem": true, "private_key_pem": true}
 	if len(patch.Fields) == 0 {
 		return errors.New("no settings to save")
 	}

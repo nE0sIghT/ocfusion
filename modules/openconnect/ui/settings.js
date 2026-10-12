@@ -28,6 +28,7 @@ function fillSettings(s) {
 
   document.getElementById("vpn-auth").value =
     s.has_certificate && s.has_private_key ? "certificate" : "password";
+  document.getElementById("vpn-native-dns").checked = s.native_dns;
   document.getElementById("vpn-dtls").checked = !s.no_dtls;
   document.getElementById("vpn-enabled").checked = s.enabled;
   document.getElementById("vpn-password").value = "";
@@ -134,6 +135,7 @@ settingsForm.addEventListener("submit", async (event) => {
     }
 
     const fields = {
+      native_dns: document.getElementById("vpn-native-dns").checked,
       server,
       protocol: document.getElementById("vpn-protocol").value,
       username: document.getElementById("vpn-username").value,
@@ -253,3 +255,23 @@ settingsForm.addEventListener("submit", async (event) => {
     }
   }
 });
+
+for (const action of ["dns-vpn", "dns-wan"]) {
+  document.getElementById(action).addEventListener("click", async () => {
+    if (pending) {
+      return;
+    }
+
+    busy(true);
+    const output = document.getElementById("dns-status");
+
+    try {
+      const status = await request(action);
+      output.textContent = status.path === "VPN" ? "DNS uses VPN." : "DNS uses WAN.";
+    } catch (error) {
+      output.textContent = error.message;
+    } finally {
+      busy(false);
+    }
+  });
+}

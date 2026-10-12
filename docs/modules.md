@@ -162,7 +162,7 @@ If your module needs a separate persistent directory, declare it in `state_paths
 
 The `vpn` module provides API 1. A client declares `dependencies: [{"id":"vpn","api":1}]`. Connections belong to a stable pair of module ID and client profile ID. Each receives an independent native Fusion binding, interface, routing table and rule priority. OpenConnect and other consumers use the same contract.
 
-Send one JSON object per connection to `/tmp/ocfusion-vpn/control.sock`, mode 0600. Requests are bounded to 16 KiB. This is a trusted administrator integration boundary, not a sandbox. All requests include `api: 1`, `client` and `profile`; IDs match `[a-z][a-z0-9-]{0,31}`.
+Send one JSON object per connection to `/tmp/ocfusion-vpn/control.sock`, mode 0600. Requests are bounded to 16 KiB. This is a trusted administrator integration boundary, not a sandbox. Connection requests include `api: 1`, `client` and `profile`; IDs match `[a-z][a-z0-9-]{0,31}`.
 
 | Operation | Effect |
 | --- | --- |
@@ -225,3 +225,21 @@ Use `stock_pages` to add a script to a supported stock page through the platform
 ```
 
 Currently only `/VPN/vpnc.html` is supported. Contributions are loaded for enabled modules. API-only modules omit `ui`; they appear in the module inventory but have no menu entry or overview card. Make your script idempotent, preserve stock controls and use the existing authenticated server. Link to your module page with `/user/extensions.html#<module-id>`; use `target="_top"` when the stock page is an iframe. Do not patch the shared header or publish a separate listener.
+
+## Router DNS policy
+
+The VPN provider owns one global router DNS policy. `dns-select` takes the caller's
+`client` and `profile` and `prefer_dns: true` to prefer that connection. Setting
+`prefer_dns: false` clears only that owner's selection. `dns-state` requires `api`
+and `client` and returns `dns_status` with `policy`, `path` (VPN or WAN) and an
+optional fallback `reason`. Selection persists across restarts.
+
+A selected connection may operate without SDN assignments. `apply` accepts
+`native_dns: true` to retain ASUS DNS for assigned networks instead of redirecting
+queries to the tunnel's advertised DNS. The globally selected connection always
+uses native DNS. Tunnel DNS is optional in this mode. The provider marks outgoing
+native resolver traffic and applies scoped tunnel NAT. Losing the connection
+restores WAN DNS independently of forwarding guards on assigned networks.
+
+IPv6 upstream configurations currently use WAN fallback because managed tunnels
+carry IPv4. Changes restart stock stubby connections without restarting DHCP.

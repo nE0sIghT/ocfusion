@@ -13,10 +13,12 @@ var identifier = regexp.MustCompile(`^[a-z][a-z0-9-]{0,31}$`)
 type Broker struct {
 	registry Connections
 	services map[string]*Service
+	dns      DNSRouter
 }
 
 func newBroker(registry Connections) *Broker {
 	broker := &Broker{registry: registry, services: map[string]*Service{}}
+	broker.dns.policy = readDNSPolicy()
 	for id, manifest := range registry.Items {
 		broker.services[id] = &Service{manifest: manifest, owner: manifest.Client}
 	}
@@ -25,8 +27,32 @@ func newBroker(registry Connections) *Broker {
 }
 
 func (b *Broker) handle(request Request) (Response, error) {
-	if request.API != 1 || !identifier.MatchString(request.Client) || !identifier.MatchString(request.Profile) {
+	if request.API != 1 || !identifier.MatchString(request.Client) {
 		return Response{}, errors.New("invalid VPN owner or API")
+	}
+
+	if request.Operation == "dns-state" {
+		return Response{OK: true, DNSStatus: &b.dns.status}, nil
+	}
+
+	if !identifier.MatchString(request.Profile) {
+		return Response{}, errors.New("invalid VPN profile")
+	}
+
+	if request.Operation == "dns-select" {
+		policy := DNSPolicy{}
+		if request.PreferDNS {
+			policy = DNSPolicy{Client: request.Client, Profile: request.Profile}
+		} else if b.dns.policy.Client != request.Client || b.dns.policy.Profile != request.Profile {
+			return Response{}, errors.New("DNS selection belongs to another connection")
+		}
+
+		if err := b.dns.selectPolicy(policy); err != nil {
+			return Response{}, err
+		}
+
+		b.dns.reconcile(b.services)
+		return Response{OK: true, DNSStatus: &b.dns.status}, nil
 	}
 
 	if request.Operation == "list" {
@@ -96,7 +122,14 @@ func (b *Broker) handle(request Request) (Response, error) {
 		return Response{}, err
 	}
 
-	return service.handle(request)
+	service.dnsOnly = b.dns.policy.Client == request.Client && b.dns.policy.Profile == request.Profile
+	if request.Operation == "apply" {
+		service.nativeDNS = request.NativeDNS || service.dnsOnly
+	}
+	response, err := service.handle(request)
+	b.dns.reconcile(b.services)
+	response.DNSStatus = &b.dns.status
+	return response, err
 }
 
 func (b *Broker) reconcile() {
@@ -116,10 +149,12 @@ func (b *Broker) reconcile() {
 		statuses[id] = map[string]any{"state": state, "client": service.manifest.Client, "profile": service.manifest.Profile, "networks": service.networks}
 	}
 
-	saveJSON(filepath.Join(runDir, "status.json"), map[string]any{"connections": statuses})
+	b.dns.reconcile(b.services)
+	saveJSON(filepath.Join(runDir, "status.json"), map[string]any{"connections": statuses, "dns": b.dns.status})
 }
 
 func (b *Broker) down() {
+	b.dns.reset()
 	for _, service := range b.services {
 		service.down()
 	}

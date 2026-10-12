@@ -1,5 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 window.OCF_MODULE_TRANSLATIONS = {
+  "Router DNS": "DNS роутера",
+  "Use this VPN for router DNS while connected. DNS falls back to WAN when unavailable.": "DNS роутера идёт через этот VPN при подключении. Если VPN недоступен, используется WAN.",
+  "Use this VPN for DNS": "Использовать этот VPN для DNS",
+  "Use WAN for DNS": "Использовать WAN для DNS",
+  "Use ASUS DNS settings for assigned networks": "Использовать настройки DNS ASUS для назначенных сетей",
+  "DNS uses VPN.": "DNS использует VPN.",
+  "DNS uses WAN.": "DNS использует WAN.",
   "Connecting to the VPN server.": "Подключаемся к VPN-серверу.",
   "Check the assigned Wi-Fi/VLAN networks and SSH diagnostics.":
     "Проверьте назначенные сети Wi-Fi/VLAN и диагностику через SSH.",

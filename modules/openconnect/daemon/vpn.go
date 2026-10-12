@@ -24,6 +24,8 @@ type Tunnel struct {
 }
 
 type vpnRequest struct {
+	NativeDNS  bool    `json:"native_dns,omitempty"`
+	PreferDNS  bool    `json:"prefer_dns,omitempty"`
 	API        int     `json:"api"`
 	Operation  string  `json:"operation"`
 	Client     string  `json:"client"`
@@ -33,11 +35,12 @@ type vpnRequest struct {
 }
 
 type vpnResponse struct {
-	OK       bool      `json:"ok"`
-	Manifest Manifest  `json:"manifest"`
-	Networks []Network `json:"networks"`
-	DNS      string    `json:"dns,omitempty"`
-	Error    string    `json:"error,omitempty"`
+	DNSStatus json.RawMessage `json:"dns_status,omitempty"`
+	OK        bool            `json:"ok"`
+	Manifest  Manifest        `json:"manifest"`
+	Networks  []Network       `json:"networks"`
+	DNS       string          `json:"dns,omitempty"`
+	Error     string          `json:"error,omitempty"`
 }
 
 var vpnCall = callVPN
@@ -108,7 +111,26 @@ func applyConnect(m Manifest, profile Profile, networks []Network, event Event) 
 	}
 
 	tunnel := &Tunnel{Interface: event.Vars["TUNDEV"], Address: event.Vars["INTERNAL_IP4_ADDRESS"], DNS: dns, MTU: mtu}
-	response, err := vpnCall(vpnRequest{Operation: "apply", Tunnel: tunnel})
+	response, err := vpnCall(vpnRequest{Operation: "apply", Tunnel: tunnel, NativeDNS: profile.NativeDNS})
 
 	return response.DNS, err
+}
+
+func dnsOnlySelected() bool {
+	response, err := vpnCall(vpnRequest{Operation: "dns-state"})
+	if err != nil {
+		return false
+	}
+
+	var status struct {
+		Policy struct {
+			Client  string `json:"client"`
+			Profile string `json:"profile"`
+		} `json:"policy"`
+	}
+	if json.Unmarshal(response.DNSStatus, &status) != nil {
+		return false
+	}
+
+	return status.Policy.Client == "openconnect" && status.Policy.Profile == profileID
 }

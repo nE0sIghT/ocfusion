@@ -23,6 +23,7 @@ var runDir = "/tmp/ocfusion"
 var ifaceRE = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_.-]{0,14}$`)
 
 type Profile struct {
+	NativeDNS   bool     `json:"native_dns,omitempty"`
 	Schema      int      `json:"schema"`
 	Server      string   `json:"server"`
 	Protocol    string   `json:"protocol"`
