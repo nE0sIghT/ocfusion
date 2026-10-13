@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Create a draft GitHub release and upload checked, source-built artifacts."""
+"""Create a GitHub release and upload checked, source-built artifacts."""
 
 import json
 import os
@@ -46,8 +46,8 @@ def main():
     metadata = {
         "tag_name": tag,
         "name": "OCFusion " + version,
-        "draft": True,
-        "prerelease": True,
+        "draft": False,
+        "prerelease": False,
         "body": (
             f"See the [README](https://github.com/{repository}/tree/{tag}#quick-start) "
             "for installation and module documentation."
@@ -67,7 +67,7 @@ def main():
             headers,
             "application/octet-stream",
         )
-    print("Draft release:", release["html_url"])
+    print("Release:", release["html_url"])
 
 
 if __name__ == "__main__":
