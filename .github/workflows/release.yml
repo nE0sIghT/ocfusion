@@ -24,7 +24,7 @@ jobs:
       - name: Verify downloaded archives
         working-directory: dist
         run: sha256sum -c SHA256SUMS
-      - name: Create draft preview release
+      - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.ref_name }}

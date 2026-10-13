@@ -3,6 +3,7 @@
 """Check release tags and uploads without contacting GitHub."""
 
 import importlib.util
+import json
 import os
 import tempfile
 import unittest
@@ -49,6 +50,10 @@ class ReleaseTests(unittest.TestCase):
                 ):
                     release.main()
 
+                metadata = json.loads(post.call_args_list[0].args[1])
+                self.assertFalse(metadata["draft"])
+                self.assertFalse(metadata["prerelease"])
+                self.assertEqual(metadata["tag_name"], tag)
                 self.assertEqual(post.call_count, 4)
                 uploads = [call.args[0] for call in post.call_args_list[1:]]
                 self.assertEqual(

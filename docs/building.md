@@ -94,7 +94,7 @@ Downloads, build trees, firmware, PLAN.md and contrib are excluded from the sour
 
 SOURCE_DATE_EPOCH controls sorted archives with normalized ownership, modes and gzip timestamps. Packaging is deterministic. C compiler output can embed build paths, so arbitrary host directories are not claimed to produce byte-identical binaries; use the controlled `/work` container path for comparisons. `meson compile -C build/meson --clean` removes graph outputs; `meson setup --wipe` recreates configuration. Deleting `build/meson` removes the whole C sysroot and extracted-source cache too.
 
-PRs run Meson host/browser checks, a source-built ARM64 bundle and incremental graph checks. Tags `v*` run the same workflow, derive the version from the release tag and create a draft preview release with archives/checksums. Actions are pinned by full commit SHA.
+PRs run Meson host/browser checks, a source-built ARM64 bundle and incremental graph checks. Tags `v*` run the same workflow, derive the version from the release tag and publish a release with archives/checksums. Actions are pinned by full commit SHA.
 
 The source archive extracts into `ocfusion-<version>/` (for example, `ocfusion-0.3.1/`), following the conventional package-name/version layout.
 
