@@ -133,7 +133,8 @@ def build_component(arguments, config):
 
     for name in recipe.get("kernel_headers", []):
         shutil.copytree(
-            Path("/usr/aarch64-linux-gnu/include") / name,
+            Path(os.environ.get("OCF_KERNEL_HEADERS", "/usr/aarch64-linux-gnu/include"))
+            / name,
             prefix / "include" / name,
             dirs_exist_ok=True,
             symlinks=True,

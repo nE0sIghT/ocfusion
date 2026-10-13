@@ -10,7 +10,6 @@ import (
 	"errors"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 )
@@ -49,23 +48,6 @@ func readPackage(dir string) (Installed, error) {
 
 	if m.Requires.Architecture != "" && m.Requires.Architecture != "aarch64" || m.Requires.PlatformAPI > 1 {
 		return item, errors.New("incompatible module requirements")
-	}
-
-	if len(m.Requires.Models) > 0 {
-		out, e := exec.Command("/bin/nvram", "get", "productid").Output()
-		if e != nil {
-			return item, e
-		}
-
-		found := false
-
-		for _, model := range m.Requires.Models {
-			found = found || strings.TrimSpace(string(out)) == model
-		}
-
-		if !found {
-			return item, errors.New("module does not support this router")
-		}
 	}
 
 	for _, dependency := range m.Dependencies {

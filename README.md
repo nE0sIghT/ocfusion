@@ -24,7 +24,7 @@ The simplest installation uses a USB drive prepared on a Linux computer. Use an 
 2. Extract the archive, then prepare the mounted USB partition (replace `/media/user/USB`):
 
    ```sh
-   tar -xzf ocfusion-0.3-aarch64.tar.gz
+   tar -xzf ocfusion-0.3.1-aarch64.tar.gz
    ./ocfusion/install.sh --prepare-usb /media/user/USB
    ```
 

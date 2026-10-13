@@ -89,9 +89,8 @@ check_asuswrt() {
 
     [ -n "$("$ASUS_NVRAM" get productid)" ] &&
         [ -n "$("$ASUS_NVRAM" get firmver)" ] &&
-        [ -n "$("$ASUS_NVRAM" get buildno)" ] &&
-        [ "$("$ASUS_NVRAM" get apps_local_space)" = /rom ] ||
-        fail 'ASUSWRT required: firmware identity or Apps metadata missing. No changes made.'
+        [ -n "$("$ASUS_NVRAM" get buildno)" ] ||
+        fail 'ASUSWRT required: firmware identity missing. No changes made.'
 }
 
 check_router_identity() {
@@ -130,15 +129,13 @@ check_distribution() {
 }
 
 locate_apps_root() {
-    [ "$(nvram get apps_local_space)" = /rom ] || fail 'Unexpected apps_local_space; inspect lifecycle before installation.'
-    [ "$(nvram get stop_runapp)" != 1 ] || fail 'ASUS app autostart disabled (stop_runapp=1).'
+    if [ "$(nvram get stop_runapp)" = 1 ]; then
+        echo 'CHECK boot_autostart=WARN; disabled in ASUS Apps settings.'
+    fi
     APP_FOLDER=$(nvram get apps_install_folder)
     case "$APP_FOLDER" in
-        asusware.arm | asusware | asusware.big | asusware.mipsbig)
-            :
-            ;;
-        *)
-            fail 'Unsupported ASUS Apps folder; do not alter NVRAM blindly.'
+        "" | . | .. | *[!a-zA-Z0-9._-]*)
+            fail 'ASUS Apps folder is missing or not a safe directory name.'
             ;;
     esac
     APP_MOUNT=$(nvram get apps_mounted_path)

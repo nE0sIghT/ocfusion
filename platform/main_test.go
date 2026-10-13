@@ -243,3 +243,32 @@ func TestPlatformRemovalPreservesAdditionalModules(t *testing.T) {
 		}
 	}
 }
+
+func TestPackageDoesNotRequireExactRouterModel(t *testing.T) {
+	directory := t.TempDir()
+	fixture(t, directory, "1.0", "echo '{}'")
+	path := filepath.Join(directory, "module.json")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var manifest map[string]any
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		t.Fatal(err)
+	}
+
+	manifest["requires"] = map[string]any{
+		"architecture": "aarch64",
+		"models":       []string{"A different router"},
+		"platform_api": 1,
+	}
+	data, _ = json.Marshal(manifest)
+	if err := os.WriteFile(path, data, 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := readPackage(directory); err != nil {
+		t.Fatal("router model blocked compatible module", err)
+	}
+}

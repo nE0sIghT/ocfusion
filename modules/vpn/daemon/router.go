@@ -56,10 +56,6 @@ func verifyArchitecture() error {
 }
 
 func verifyIdentity(m Manifest) error {
-	if firmware() != m.Firmware {
-		return errors.New("firmware changed: rerun doctor and revalidate before activation")
-	}
-
 	for _, r := range strings.Split(nvget("vpnc_clientlist"), "<") {
 		f := strings.Split(r, ">")
 		if len(f) > 6 && f[6] == strconv.Itoa(m.Index) {

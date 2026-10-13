@@ -29,7 +29,6 @@ Example manifest:
   "ui": "ui/index.html",
   "requires": {
     "architecture": "aarch64",
-    "models": ["GT-BE98"],
     "platform_api": 1
   },
   "actions": [],
@@ -46,7 +45,7 @@ Example manifest:
 | `version` | `[a-zA-Z0-9][a-zA-Z0-9._-]{0,47}`; new bytes require a new version |
 | `entrypoint` | Relative executable path within the package |
 | `ui` | Optional relative HTML path; its directory is published for UI assets |
-| `requires` | Optional architecture, supported models and platform API requirement |
+| `requires` | Optional architecture and platform API requirement |
 | `actions` | Optional additional fixed operation names matching `[a-z][a-z0-9-]{0,31}` |
 | `capabilities` | Descriptive metadata; does not grant or limit privileges |
 | `provides_api` | Optional positive provider API version |

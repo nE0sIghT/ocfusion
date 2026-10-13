@@ -2,9 +2,8 @@
 package main
 
 type Requirements struct {
-	Architecture string   `json:"architecture"`
-	Models       []string `json:"models"`
-	PlatformAPI  int      `json:"platform_api"`
+	Architecture string `json:"architecture"`
+	PlatformAPI  int    `json:"platform_api"`
 }
 
 type Dependency struct {

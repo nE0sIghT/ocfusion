@@ -11,30 +11,25 @@ import (
 )
 
 func TestStockHeaderInsertion(t *testing.T) {
-	b, e := os.ReadFile(os.Getenv("ASUS_STATE_JS_FIXTURE"))
-	if e != nil {
-		t.Skip("extracted firmware unavailable")
+	original := "function show_banner() { /* stock header */ }\n"
+	if fixture := os.Getenv("ASUS_STATE_JS_FIXTURE"); fixture != "" {
+		data, err := os.ReadFile(fixture)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		original = string(data)
 	}
 
-	patched, e := stateOverlay(string(b))
-	if e != nil {
-		t.Fatal(e)
+	for _, stock := range []string{original, original + "\n// Firmware changed\n", ""} {
+		patched := stateOverlay(stock)
+		if !strings.HasPrefix(patched, stock+"\n") || !strings.HasSuffix(patched, headerScript) {
+			t.Fatal("stock script changed instead of appending the extension")
+		}
 	}
 
-	if !strings.Contains(patched, statusAnchor+"\n"+extensionMarker+"\nbanner_code += `"+extensionIcon) {
-		t.Fatal("icon not first in header")
-	}
-
-	if strings.Count(patched, "asus_extensions_link") != 1 || !strings.Contains(patched, "margin-right:16px") {
-		t.Fatal("duplicate/missing separation")
-	}
-
-	if _, e = stateOverlay(patched); e == nil {
-		t.Fatal("accepted patched page as original")
-	}
-
-	if _, e = stateOverlay(string(b) + "changed"); e == nil {
-		t.Fatal("accepted incompatible firmware")
+	if !strings.Contains(headerScript, "status_block") || !strings.Contains(headerScript, "target.insertBefore(link, target.firstChild)") {
+		t.Fatal("DOM integration missing")
 	}
 
 	for _, src := range []string{"/ocfusion/state.js", "/ocfusion/state.js//deleted"} {
