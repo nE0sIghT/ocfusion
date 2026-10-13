@@ -441,6 +441,39 @@ async function testFusion(browser, address, language) {
   await page.close();
 }
 
+async function testHeader(browser) {
+  const page = await browser.newPage();
+  const script = path.join(root, "platform/header.js");
+
+  await page.setContent("<main>Header not ready</main>");
+  await page.addScriptTag({ path: script });
+  assert.equal(await page.locator("#asus_extensions_link").count(), 0);
+
+  await page.evaluate(() => {
+    const node = document.createElement("div");
+    node.id = "status_block";
+    node.innerHTML = '<button id="reboot">Reboot</button>';
+    document.body.appendChild(node);
+  });
+
+  await page.locator("#asus_extensions_link").waitFor();
+  assert.equal(await page.locator("#status_block > :first-child").getAttribute("id"), "asus_extensions_link");
+  assert.equal(await page.locator("#asus_extensions_link").getAttribute("href"), "/user/extensions.html");
+  assert.equal(await page.locator("#asus_extensions_link").evaluate((link) => link.style.marginRight), "16px");
+
+  await page.addScriptTag({ path: script });
+  assert.equal(await page.locator("#asus_extensions_link").count(), 1);
+
+  await page.evaluate(() => {
+    document.getElementById("status_block").innerHTML = '<button id="reboot">Reboot</button>';
+  });
+
+  await page.locator("#asus_extensions_link").waitFor();
+  assert.equal(await page.locator("#asus_extensions_link").count(), 1);
+  assert.equal(await page.locator("#reboot").count(), 1);
+  await page.close();
+}
+
 async function main() {
   const server = createFixtureServer();
   let browser;
@@ -451,6 +484,8 @@ async function main() {
     const address = "http://127.0.0.1:" + server.address().port;
 
     browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });
+
+    await testHeader(browser);
 
     for (const language of ["EN", "RU", "DE"]) {
       await testModuleUI(browser, address, language);

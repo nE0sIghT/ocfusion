@@ -189,3 +189,29 @@ func TestCurrentInstallationRetainsConnectionRegistry(t *testing.T) {
 		}
 	}
 }
+
+func TestFirmwareUpdateRetainsConnection(t *testing.T) {
+	broker, values := fixtureBroker(t)
+	request := Request{API: 1, Client: "openconnect", Profile: "default", Operation: "claim"}
+	before, err := broker.handle(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	native := values["vpnc_clientlist"]
+	values["firmver"] = "3.0.0.6"
+	values["buildno"] = "102"
+	values["extendno"] = "39447"
+	after, err := broker.handle(request)
+	if err != nil {
+		t.Fatal("firmware update blocked an existing connection", err)
+	}
+
+	if !reflect.DeepEqual(before.Manifest, after.Manifest) || values["vpnc_clientlist"] != native {
+		t.Fatal("firmware update changed allocated resources or network bindings")
+	}
+
+	if err := verifyIdentity(after.Manifest); err != nil {
+		t.Fatal("firmware update blocked native identity verification", err)
+	}
+}

@@ -2,9 +2,7 @@
 package main
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
-	"errors"
+	_ "embed"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -12,36 +10,11 @@ import (
 	"syscall"
 )
 
-const statePageSHA = "272c6e692bf9f058f52dce11da9940ec7a8b95fa1836abce1d3041335a8366f5"
-const extensionMarker = "/* ASUS-EXTENSIONS-V1 */"
-const statusAnchor = "banner_code += `<div id=\"status_block\" style=\"display: flex; align-items: center;\">`;"
-const extensionIcon = `<a id="asus_extensions_link" href="/user/extensions.html" title="OCFusion" aria-label="OCFusion" style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;margin-right:16px;flex-shrink:0"><img src="/user/ocfusion-icon.png" width="28" height="28" alt="" style="object-fit:contain"></a>`
+//go:embed header.js
+var headerScript string
 
-func stateOverlay(original string) (string, error) {
-	if strings.Contains(original, extensionMarker) {
-		return "", errors.New("expected unmounted stock state.js")
-	}
-
-	sum := sha256.Sum256([]byte(original))
-	if hex.EncodeToString(sum[:]) != statePageSHA {
-		return "", errors.New("stock state.js mismatch; panel remains available by direct URL")
-	}
-
-	if strings.Count(original, statusAnchor) != 1 {
-		return "", errors.New("stock header anchor missing or ambiguous")
-	}
-
-	patched := strings.Replace(original, statusAnchor, statusAnchor+"\n"+extensionMarker+"\nbanner_code += `"+extensionIcon+"`;", 1)
-	// vpnc.html is an iframe which loads state.js but does not call show_banner.
-	patched += `
-if (typeof location !== "undefined") {
-    var ocfScript = document.createElement('script');
-    ocfScript.src = '/user/ocfusion-contributions.js';
-    document.head.appendChild(ocfScript);
-}
-`
-
-	return patched, nil
+func stateOverlay(original string) string {
+	return original + "\n" + headerScript
 }
 
 func ownWebMount(info, target, source string) bool {
@@ -141,10 +114,7 @@ func publishWeb() error {
 		return e
 	}
 
-	replacement, e := stateOverlay(string(original))
-	if e != nil {
-		return e
-	}
+	replacement := stateOverlay(string(original))
 
 	overlay := filepath.Join(ram, "state.js")
 	if e = atomicWrite(overlay, []byte(replacement), 0644); e != nil {

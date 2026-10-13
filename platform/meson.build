@@ -17,6 +17,7 @@ platform_go = files(
     'registry.go',
     'stock.go',
     'stock_web.go',
+    'header.js',
     'transport.go',
     'command_transport.go',
     'web.go',
