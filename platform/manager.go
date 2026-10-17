@@ -305,14 +305,20 @@ func (m *Manager) handle(q Request) (any, error) {
 			return nil, e
 		}
 
-		if _, e = invoke(item, payload, "remove", nil); e != nil {
+		result, e := invoke(item, payload, "remove", nil)
+		if e != nil {
+			return nil, e
+		}
+
+		removal, e := recordRemovalResult(result)
+		if e != nil {
 			return nil, e
 		}
 
 		delete(m.registry.Modules, q.ID)
 		os.Remove(filepath.Join(webRoot, "extensions-status", q.ID+".json"))
 
-		return nil, m.save()
+		return removal, m.save()
 	case "action":
 		if !exists {
 			return nil, errors.New("module not installed")

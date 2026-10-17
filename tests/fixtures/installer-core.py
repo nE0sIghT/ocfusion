@@ -78,6 +78,8 @@ def main():
             for package in packages(sys.argv[2]):
                 output.write(str(package) + "\n")
     elif OPERATION == "remove-bundled":
+        if os.environ.get("TEST_REMOVE_FAIL") == "1":
+            sys.exit(1)
         manifest = JFFS / "ocfusion/manifest.json"
         if manifest.exists():
             manifest.rename(manifest.with_name("manifest.uninstalled.json"))

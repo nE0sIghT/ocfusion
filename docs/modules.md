@@ -63,7 +63,7 @@ Example manifest:
 | `dependencies`         | Required module IDs and exact compatible provider API versions, for example `[{"id":"vpn","api":1}]`                                                               |
 | `install`              | Opt into the preflight/install hooks for persistent runtime setup                                                                                                  |
 | `state_paths`          | Owned top-level `/jffs/ocfusion*` directories included in distribution update backup and explicit prune; must not include platform state or overlap another module |
-| `stock_pages`          | Optional stock-page script contributions: supported stock-page path, relative script path within the package                                                 |
+| `stock_pages`          | Optional stock-page script contributions: supported stock-page path, relative script path within the package                                                       |
 | `resources`            | Map of resource namespace to value; duplicate namespace/value ownership is rejected                                                                                |
 
 Dependencies must exist, be enabled when their consumer is enabled and provide
@@ -106,6 +106,23 @@ valid JSON, for example `{"ok":true}`. Empty output is treated as `{}`. A
 nonzero exit status rejects the operation; JSON alone does not determine
 success. Stderr is not forwarded to the UI. Keep diagnostic JSON small enough to
 avoid truncation.
+
+### Removal result
+
+`remove` must restore module-owned native settings and release external
+resources before returning successfully. Keep saved user data unless explicitly
+pruned by the installer. Refuse removal with a nonzero exit status if cleanup
+fails or resources are still in use; the manager retains the registry entry and
+data for a retry.
+
+Return `{"reboot_required":true}` when cleanup has succeeded but the router must
+reboot to finish applying the restored settings. Omit the field or return false
+when no reboot is needed. The manager returns this flag to `extctl remove` and
+records a private RAM marker before unregistering the module. The full installer
+reports `REBOOT REQUIRED` after removal, including with `--prune`. The marker
+survives partial uninstall and manager restarts until the router reboots.
+Modules must make cleanup idempotent and repeat the flag while a reboot is still
+pending. Do not reboot the router from the hook.
 
 A module may publish a public status snapshot without a browser request. The
 manager supplies `EXT_PUBLIC_STATUS_PATH` to `run`. Atomically replace this
@@ -368,13 +385,13 @@ Stock-page contributions do not require a module UI:
 }
 ```
 
-Supported paths are `/VPN/vpnc.html` and `/Advanced_Wireless_Content.asp`. Contributions are loaded for
-enabled modules. API-only modules omit `ui`; they appear in the module inventory
-but have no menu entry or overview card. Make your script idempotent, preserve
-stock controls and use the existing authenticated server. Link to your module
-page with `/user/extensions.html#<module-id>`; use `target="_top"` when the
-stock page is an iframe. Do not patch the shared header or publish a separate
-listener.
+Supported paths are `/VPN/vpnc.html` and `/Advanced_Wireless_Content.asp`.
+Contributions are loaded for enabled modules. API-only modules omit `ui`; they
+appear in the module inventory but have no menu entry or overview card. Make
+your script idempotent, preserve stock controls and use the existing
+authenticated server. Link to your module page with
+`/user/extensions.html#<module-id>`; use `target="_top"` when the stock page is
+an iframe. Do not patch the shared header or publish a separate listener.
 
 ## Router DNS policy
 
@@ -471,10 +488,11 @@ not establish successful RF operation or regulatory approval.
 
 The original selectors, including absent versus empty values, are retained
 privately in the module data directory. Restore rejects conflicting external
-changes instead of overwriting them. Removal restores owned selectors when
-possible; a reboot is still required. Disable and USB removal leave saved native
-settings in place. Restore and reboot before removing the module for immediate
-confirmation of the original live state.
+changes instead of overwriting them. Removal restores owned selectors and
+returns `reboot_required: true` while restoration awaits reboot. A restoration
+failure rejects removal. Disable and USB removal leave saved native settings in
+place. Restore and reboot before removing the module for immediate confirmation
+of the original live state.
 
 The radio module contributes a script to the stock wireless settings page. It
 rebuilds the 6 GHz PSC subset from the channel set already selected by ASUS,

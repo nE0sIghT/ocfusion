@@ -78,7 +78,22 @@ func execute(c Controller, operation string, config json.RawMessage) (any, error
 			return nil, err
 		}
 
-		return c.restore(state.Revision)
+		state, err = c.restore(state.Revision)
+		if err != nil {
+			return nil, err
+		}
+
+		rebootRequired := state.Phase == "REBOOT_REQUIRED"
+		if rebootRequired {
+			status, err := c.status()
+			if err != nil {
+				return nil, err
+			}
+
+			rebootRequired = status["state"] != "STOCK"
+		}
+
+		return map[string]bool{"reboot_required": rebootRequired}, nil
 	case "apply", "restore":
 		var request struct {
 			Revision *uint64 `json:"revision"`

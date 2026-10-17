@@ -322,7 +322,7 @@ stop_installed_services() {
     if [ -x /jffs/ocfusion-platform/extctl ] && [ -f /jffs/ocfusion-platform/transport.json ]; then
         /jffs/ocfusion-platform/extctl start || fail 'Cannot start module manager for removal.'
         /jffs/ocfusion-platform/extctl remove-bundled /tmp/opt/ocfusion/modules ||
-            fail 'Module removal failed; reassign its Wi-Fi/VLAN networks first.'
+            fail 'Module cleanup failed. Resolve dependencies or restore its settings, then retry. Saved data retained.'
         /jffs/ocfusion-platform/extctl web-reset || fail 'Cannot remove owned web overlays.'
         /jffs/ocfusion-platform/extctl remove-transport || fail 'Cannot remove platform transport.'
 
@@ -349,11 +349,20 @@ remove_installed_programs() {
 }
 
 finish_uninstall() {
+    REBOOT_REQUIRED=0
+    if [ -f /tmp/ocfusion-platform/removal-reboot-required ]; then
+        REBOOT_REQUIRED=1
+    fi
+
     if [ "$PRUNE" = 1 ]; then
         "$HERE/bin/extd" prune-state "$HERE/modules" || fail 'Cannot prune module data.'
         echo 'UNINSTALL OK; saved OCFusion data deleted.'
     else
         echo 'UNINSTALL OK; saved OCFusion data retained. Use --uninstall --prune to delete it.'
+    fi
+
+    if [ "$REBOOT_REQUIRED" = 1 ]; then
+        echo 'REBOOT REQUIRED: restart the router through ASUS to finish restoring module settings.'
     fi
 }
 

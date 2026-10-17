@@ -146,6 +146,7 @@ esac
             "/tmp/ocfusion-checksums.log",
             "/tmp/ocfusion-install.lock",
             "/tmp/ocfusion/status.json",
+            "/tmp/ocfusion-platform/removal-reboot-required",
             "/tmp/opt",
             "/opt",
             "/jffs",
@@ -177,9 +178,14 @@ esac
         boot_target.write_text(boot_script)
         (self.bundle / "SHA256SUMS").unlink(missing_ok=True)
 
-    def install(self, fail=False, architecture="aarch64", arguments=()):
+    def install(
+        self, fail=False, architecture="aarch64", arguments=(), removal_fail=False
+    ):
         environment = dict(
-            os.environ, TEST_FAIL="1" if fail else "0", TEST_ARCH=architecture
+            os.environ,
+            TEST_FAIL="1" if fail else "0",
+            TEST_ARCH=architecture,
+            TEST_REMOVE_FAIL="1" if removal_fail else "0",
         )
         return subprocess.run(
             ["/bin/sh", str(self.bundle / "install.sh"), *arguments],
@@ -276,13 +282,27 @@ def main():
         test_interrupted_update_recovery(router)
         unrelated = router.apps / "other-app"
         unrelated.mkdir()
-        assert_success(router.install(arguments=("--uninstall",)))
+        failed_removal = router.install(
+            arguments=("--uninstall", "--prune"), removal_fail=True
+        )
+        assert failed_removal.returncode != 0
+        assert router.profile.read_text() == "secret-config"
+        assert router.manager.exists()
+        assert (router.apps / "ocfusion").exists()
+        reboot_marker = router.root / "tmp/ocfusion-platform/removal-reboot-required"
+        reboot_marker.parent.mkdir(parents=True, exist_ok=True)
+        reboot_marker.write_text("")
+        removal = router.install(arguments=("--uninstall",))
+        assert_success(removal)
+        assert "REBOOT REQUIRED" in removal.stdout
         assert router.profile.read_text() == "secret-config"
         assert not router.supervisor.exists()
         assert not router.manager.exists()
         assert not (router.apps / "ocfusion").exists()
         assert unrelated.exists()
-        assert_success(router.install(arguments=("--uninstall", "--prune")))
+        removal = router.install(arguments=("--uninstall", "--prune"))
+        assert_success(removal)
+        assert "REBOOT REQUIRED" in removal.stdout
         assert not router.profile.exists()
         assert unrelated.exists()
     print(

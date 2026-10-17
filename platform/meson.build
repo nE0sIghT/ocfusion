@@ -15,6 +15,7 @@ platform_go = files(
     'paths.go',
     'process.go',
     'registry.go',
+    'removal.go',
     'stock.go',
     'stock_web.go',
     'header.js',

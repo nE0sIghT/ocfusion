@@ -225,6 +225,11 @@ To also delete all retained OCFusion settings, credentials and module data:
 /bin/sh install.sh --uninstall --prune
 ```
 
+Modules restore their owned router settings during removal. If restoration
+fails, uninstall stops and retains saved data; resolve the conflict and retry.
+If the installer reports `REBOOT REQUIRED`, reboot the router through ASUS to
+finish restoring settings. This also applies when using `--prune`.
+
 After removal, safely eject USB and reboot. Other ASUS Apps files are left in
 place. Removing USB and rebooting without uninstalling only disables OCFusion
 and retains its settings.

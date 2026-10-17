@@ -247,8 +247,13 @@ func TestRemoveRestoresSelectorsWithoutRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := execute(c, "remove", nil); err != nil {
+	result, err := execute(c, "remove", nil)
+	if err != nil {
 		t.Fatal(err)
+	}
+
+	if !result.(map[string]bool)["reboot_required"] {
+		t.Fatal("removal must report pending reboot")
 	}
 
 	if h.values["wl1_country_abbrev_override"].Text != "DE" || h.commits != 2 {
@@ -256,6 +261,11 @@ func TestRemoveRestoresSelectorsWithoutRestart(t *testing.T) {
 	}
 
 	assertPhase(t, c, "REBOOT_REQUIRED")
+
+	result, err = execute(c, "remove", nil)
+	if err != nil || !result.(map[string]bool)["reboot_required"] || h.commits != 2 {
+		t.Fatal("retry lost reboot requirement or rewrote NVRAM", result, err)
+	}
 }
 
 func TestCountryChangeWithoutRebootDoesNotConfirmProfile(t *testing.T) {
@@ -399,5 +409,47 @@ func TestApplyEachProfile(t *testing.T) {
 				t.Fatalf("profile not verified: %+v %v", status, err)
 			}
 		})
+	}
+}
+
+func TestRemoveUnchangedRadioNeedsNoReboot(t *testing.T) {
+	c, h := fixture(t)
+	result, err := execute(c, "remove", nil)
+	if err != nil || result.(map[string]bool)["reboot_required"] || h.commits != 0 {
+		t.Fatal("unchanged radio removal", result, err, h.commits)
+	}
+}
+
+func TestRemoveRadioConflictRetainsSnapshot(t *testing.T) {
+	c, h := fixture(t)
+	if _, err := execute(c, "apply", json.RawMessage(`{"revision":0,"profile":"AA"}`)); err != nil {
+		t.Fatal(err)
+	}
+
+	h.values["location_code"] = Value{Present: true, Text: "external"}
+	if _, err := execute(c, "remove", nil); err == nil {
+		t.Fatal("conflicting selectors must block removal")
+	}
+
+	state, err := c.load()
+	if err != nil || len(state.Original) == 0 || state.Mode != "AA" {
+		t.Fatal("snapshot lost after failed removal", err)
+	}
+}
+
+func TestRemoveAfterConfirmedRestoreNeedsNoReboot(t *testing.T) {
+	c, h := fixture(t)
+	if _, err := execute(c, "apply", json.RawMessage(`{"revision":0,"profile":"AA"}`)); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := execute(c, "remove", nil); err != nil {
+		t.Fatal(err)
+	}
+
+	h.boot = "second"
+	result, err := execute(c, "remove", nil)
+	if err != nil || result.(map[string]bool)["reboot_required"] || h.commits != 2 {
+		t.Fatal("confirmed restoration should not require another reboot", result, err)
 	}
 }

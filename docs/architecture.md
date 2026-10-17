@@ -221,10 +221,15 @@ published files can remain in RAM after USB removal; their presence alone does
 not indicate a running service.
 
 Safe USB removal stops the Apps-managed services. Removing storage and rebooting
-disables startup but retains JFFS settings and native bindings. Full uninstall
-first requires reassignment of dependent networks, then removal of owned
-runtime/registry objects. See [installation and operation](../INSTALLATION.md)
-for the procedures.
+disables startup but retains JFFS settings and native bindings. Successful
+module removal can report `reboot_required`; the manager retains a private RAM
+notice until reboot so a partial removal or retry cannot lose it. The installer
+reports the notice even when saved data is pruned. Failed cleanup retains the
+module registration and blocks further platform deletion.
+
+Full uninstall first requires reassignment of dependent networks, then removal
+of owned runtime/registry objects. See
+[installation and operation](../INSTALLATION.md) for the procedures.
 
 ## Native radio settings
 
