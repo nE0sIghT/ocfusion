@@ -2,8 +2,6 @@
 "use strict";
 
 let settingsDirty = false;
-let dnsDirty = false;
-let dnsProfile = "";
 
 const tabs = [...document.querySelectorAll('[role="tab"]')];
 
@@ -43,7 +41,7 @@ for (const tab of tabs) {
 }
 
 function confirmSettingsDiscard() {
-  return !(settingsDirty || dnsDirty) || confirmUI("Discard unsaved changes?");
+  return !settingsDirty || confirmUI("Discard unsaved changes?");
 }
 
 function updateAuthenticationFields() {
@@ -82,7 +80,7 @@ document
   .getElementById("vpn-auth")
   .addEventListener("change", updateAuthenticationFields);
 window.addEventListener("beforeunload", (event) => {
-  if (settingsDirty || dnsDirty) {
+  if (settingsDirty) {
     event.preventDefault();
     event.returnValue = "";
   }
@@ -112,6 +110,7 @@ async function loadDNSPolicy() {
   busy(true);
   try {
     const status = await request("dns-state");
+    renderDNSStatus({ dns_path: status.path, dns_reason: status.reason });
     const policy = status.policy;
 
     document.getElementById("dns-policy").value = !policy
@@ -122,7 +121,7 @@ async function loadDNSPolicy() {
           ? "dns-wan"
           : "";
   } catch (error) {
-    document.getElementById("dns-status").textContent = error.message;
+    renderDNSStatus({});
   } finally {
     busy(false);
   }
@@ -136,65 +135,22 @@ function confirmUI(message) {
   return confirm(translated);
 }
 
-function updateDNSFields() {
-  document.getElementById("vpn-dns-addresses").hidden =
-    document.getElementById("vpn-dns-mode").value !== "manual";
+function setButtonPending(button, label) {
+  const original = button.textContent;
+  button.textContent = label;
+  button.setAttribute("aria-busy", "true");
+
+  return () => {
+    button.textContent = original;
+    button.removeAttribute("aria-busy");
+  };
 }
 
-document
-  .getElementById("vpn-dns-mode")
-  .addEventListener("change", updateDNSFields);
-document.getElementById("vpn-dns-form").addEventListener("input", () => {
-  dnsDirty = true;
-});
-
-document
-  .getElementById("vpn-dns-form")
-  .addEventListener("submit", async (event) => {
-    event.preventDefault();
-    if (pending || !settingsSnapshot) {
-      return;
+function showSaved(node, message) {
+  node.textContent = message;
+  setTimeout(() => {
+    if (node.textContent === message) {
+      node.textContent = "";
     }
-
-    const mode = document.getElementById("vpn-dns-mode").value;
-    const dns =
-      mode === "manual"
-        ? document
-            .getElementById("vpn-dns")
-            .value.trim()
-            .split(/[\s,;]+/)
-            .filter(Boolean)
-        : [];
-    const output = document.getElementById("vpn-dns-result");
-
-    busy(true);
-    try {
-      if (
-        mode === "manual" &&
-        (!dns.length ||
-          dns.some(
-            (ip) =>
-              !/^\d{1,3}(\.\d{1,3}){3}$/.test(ip) ||
-              ip.split(".").some((part) => Number(part) > 255),
-          ))
-      ) {
-        throw Error("DNS: enter IPv4 addresses.");
-      }
-
-      await parent.EXTENSIONS.call(moduleID, "update-settings", {
-        profile: selectedProfile,
-        data: {
-          revision: settingsSnapshot.revision,
-          fields: { native_dns: mode === "router", dns },
-        },
-      });
-      // Refresh the revision without replacing edits in the connection form.
-      settingsSnapshot = await request("settings");
-      dnsDirty = false;
-      output.textContent = "DNS settings saved.";
-    } catch (error) {
-      output.textContent = error.message;
-    } finally {
-      busy(false);
-    }
-  });
+  }, 4000);
+}

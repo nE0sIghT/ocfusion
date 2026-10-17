@@ -77,39 +77,6 @@ func TestTerminalRoutePreventsFallback(t *testing.T) {
 	}
 }
 
-func TestDNSCapturesBothTransports(t *testing.T) {
-	old := runner
-	defer func() {
-		runner = old
-	}()
-
-	var mutations []string
-	runner = func(name string, args ...string) (string, error) {
-		s := strings.Join(args, " ")
-		if strings.Contains(s, " -C ") {
-			return "", errors.New("rule missing")
-		}
-
-		mutations = append(mutations, name+" "+s)
-
-		return "", nil
-	}
-	e := dnsRules(Manifest{}, Network{Bridge: "br3"}, "10.0.0.53", "add")
-	if e != nil || len(mutations) != 2 {
-		t.Fatal(e, mutations)
-	}
-
-	if !strings.Contains(mutations[0], "-p udp") || !strings.Contains(mutations[1], "-p tcp") {
-		t.Fatal(mutations)
-	}
-
-	for _, s := range mutations {
-		if !strings.Contains(s, "-i br3") || !strings.Contains(s, "DNAT --to-destination 10.0.0.53") {
-			t.Fatal(s)
-		}
-	}
-}
-
 func TestNoRuleDuplication(t *testing.T) {
 	old := runner
 	defer func() {
@@ -300,7 +267,7 @@ func TestRulesUseOnlyConnectionResources(t *testing.T) {
 	}
 	manifest := Manifest{ID: "connection-8", Interface: "ocvpn1", Index: 8, Table: 51999, Priority: 91}
 	network := Network{Bridge: "br56", CIDR: "192.168.53.0/24"}
-	for _, err := range []error{guard(manifest, network, "add"), forwarding(manifest, network, "add"), dnsRules(manifest, network, "10.0.0.53", "add"), closeTunnel(manifest)} {
+	for _, err := range []error{guard(manifest, network, "add"), forwarding(manifest, network, "add"), closeTunnel(manifest)} {
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -311,5 +278,80 @@ func TestRulesUseOnlyConnectionResources(t *testing.T) {
 	}
 	if !strings.Contains(commands, "ocfusion:connection-8:") || !strings.Contains(commands, "dev ocvpn1") || !strings.Contains(commands, "table 51999") {
 		t.Fatal("connection-specific ownership missing", commands)
+	}
+}
+
+func TestRemoveDNSRedirectsPreservesOtherOwners(t *testing.T) {
+	previous := runner
+	t.Cleanup(func() { runner = previous })
+	var deleted []string
+	runner = func(name string, args ...string) (string, error) {
+		if strings.Contains(strings.Join(args, " "), "-S PREROUTING") {
+			return "-A PREROUTING -i br55 -p udp --dport 53 -m comment --comment \"ocfusion:dns\" -j DNAT --to-destination 10.0.0.53\n" +
+				"-A PREROUTING -i br55 -p tcp --dport 53 -m comment --comment ocfusion:dns -j DNAT --to-destination 10.0.0.53\n" +
+				"-A PREROUTING -p udp --dport 53 -m comment --comment ocfusion:connection-9:dns -j DNAT --to-destination 10.0.0.54\n" +
+				"-A PREROUTING -p udp --dport 53 -m comment --comment ocfusion:resolver -j REDIRECT --to-ports 53535", nil
+		}
+
+		deleted = append(deleted, name+" "+strings.Join(args, " "))
+
+		return "", nil
+	}
+
+	if err := removeDNSRedirects(Manifest{Interface: "ocvpn0"}); err != nil {
+		t.Fatal(err)
+	}
+
+	if len(deleted) != 2 {
+		t.Fatal(deleted)
+	}
+
+	for _, call := range deleted {
+		if !strings.Contains(call, "-D PREROUTING -i br55") || strings.Contains(call, "connection-9") || strings.Contains(call, "resolver") {
+			t.Fatal(call)
+		}
+	}
+}
+
+func TestTunnelSetupDoesNotRequireOrInterceptDNS(t *testing.T) {
+	previous := runner
+	t.Cleanup(func() { runner = previous })
+	stop := errors.New("stop before host interface mutation")
+	var calls []string
+	runner = func(name string, args ...string) (string, error) {
+		call := name + " " + strings.Join(args, " ")
+		calls = append(calls, call)
+		if strings.Contains(call, "ip link set") {
+			return "", stop
+		}
+
+		return "", nil
+	}
+
+	for _, dns := range [][]string{nil, {"10.0.0.53"}} {
+		_, err := applyConnection(Manifest{Interface: "ocvpn0", Table: 51998}, nil,
+			Tunnel{Interface: "ocvpn0", Address: "10.0.0.2", DNS: dns})
+		if !errors.Is(err, stop) {
+			t.Fatalf("DNS affected tunnel setup: %v", err)
+		}
+	}
+
+	for _, call := range calls {
+		if strings.Contains(call, "DNAT") || strings.Contains(call, "--dport 53") {
+			t.Fatal("DNS interception created", call)
+		}
+	}
+}
+
+func TestDNSRedirectCleanupFailureIsReported(t *testing.T) {
+	previous := runner
+	t.Cleanup(func() { runner = previous })
+	failure := errors.New("cannot read firewall rules")
+	runner = func(string, ...string) (string, error) {
+		return "", failure
+	}
+
+	if !errors.Is(removeDNSRedirects(Manifest{}), failure) {
+		t.Fatal("cleanup failure hidden")
 	}
 }

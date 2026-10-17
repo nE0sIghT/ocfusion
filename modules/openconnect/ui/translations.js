@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 window.OCF_MODULE_TRANSLATIONS = {
+  "Saving…": "Сохранение…",
+  "Settings saved.": "Настройки сохранены.",
   "Currently: VPN": "Сейчас: VPN",
   "Currently: WAN": "Сейчас: WAN",
   "VPN connection DNS": "DNS VPN-подключения",

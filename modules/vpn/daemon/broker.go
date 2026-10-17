@@ -134,9 +134,6 @@ func (b *Broker) handle(request Request) (Response, error) {
 	}
 
 	service.dnsOnly = b.dns.policy.Client == request.Client && b.dns.policy.Profile == request.Profile
-	if request.Operation == "apply" {
-		service.nativeDNS = request.NativeDNS || service.dnsOnly
-	}
 	response, err := service.handle(request)
 	b.dns.reconcile(b.services)
 	response.DNSStatus = &b.dns.status

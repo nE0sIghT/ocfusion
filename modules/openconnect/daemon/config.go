@@ -23,9 +23,10 @@ var runDir = "/tmp/ocfusion"
 var ifaceRE = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_.-]{0,14}$`)
 
 type Profile struct {
-	OTPMode     string   `json:"otp_mode,omitempty"`
-	OTPSecret   string   `json:"otp_secret,omitempty"`
-	OTPField    string   `json:"otp_field,omitempty"`
+	OTPMode   string `json:"otp_mode,omitempty"`
+	OTPSecret string `json:"otp_secret,omitempty"`
+	OTPField  string `json:"otp_field,omitempty"`
+	// Keep stored 0.3 profile fields readable; DNS selection now belongs to ASUS.
 	NativeDNS   bool     `json:"native_dns,omitempty"`
 	Schema      int      `json:"schema"`
 	Server      string   `json:"server"`

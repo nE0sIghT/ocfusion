@@ -57,6 +57,7 @@
         </div>
         <p id="state-message" role="status"></p>
         <p id="action-result" role="status"></p>
+        <p id="profile-result" role="status"></p>
         <div id="otp-challenge" hidden="">
           <label for="otp-code">One-time code</label>
           <input
@@ -72,9 +73,7 @@
           <p id="otp-result" role="status"></p>
         </div>
       </header>
-      <p id="settings-result" role="status">
-        Open settings to load the current profile.
-      </p>
+
       <nav class="ocf-tabs" role="tablist" aria-label="OpenConnect">
         <button
           type="button"
@@ -312,6 +311,7 @@
                 </div>
               </details>
               <button id="settings-save" type="submit">Save settings</button>
+              <p id="settings-result" role="status"></p>
             </fieldset>
           </form>
         </article>
@@ -339,32 +339,6 @@
         aria-labelledby="tab-networks"
         hidden=""
       >
-        <article class="ext-card">
-          <h2>VPN connection DNS</h2>
-          <p>DNS servers for networks assigned to this VPN profile.</p>
-          <form id="vpn-dns-form">
-            <fieldset id="vpn-dns-fields" disabled="">
-              <div class="ext-field">
-                <label for="vpn-dns-mode">DNS servers</label
-                ><select id="vpn-dns-mode">
-                  <option value="server">Provided by VPN server</option>
-                  <option value="manual">Specify manually</option>
-                  <option value="router">Use router DNS</option>
-                </select>
-              </div>
-              <div class="ext-field" id="vpn-dns-addresses" hidden="">
-                <label for="vpn-dns">DNS server addresses</label
-                ><input
-                  id="vpn-dns"
-                  type="text"
-                  placeholder="1.1.1.1, 9.9.9.9"
-                /><small>IPv4 addresses separated by commas or spaces.</small>
-              </div>
-              <button type="submit">Apply</button>
-            </fieldset>
-            <p id="vpn-dns-result" role="status"></p>
-          </form>
-        </article>
         <article class="ext-card">
           <h2>Global router DNS</h2>
           <div class="ext-field">
@@ -398,7 +372,9 @@
 
           <div id="networks"></div>
           <p>
-            <a href="/Guest_network.asp">Change network assignments in ASUS</a>
+            <a href="/Guest_network.asp" target="_top"
+              >Change network assignments in ASUS</a
+            >
           </p>
           <p>
             <span>VPN Fusion profile</span>:

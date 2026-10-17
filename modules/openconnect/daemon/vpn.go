@@ -24,7 +24,6 @@ type Tunnel struct {
 }
 
 type vpnRequest struct {
-	NativeDNS  bool    `json:"native_dns,omitempty"`
 	PreferDNS  bool    `json:"prefer_dns,omitempty"`
 	API        int     `json:"api"`
 	Operation  string  `json:"operation"`
@@ -111,7 +110,7 @@ func applyConnect(m Manifest, profile Profile, networks []Network, event Event) 
 	}
 
 	tunnel := &Tunnel{Interface: event.Vars["TUNDEV"], Address: event.Vars["INTERNAL_IP4_ADDRESS"], DNS: dns, MTU: mtu}
-	response, err := vpnCall(vpnRequest{Operation: "apply", Tunnel: tunnel, NativeDNS: profile.NativeDNS})
+	response, err := vpnCall(vpnRequest{Operation: "apply", Tunnel: tunnel})
 
 	return response.DNS, err
 }

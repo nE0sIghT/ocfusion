@@ -5,6 +5,7 @@ let pending = false;
 
 const moduleID = "openconnect";
 let selectedProfile = "default";
+const profileResult = document.getElementById("profile-result");
 const result = document.getElementById("result");
 const view = document.getElementById("status");
 const button = document.getElementById("import");
@@ -45,7 +46,6 @@ async function uploadConfig(bytes, module, onProgress, kind = "") {
 function busy(value) {
   pending = value;
   settingsFields.disabled = value || !settingsLoaded;
-  document.getElementById("vpn-dns-fields").disabled = value || !settingsLoaded;
   for (const input of document.querySelectorAll('[form="vpn-settings"]')) {
     input.disabled = value || !settingsLoaded;
   }
@@ -131,7 +131,7 @@ document.getElementById("profile-add").addEventListener("click", async () => {
 
   const id = document.getElementById("profile-name").value.trim();
   if (!/^[a-z][a-z0-9-]{0,31}$/.test(id)) {
-    settingsResult.textContent =
+    profileResult.textContent =
       "Use a lowercase profile ID, up to 32 characters.";
     return;
   }
@@ -145,7 +145,7 @@ document.getElementById("profile-add").addEventListener("click", async () => {
     await loadProfiles();
     settingsLoaded = false;
   } catch (error) {
-    settingsResult.textContent = error.message;
+    profileResult.textContent = error.message;
   } finally {
     busy(false);
   }
@@ -174,7 +174,7 @@ document
       await loadProfiles();
       settingsLoaded = false;
     } catch (error) {
-      settingsResult.textContent = error.message;
+      profileResult.textContent = error.message;
     } finally {
       busy(false);
     }

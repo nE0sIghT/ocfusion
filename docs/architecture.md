@@ -123,19 +123,24 @@ provider owns connection records by module/profile and allocates native
 bindings, interfaces and routing resources independently. The managed binding's
 switch stays OFF. Firmware version changes do not block existing connections.
 ASUS owns Wi-Fi/VLAN/SDN topology. The VPN provider discovers assigned bridges
-and installs policy routes and forwarding/NAT/DNS rules. A tunnel default route
+and installs policy routes and forwarding/NAT rules. A tunnel default route
 is paired with an unreachable fallback; assigned IPv6 traffic is blocked.
 Server-advertised split exclusions are ignored for the managed IPv4 full tunnel.
 
 The managed OpenConnect patch keeps its hook environment bounded when a server
 advertises a large route list. OpenConnect normalizes hook events into
-interface/address/MTU/DNS parameters and sends them to the VPN provider. The
+interface/address/MTU parameters and sends them to the VPN provider. The
 client reports UP only after the provider acknowledges application. Each
 connection has independent runtime state and rules. The provider independently
 expires client heartbeats, detects loss of the tunnel interface and reconciles
 network rules. Client authentication credentials and server trust are separate:
 public roots plus an optional additional CA validate the server, while the
 client certificate/key authenticate the client.
+
+DNS servers for each Wi-Fi/VLAN network remain configured in ASUS. The provider
+does not intercept port 53 traffic or apply tunnel-advertised DNS. Requests to
+external DNS addresses follow the network's normal VPN routes and kill switch;
+requests to the router use its DNS service and the global DNS policy below.
 
 ## Global DNS and filtering
 

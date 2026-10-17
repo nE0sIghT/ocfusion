@@ -110,17 +110,6 @@ func closeTunnel(m Manifest) error {
 	return nil
 }
 
-func dnsRules(m Manifest, n Network, dns, op string) error {
-	for _, proto := range []string{"udp", "tcp"} {
-		e := xt("iptables", "nat", op, "PREROUTING", "-i", n.Bridge, "-p", proto, "--dport", "53", "-m", "comment", "--comment", ruleComment(m, "dns"), "-j", "DNAT", "--to-destination", dns)
-		if e != nil {
-			return e
-		}
-	}
-
-	return nil
-}
-
 func forwarding(m Manifest, n Network, op string) error {
 	if e := xt("iptables", "filter", op, "FORWARD", "-i", n.Bridge, "-o", tunnelInterface(m), "-m", "comment", "--comment", ruleComment(m, "out"), "-j", "ACCEPT"); e != nil {
 		return e
@@ -166,10 +155,6 @@ func prepare(m Manifest, ns []Network) error {
 }
 
 func unbind(m Manifest, n Network, dns string) {
-	if dns != "" {
-		dnsRules(m, n, dns, "del")
-	}
-
 	forwarding(m, n, "del")
 	routeRule(m, n, "del")
 	guard(m, n, "del")
@@ -199,10 +184,10 @@ func setTunAddress(m Manifest, ip net.IP) error {
 }
 
 func applyConnect(m Manifest, ns []Network, tunnel Tunnel) (string, error) {
-	return applyConnection(m, ns, tunnel, false)
+	return applyConnection(m, ns, tunnel)
 }
 
-func applyConnection(m Manifest, ns []Network, tunnel Tunnel, nativeDNS bool) (retDNS string, retErr error) {
+func applyConnection(m Manifest, ns []Network, tunnel Tunnel) (retDNS string, retErr error) {
 	if tunnel.Interface != tunnelInterface(m) {
 		return "", errors.New("unexpected TUN name")
 	}
@@ -220,29 +205,12 @@ func applyConnection(m Manifest, ns []Network, tunnel Tunnel, nativeDNS bool) (r
 	}
 
 	dns := ""
-	candidates := tunnel.DNS
-
-	for _, d := range candidates {
-		if x := net.ParseIP(d); x != nil && x.To4() != nil {
-			dns = d
-			break
-		}
-	}
-
-	if nativeDNS {
-		dns = ""
-	}
-
-	if dns == "" && !nativeDNS {
-		return "", errors.New("no IPv4 VPN DNS: supply dns in profile")
-	}
 
 	defer func() {
 		if retErr != nil {
 			closeTunnel(m)
 
 			for _, n := range ns {
-				dnsRules(m, n, dns, "del")
 				forwarding(m, n, "del")
 			}
 		}
@@ -272,10 +240,6 @@ func applyConnection(m Manifest, ns []Network, tunnel Tunnel, nativeDNS bool) (r
 	}
 
 	for _, n := range ns {
-		if e := installConnectionDNS(m, n, dns); e != nil {
-			return "", e
-		}
-
 		if e := forwarding(m, n, "add"); e != nil {
 			return "", e
 		}
@@ -363,10 +327,40 @@ func ruleComment(m Manifest, kind string) string {
 	return "ocfusion:" + m.ID + ":" + kind
 }
 
-func installConnectionDNS(m Manifest, n Network, dns string) error {
-	if dns == "" {
-		return nil
+// Remove rules left by an installed version that redirected network DNS.
+// Keep every rule not explicitly owned by this connection.
+func removeDNSRedirects(m Manifest) error {
+	output, err := runner("iptables", "-t", "nat", "-S", "PREROUTING")
+	if err != nil {
+		return err
 	}
 
-	return dnsRules(m, n, dns, "add")
+	for _, line := range strings.Split(output, "\n") {
+		args := strings.Fields(line)
+		if len(args) < 2 || args[0] != "-A" || args[1] != "PREROUTING" {
+			continue
+		}
+
+		owned, dns, redirect := false, false, false
+		for i := 2; i+1 < len(args); i++ {
+			switch args[i] {
+			case "--comment":
+				owned = strings.Trim(args[i+1], "\"") == ruleComment(m, "dns")
+				args[i+1] = strings.Trim(args[i+1], "\"")
+			case "--dport":
+				dns = args[i+1] == "53"
+			case "-j":
+				redirect = args[i+1] == "DNAT"
+			}
+		}
+
+		if owned && dns && redirect {
+			args[0] = "-D"
+			if _, err = runner("iptables", append([]string{"-t", "nat"}, args...)...); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }

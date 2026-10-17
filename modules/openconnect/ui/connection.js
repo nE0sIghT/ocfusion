@@ -1,21 +1,23 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 let otpChallengeID = "";
 
-function renderConnection(st) {
-  if (st.dns_path) {
-    const status = document.getElementById("dns-status");
-    status.textContent =
-      st.dns_path === "VPN"
-        ? "Currently: VPN"
-        : st.dns_path === "WAN"
-          ? "Currently: WAN"
-          : "Check DNS routing diagnostics";
-    if (st.dns_reason) {
-      const detail = document.createElement("span");
-      detail.textContent = st.dns_reason;
-      status.append(document.createTextNode(" "), detail);
-    }
+function renderDNSStatus(st) {
+  const status = document.getElementById("dns-status");
+  status.textContent =
+    st.dns_path === "VPN"
+      ? "Currently: VPN"
+      : st.dns_path === "WAN"
+        ? "Currently: WAN"
+        : "Check DNS routing diagnostics";
+  if (st.dns_reason) {
+    const detail = document.createElement("span");
+    detail.textContent = st.dns_reason;
+    status.append(document.createTextNode(" "), detail);
   }
+}
+
+function renderConnection(st) {
+  renderDNSStatus(st);
 
   const challenge = st.otp;
   const activeID = challenge ? challenge.id : "";
@@ -167,16 +169,22 @@ document.querySelectorAll("[data-action]").forEach((b) =>
 
     const node = document.getElementById("action-result");
 
-    node.textContent = "Waiting for service…";
+    const label =
+      b.dataset.action === "enable" ? "Connecting…" : "Disconnecting…";
+    const restoreButton = setButtonPending(b, label);
+    node.textContent = "";
 
     try {
       await request(b.dataset.action);
-      node.textContent = "Command accepted. Status will update automatically.";
+      node.textContent = "";
     } catch (e) {
       node.textContent = e.message;
     } finally {
+      restoreButton();
       busy(false);
     }
+
+    await refreshConnection();
   }),
 );
 
@@ -203,6 +211,7 @@ async function refreshConnection() {
       },
     );
   } catch (error) {
+    renderDNSStatus({});
     const node = document.getElementById("api-error");
 
     node.hidden = false;

@@ -23,7 +23,6 @@ type Tunnel struct {
 
 type Request struct {
 	Resolver   *ResolverRegistration `json:"resolver,omitempty"`
-	NativeDNS  bool                  `json:"native_dns,omitempty"`
 	PreferDNS  bool                  `json:"prefer_dns,omitempty"`
 	API        int                   `json:"api"`
 	Operation  string                `json:"operation"`
@@ -45,23 +44,19 @@ type Response struct {
 }
 
 type Service struct {
-	dnsOnly   bool
-	nativeDNS bool
-	manifest  Manifest
-	owner     string
-	networks  []Network
-	event     *Tunnel
-	dns       string
-	heartbeat time.Time
+	dnsCleaned bool
+	dnsOnly    bool
+	manifest   Manifest
+	owner      string
+	networks   []Network
+	event      *Tunnel
+	dns        string
+	heartbeat  time.Time
 }
 
 func (s *Service) down() {
 	closeTunnel(s.manifest)
 	for _, network := range s.networks {
-		if s.dns != "" {
-			dnsRules(s.manifest, network, s.dns, "del")
-		}
-
 		forwarding(s.manifest, network, "del")
 	}
 
@@ -74,6 +69,16 @@ func (s *Service) reconcile(refreshTunnel bool) error {
 		s.down()
 
 		return err
+	}
+
+	if !s.dnsCleaned {
+		if err := removeDNSRedirects(s.manifest); err != nil {
+			s.down()
+
+			return err
+		}
+
+		s.dnsCleaned = true
 	}
 
 	if err := ensureNativePolicy(s.manifest); err != nil {
@@ -123,7 +128,7 @@ func (s *Service) reconcile(refreshTunnel bool) error {
 			return nil
 		}
 
-		s.dns, err = applyConnection(s.manifest, s.networks, *s.event, s.nativeDNS)
+		s.dns, err = applyConnection(s.manifest, s.networks, *s.event)
 		if err != nil {
 			s.down()
 		}
@@ -172,17 +177,11 @@ func (s *Service) handle(request Request) (Response, error) {
 			return response, errors.New("no assigned networks")
 		}
 
-		dns, err := applyConnection(s.manifest, s.networks, *request.Tunnel, s.nativeDNS)
+		dns, err := applyConnection(s.manifest, s.networks, *request.Tunnel)
 		if err != nil {
 			s.down()
 
 			return response, err
-		}
-
-		if s.dns != "" && s.dns != dns {
-			for _, network := range s.networks {
-				dnsRules(s.manifest, network, s.dns, "del")
-			}
 		}
 
 		s.event = request.Tunnel

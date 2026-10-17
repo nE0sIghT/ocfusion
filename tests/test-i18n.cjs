@@ -39,6 +39,7 @@ modules.push({
 const requests = [];
 
 let mailbox = {};
+let adguardDNSPath = "VPN";
 
 function crc32(payload) {
   let crc = 0xffffffff;
@@ -106,7 +107,7 @@ function createFixtureServer() {
           state: "RUNNING",
           updated_at: Date.now(),
           data_updated_at: Date.now(),
-          data: { state: "DISABLED", dns_path: "WAN" },
+          data: { state: "DISABLED", dns_path: adguardDNSPath },
         }),
         "application/json",
       );
@@ -172,34 +173,44 @@ function createFixtureServer() {
                 clients: [],
               }
             : q.module === "adguard-home" && q.operation === "catalog"
-              ? [{name: "AdGuard DNS filter", url: "https://adguardteam.github.io/HostlistsRegistry/assets/filter_1.txt", homepage: "https://github.com/AdguardTeam/AdGuardSDNSFilter", description: "Ads and trackers, including Russian-language sites"}]
-            : q.module === "adguard-home" && q.operation === "filter-status"
-              ? {filters: [], updating: false}
-            : q.module === "adguard-home" && q.operation === "statistics"
-              ? { num_dns_queries: 3, num_blocked_filtering: 1 }
-              : q.operation === "profiles"
-                ? profiles
-                : q.operation === "settings"
-                  ? {
-                      revision: "revision1",
-                      server: "https://vpn.example/",
-                      enabled: true,
-                      has_certificate: true,
-                      has_private_key: true,
-                    }
-                  : q.operation === "diagnose"
-                    ? {
-                        state: "UP",
-                        message: "IPv4 full tunnel; Wi-Fi/VLAN bindings active",
-                        networks: [
-                          {
-                            bridge: "br55",
-                            cidr: "192.168.52.0/24",
-                            sdn_idx: "4",
-                          },
-                        ],
-                      }
-                    : { ok: true };
+              ? [
+                  {
+                    name: "AdGuard DNS filter",
+                    url: "https://adguardteam.github.io/HostlistsRegistry/assets/filter_1.txt",
+                    homepage:
+                      "https://github.com/AdguardTeam/AdGuardSDNSFilter",
+                    description:
+                      "Ads and trackers, including Russian-language sites",
+                  },
+                ]
+              : q.module === "adguard-home" && q.operation === "filter-status"
+                ? { filters: [], updating: false }
+                : q.module === "adguard-home" && q.operation === "statistics"
+                  ? { num_dns_queries: 3, num_blocked_filtering: 1 }
+                  : q.operation === "profiles"
+                    ? profiles
+                    : q.operation === "settings"
+                      ? {
+                          revision: "revision1",
+                          server: "https://vpn.example/",
+                          enabled: true,
+                          has_certificate: true,
+                          has_private_key: true,
+                        }
+                      : q.operation === "diagnose"
+                        ? {
+                            state: "UP",
+                            message:
+                              "IPv4 full tunnel; Wi-Fi/VLAN bindings active",
+                            networks: [
+                              {
+                                bridge: "br55",
+                                cidr: "192.168.52.0/24",
+                                sdn_idx: "4",
+                              },
+                            ],
+                          }
+                        : { ok: true };
 
         mailbox = {
           state: "UP",
@@ -384,6 +395,20 @@ async function testModuleUI(browser, address, language) {
     await frame.locator('[data-action="disable"]').isVisible(),
     true,
   );
+  assert.equal(await frame.locator("#settings-result").textContent(), "");
+  await page.route("**/splash_page.cgi", async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    await route.continue();
+  });
+  await frame.locator('[data-action="disable"]').click();
+  await frame.locator('[data-action="disable"][aria-busy="true"]').waitFor();
+  assert.match(
+    await frame.locator('[data-action="disable"]').textContent(),
+    ru ? /Отключение/ : /Disconnecting/,
+  );
+  await frame.locator('[data-action="disable"]:not([aria-busy])').waitFor();
+  assert.equal(await frame.locator("#action-result").textContent(), "");
+  await page.unroute("**/splash_page.cgi");
   assert.equal(await frame.locator("#profile-new").isVisible(), true);
   assert.equal(await frame.locator('[data-action="reconnect"]').count(), 0);
   await frame.locator("#vpn-server").fill("https://unsaved.example/");
@@ -402,28 +427,27 @@ async function testModuleUI(browser, address, language) {
   );
   await frame.locator("#tab-networks").click();
   await frame.locator("#dns-policy:not([disabled])").waitFor();
-  assert.equal(
-    await frame.locator("#vpn-dns").evaluate((node) => node.form.id),
-    "vpn-dns-form",
-  );
-  await frame.locator("#vpn-dns-mode").selectOption("manual");
-  await frame.locator("#vpn-dns").fill("1.1.1.1");
-  await frame.locator('#vpn-dns-form button[type="submit"]').click();
-  await frame
-    .locator("#vpn-dns-result")
-    .filter({ hasText: ru ? "Настройки DNS сохранены" : "DNS settings saved" })
-    .waitFor();
-  const dnsRequest = requests.find(
-    (request) => request.operation === "update-settings",
-  );
-  assert.deepEqual(dnsRequest.config.data.fields, {
-    native_dns: false,
-    dns: ["1.1.1.1"],
-  });
+  assert.equal(await frame.locator("#vpn-dns-form").count(), 0);
   await frame.locator("#dns-policy").selectOption("dns-vpn");
   await frame.locator("#dns-apply").click();
   await frame.locator("#dns-policy:not([disabled])").waitFor();
   assert(requests.some((request) => request.operation === "dns-vpn"));
+  for (const [dnsPath, label] of [
+    ["VPN", ru ? "Сейчас: VPN" : "Currently: VPN"],
+    ["WAN", ru ? "Сейчас: WAN" : "Currently: WAN"],
+    [
+      undefined,
+      ru
+        ? "Проверьте диагностику маршрутизации DNS"
+        : "Check DNS routing diagnostics",
+    ],
+  ]) {
+    await frame.locator("body").evaluate((_, value) => {
+      renderDNSStatus({ dns_path: value });
+    }, dnsPath);
+    await frame.locator("#dns-status").filter({ hasText: label }).waitFor();
+  }
+
   await frame.locator("#tab-connection").click();
   assert.equal(
     await frame.locator("#vpn-server").inputValue(),
@@ -551,6 +575,29 @@ async function testModuleUI(browser, address, language) {
 
   await page.locator('#module-menu a[href="#module-adguard-home"]').click();
   await frame.locator("#fields:not([disabled])").waitFor();
+  for (const [dnsPath, label] of [
+    [
+      "VPN",
+      ru
+        ? "Внешние DNS-запросы: через VPN"
+        : "External DNS queries: through VPN",
+    ],
+    [
+      "WAN",
+      ru
+        ? "Внешние DNS-запросы: через провайдера"
+        : "External DNS queries: through your ISP",
+    ],
+    [
+      "UNKNOWN",
+      ru
+        ? "Путь внешних DNS-запросов неизвестен"
+        : "External DNS route unavailable",
+    ],
+  ]) {
+    adguardDNSPath = dnsPath;
+    await frame.locator("#dns-path").filter({ hasText: label }).waitFor();
+  }
   await frame.locator("#tab-advanced").click();
   await frame.locator("#panel-advanced details > summary").click();
   for (const selector of ["#upstreams", "#filters", "#rules", "#clients"]) {
@@ -590,10 +637,7 @@ async function testModuleUI(browser, address, language) {
   await frame.locator("#catalog input").check();
   await frame.locator("#tab-protection").click();
   await frame.locator("#stats").click();
-  await frame
-    .locator("#statistics")
-    .filter({ hasText: "3" })
-    .waitFor();
+  await frame.locator("#statistics").filter({ hasText: "3" }).waitFor();
   await frame.locator("#enabled").check();
   await frame.locator('button[type="submit"]').click();
   await frame
@@ -603,6 +647,17 @@ async function testModuleUI(browser, address, language) {
   assert(
     requests.some(
       (q) => q.action === "module.configure" && q.module === "adguard-home",
+    ),
+  );
+
+  const adguardConfig = requests.find(
+    (request) =>
+      request.action === "module.configure" &&
+      request.module === "adguard-home",
+  );
+  assert(
+    adguardConfig.config.filters.includes(
+      "https://adguardteam.github.io/HostlistsRegistry/assets/filter_1.txt",
     ),
   );
 

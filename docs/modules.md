@@ -402,13 +402,12 @@ connection. Setting `prefer_dns: false` clears only that owner's selection.
 `path` (VPN, WAN or ERROR during failed cleanup) and an optional fallback
 `reason`. Selection persists across restarts.
 
-A selected connection may operate without SDN assignments. `apply` accepts
-`native_dns: true` to retain ASUS DNS for assigned networks instead of
-redirecting queries to the tunnel's advertised DNS. The globally selected
-connection always uses native DNS. Tunnel DNS is optional in this mode. The
-provider marks outgoing native resolver traffic and applies scoped tunnel NAT.
-Losing the connection restores WAN DNS independently of forwarding guards on
-assigned networks.
+A selected connection may operate without SDN assignments. The provider retains
+ASUS DNS settings for assigned networks and does not redirect their port 53
+traffic. Tunnel-advertised DNS is not required or applied. The provider marks
+outgoing native resolver traffic and applies scoped tunnel NAT. Losing the
+connection restores WAN DNS independently of forwarding guards on assigned
+networks.
 
 IPv6 upstream configurations currently use WAN fallback because managed tunnels
 carry IPv4. Changes restart stock stubby connections without restarting DHCP.
@@ -442,15 +441,14 @@ from bypassing an active IPv4 DNS path.
 AdGuard Home inherits per-network native DNS using client/CIDR upstream mapping.
 Its administrator API is available only on a private mode-0600 Unix socket; the
 module exposes settings and bounded aggregate statistics through normal platform
-actions. It does not expose the upstream administrator UI or a new HTTP
+actions. `catalog` returns the curated list choices; `filter-status` returns
+bounded rule counts, last successful updates and failure flags.
+`refresh-filters` queues an asynchronous update of saved lists. Downloads start
+automatically and repeat every 24 hours while protection is enabled. Failed
+updates retain the loaded copy. List cache and statistics use RAM; after reboot
+lists download again. Additional HTTPS list URLs and manual rules remain
+configurable. It does not expose the upstream administrator UI or a new HTTP
 listener.
-
-The module's `catalog` action returns curated DNS filter subscriptions.
-`filter-status` returns bounded rule counts, successful update dates and error
-flags. `refresh-filters` queues an asynchronous update of saved lists. Downloads
-start automatically and repeat every 24 hours while protection is enabled;
-failed downloads retain loaded rules. Cache and statistics use RAM and lists
-are downloaded again after reboot. Manual list URLs and rules remain available.
 
 ## OpenConnect OTP actions
 

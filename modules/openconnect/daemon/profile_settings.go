@@ -15,27 +15,25 @@ import (
 var errProfileChanged = errors.New("profile changed; reload settings")
 
 type profileSettings struct {
-	OTPMode        string   `json:"otp_mode"`
-	OTPField       string   `json:"otp_field"`
-	HasOTPSecret   bool     `json:"has_otp_secret"`
-	NativeDNS      bool     `json:"native_dns"`
-	Profile        string   `json:"profile"`
-	FusionName     string   `json:"fusion_name"`
-	Schema         int      `json:"schema"`
-	Revision       string   `json:"revision"`
-	Server         string   `json:"server"`
-	Protocol       string   `json:"protocol"`
-	Username       string   `json:"username"`
-	Authgroup      string   `json:"authgroup"`
-	ServerCert     string   `json:"servercert"`
-	DNS            []string `json:"dns"`
-	MTU            int      `json:"mtu"`
-	NoDTLS         bool     `json:"no_dtls"`
-	Enabled        bool     `json:"enabled"`
-	HasPassword    bool     `json:"has_password"`
-	HasCA          bool     `json:"has_ca"`
-	HasCertificate bool     `json:"has_certificate"`
-	HasPrivateKey  bool     `json:"has_private_key"`
+	OTPMode        string `json:"otp_mode"`
+	OTPField       string `json:"otp_field"`
+	HasOTPSecret   bool   `json:"has_otp_secret"`
+	Profile        string `json:"profile"`
+	FusionName     string `json:"fusion_name"`
+	Schema         int    `json:"schema"`
+	Revision       string `json:"revision"`
+	Server         string `json:"server"`
+	Protocol       string `json:"protocol"`
+	Username       string `json:"username"`
+	Authgroup      string `json:"authgroup"`
+	ServerCert     string `json:"servercert"`
+	MTU            int    `json:"mtu"`
+	NoDTLS         bool   `json:"no_dtls"`
+	Enabled        bool   `json:"enabled"`
+	HasPassword    bool   `json:"has_password"`
+	HasCA          bool   `json:"has_ca"`
+	HasCertificate bool   `json:"has_certificate"`
+	HasPrivateKey  bool   `json:"has_private_key"`
 }
 
 func profileRevision(raw []byte) string {
@@ -59,7 +57,7 @@ func readSettings() (json.RawMessage, error) {
 		return nil, e
 	}
 
-	settings := profileSettings{OTPMode: p.OTPMode, OTPField: p.OTPField, HasOTPSecret: p.OTPSecret != "", NativeDNS: p.NativeDNS, Schema: 1, Revision: revision, Server: p.Server, Protocol: p.Protocol, Username: p.Username, Authgroup: p.Authgroup, ServerCert: p.ServerCert, DNS: p.DNS, MTU: p.MTU, NoDTLS: p.NoDTLS, Enabled: p.Enabled, HasPassword: p.Password != "", HasCA: p.CA != "", HasCertificate: p.Certificate != "", HasPrivateKey: p.PrivateKey != ""}
+	settings := profileSettings{OTPMode: p.OTPMode, OTPField: p.OTPField, HasOTPSecret: p.OTPSecret != "", Schema: 1, Revision: revision, Server: p.Server, Protocol: p.Protocol, Username: p.Username, Authgroup: p.Authgroup, ServerCert: p.ServerCert, MTU: p.MTU, NoDTLS: p.NoDTLS, Enabled: p.Enabled, HasPassword: p.Password != "", HasCA: p.CA != "", HasCertificate: p.Certificate != "", HasPrivateKey: p.PrivateKey != ""}
 	settings.Profile = profileID
 	if manifest, err := loadManifest(); err == nil {
 		settings.FusionName = manifest.Name
@@ -115,7 +113,7 @@ func patchProfile(raw []byte) error {
 	var fields map[string]json.RawMessage
 	json.Unmarshal(b, &fields)
 
-	allowed := map[string]bool{"otp_mode": true, "otp_secret": true, "otp_field": true, "native_dns": true, "server": true, "protocol": true, "username": true, "authgroup": true, "servercert": true, "dns": true, "mtu": true, "no_dtls": true, "enabled": true, "password": true, "ca_pem": true, "certificate_pem": true, "private_key_pem": true}
+	allowed := map[string]bool{"otp_mode": true, "otp_secret": true, "otp_field": true, "server": true, "protocol": true, "username": true, "authgroup": true, "servercert": true, "mtu": true, "no_dtls": true, "enabled": true, "password": true, "ca_pem": true, "certificate_pem": true, "private_key_pem": true}
 	if len(patch.Fields) == 0 {
 		return errors.New("no settings to save")
 	}

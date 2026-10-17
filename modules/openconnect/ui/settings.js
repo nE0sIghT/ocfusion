@@ -29,17 +29,6 @@ function fillSettings(s) {
 
   document.getElementById("vpn-auth").value =
     s.has_certificate && s.has_private_key ? "certificate" : "password";
-  if (!dnsDirty || dnsProfile !== selectedProfile) {
-    document.getElementById("vpn-dns-mode").value = s.native_dns
-      ? "router"
-      : s.dns?.length
-        ? "manual"
-        : "server";
-    document.getElementById("vpn-dns").value = (s.dns || []).join(", ");
-    dnsDirty = false;
-    dnsProfile = selectedProfile;
-    updateDNSFields();
-  }
   document.getElementById("vpn-dtls").checked = !s.no_dtls;
   document.getElementById("vpn-enabled").checked = s.enabled;
   document.getElementById("vpn-password").value = "";
@@ -76,9 +65,7 @@ function fillSettings(s) {
   updateAuthenticationFields();
   settingsLoaded = true;
   settingsFields.disabled = false;
-  settingsResult.textContent = s.revision
-    ? "Current settings loaded."
-    : "Create a connection profile.";
+  settingsResult.textContent = s.revision ? "" : "Create a connection profile.";
 }
 
 async function loadSettings(force = false) {
@@ -120,7 +107,11 @@ settingsForm.addEventListener("submit", async (event) => {
   }
 
   busy(true);
-  settingsResult.textContent = "Checking settings…";
+  const restoreButton = setButtonPending(
+    document.getElementById("settings-save"),
+    "Saving…",
+  );
+  settingsResult.textContent = "";
 
   try {
     const server = document.getElementById("vpn-server").value.trim();
@@ -259,6 +250,7 @@ settingsForm.addEventListener("submit", async (event) => {
   } catch (e) {
     settingsResult.textContent = e.message;
   } finally {
+    restoreButton();
     busy(false);
   }
 
@@ -266,8 +258,7 @@ settingsForm.addEventListener("submit", async (event) => {
     await loadSettings(true);
 
     if (settingsLoaded) {
-      settingsResult.textContent =
-        "Settings saved. Wi-Fi/VLAN bindings preserved.";
+      showSaved(settingsResult, "Settings saved.");
     }
   }
 });
@@ -279,15 +270,19 @@ document.getElementById("dns-apply").addEventListener("click", async () => {
   }
 
   busy(true);
+  const restoreButton = setButtonPending(
+    document.getElementById("dns-apply"),
+    "Saving…",
+  );
   const output = document.getElementById("dns-status");
 
   try {
     const status = await request(action);
-    output.textContent =
-      status.path === "VPN" ? "Currently: VPN" : "Currently: WAN";
+    renderDNSStatus({ dns_path: status.path, dns_reason: status.reason });
   } catch (error) {
     output.textContent = error.message;
   } finally {
+    restoreButton();
     busy(false);
   }
 });

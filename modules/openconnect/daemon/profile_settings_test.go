@@ -39,7 +39,7 @@ func TestSettingsRedactionAndSecretPreservingPatch(t *testing.T) {
 		t.Fatal("presence flags missing")
 	}
 
-	patch, _ := json.Marshal(map[string]any{"revision": public.Revision, "fields": map[string]any{"server": "https://vpn.example.org/?another=value", "no_dtls": true, "mtu": 1400, "dns": []string{"8.8.8.8"}}})
+	patch, _ := json.Marshal(map[string]any{"revision": public.Revision, "fields": map[string]any{"server": "https://vpn.example.org/?another=value", "no_dtls": true, "mtu": 1400}})
 	if e = patchProfile(patch); e != nil {
 		t.Fatal(e)
 	}
