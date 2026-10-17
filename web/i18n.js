@@ -2,6 +2,7 @@
 "use strict";
 
 const OCF_TRANSLATIONS = {
+  "Wi-Fi radio settings": "Настройки радиомодулей Wi-Fi",
   "Public status unavailable": "Публичный статус пока недоступен",
   "OCFusion is stopping. Please wait.": "OCFusion останавливается. Подождите.",
   "Checking platform availability...": "Проверяем доступность платформы...",

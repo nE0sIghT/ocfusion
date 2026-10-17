@@ -7,6 +7,7 @@ import subprocess
 from pathlib import Path
 
 EXECUTABLES = (
+    "modules/radio-settings/bin/ocfusion-radio-settings",
     "modules/adguard-home/bin/AdGuardHome",
     "modules/adguard-home/bin/ocfusion-adguard-home",
     "modules/openconnect/bin/openconnect",

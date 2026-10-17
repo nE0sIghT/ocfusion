@@ -56,7 +56,7 @@ class RouterFixture:
     def create_bundle(self):
         shutil.copytree(PROJECT_ROOT / "packaging", self.bundle)
         shutil.copytree(PROJECT_ROOT / "web", self.bundle / "web")
-        for module_id in ("vpn", "openconnect", "adguard-home"):
+        for module_id in ("vpn", "openconnect", "adguard-home", "radio-settings"):
             module = self.bundle / "modules" / module_id
             shutil.copytree(PROJECT_ROOT / "modules" / module_id / "packaging", module)
             shutil.copytree(PROJECT_ROOT / "modules" / module_id / "ui", module / "ui")
@@ -203,6 +203,7 @@ def test_fresh_and_repeated_install(router):
     expected = router.root / "tmp/opt/ocfusion/modules"
     assert str(expected / "openconnect") in registered
     assert str(expected / "adguard-home") in registered
+    assert str(expected / "radio-settings") in registered
     assert str(expected / "example") in registered
     assert (router.apps / "ocfusion/modules/example/module.json").exists()
     assert not (router.apps / "ocfusion/module.json").exists()

@@ -78,6 +78,7 @@ if get_option('runtime')
     subdir('modules/vpn')
     subdir('modules/openconnect')
     subdir('modules/adguard-home')
+    subdir('modules/radio-settings')
     subdir('packaging')
 endif
 

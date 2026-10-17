@@ -2,7 +2,7 @@
 
 ## Inputs and tools
 
-OCFusion uses Meson 1.12.1 and Ninja 1.13.2 to orchestrate four Go modules, static C dependencies, web assets and packaging. Go 1.27.2 builds the router services; GCC 14.2.0 cross-compiles C for AArch64. All runtime dependencies are fetched by immutable URL and verified against `third_party/sources.lock.json`. No firmware image, prebuilt router executable or MVP directory is required.
+OCFusion uses Meson 1.12.1 and Ninja 1.13.2 to orchestrate the Go services, static C dependencies, web assets and packaging. Go 1.27.2 builds the router services; GCC 14.2.0 cross-compiles C for AArch64. All runtime dependencies are fetched by immutable URL and verified against `third_party/sources.lock.json`. No firmware image, prebuilt router executable or MVP directory is required.
 
 Install Go 1.27.2, native C/C++ compilers, AArch64 GCC 14.2.0 and its binutils/Linux headers, make, autoconf, automake, libtool, pkg-config, Python 3.12 or newer, Perl, patch, xz and Node.js. The cross compiler must be available as `aarch64-linux-gnu-gcc`. The matching Debian packages are listed in `build-env/Dockerfile`. If cross headers are installed outside `/usr/aarch64-linux-gnu/include`, set `OCF_KERNEL_HEADERS` to their include directory.
 
@@ -25,7 +25,7 @@ meson compile -C build/meson bundle
 meson test -C build/meson --suite unit --suite example --suite client --print-errorlogs
 ```
 
-The root `meson.build` configures the project and includes component build files from `third_party/`, `platform/`, `modules/vpn/`, `modules/openconnect/`, `modules/adguard-home/`, `packaging/` and `tests/`. Upstream configure options, compiler environment and install targets are in [third_party/build.json](../third_party/build.json); pinned downloads remain in `sources.lock.json`.
+The root `meson.build` configures the project and includes component build files from `third_party/`, `platform/`, `modules/vpn/`, `modules/openconnect/`, `modules/adguard-home/`, `modules/radio-settings/`, `packaging/` and `tests/`. Upstream configure options, compiler environment and install targets are in [third_party/build.json](../third_party/build.json); pinned downloads remain in `sources.lock.json`.
 
 Meson owns the dependency graph. Separate targets build musl, zlib, OpenSSL, libxml2, OpenConnect, the supervisor and the module manager. A small adapter invokes the original upstream configure/make commands for one C project at a time. It does not orchestrate other projects. The OpenConnect target applies its tracked patches before compilation. AdGuard Home is built from the locked upstream archive and its go.sum-pinned dependencies with private-control and DNS-dialer patches. Its native DNS integration fixture is also built from source for the client suite. Dependency licenses are collected into the runtime notices. Upstream build logs are in `build/meson/logs/`.
 

@@ -1,4 +1,8 @@
 runtime_assets = files(
+    '../modules/radio-settings/packaging/module.json.in',
+    '../modules/radio-settings/ui/index.html',
+    '../modules/radio-settings/ui/app.js',
+    '../modules/radio-settings/ui/translations.js',
     '../modules/adguard-home/packaging/module.json.in',
     '../modules/adguard-home/ui/index.html',
     '../modules/adguard-home/ui/app.js',
@@ -45,6 +49,7 @@ stage = custom_target(
         downloads['cacert-2026-09-25.pem'],
         adguard_home,
         adguard_adapter,
+        radio_service,
     ],
     depend_files: [stage_tool, runtime_assets, lock],
     command: [
@@ -68,6 +73,8 @@ stage = custom_target(
         '@INPUT5@',
         '--adguard-adapter',
         '@INPUT6@',
+        '--radio-service',
+        '@INPUT7@',
         '--output',
         '@OUTPUT@',
     ],

@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Wi-Fi radio settings - OCFusion</title>
+    <link rel="stylesheet" href="/index_style.css" />
+    <link rel="stylesheet" href="/form_style.css" />
+    <link rel="stylesheet" href="/user/extensions-panel.css" />
+  </head>
+  <body class="bg">
+    <main class="ext-shell ext-module">
+      <h1>Wi-Fi radio settings</h1>
+      <div id="reboot-notice" class="ext-managed-notice" role="alert" hidden>
+        <h2>Reboot required</h2>
+        <p>Settings are saved. Reboot the router through ASUS to apply them.</p>
+      </div>
+      <p>Inspect live radio capabilities and select a native ASUS regional profile.</p>
+      <article class="ext-card">
+        <h2>Regional profile</h2>
+        <p>The regional profile sets channel and transmit power limits for all radios. Select settings permitted at your location.</p>
+        <p>Saving does not restart Wi-Fi. Reboot the router through ASUS to apply or restore the profile.</p>
+        <p>Saved settings remain after USB removal or module disable. Restore the original settings before removal; restoration also requires a reboot.</p>
+        <fieldset id="fields" disabled>
+          <label for="profile">Region</label>
+          <select id="profile" aria-describedby="profile-help"></select>
+          <p id="profile-help">Only profiles supported by every radio can be selected. Channel availability depends on the firmware, radio and channel width.</p>
+          <section id="profile-preview" aria-live="polite">
+            <h3>Selected region</h3>
+            <p>Reference data: ASUS GT-BE98, CLM BE98_20240925 (v17.6).</p>
+            <p id="preview-note">Loading…</p>
+            <div id="preview-bands"></div>
+          </section>
+          <button id="apply" type="button">Save region</button>
+          <button id="restore" class="ext-secondary" type="button">Restore original settings</button>
+        </fieldset>
+        <button id="reload" class="ext-secondary" type="button">Reload</button>
+        <p id="result" role="status">Loading…</p>
+      </article>
+      <article class="ext-card">
+        <h2>Channels and frequencies</h2>
+        <p>2.4 GHz: channels 1-13 have center frequencies from 2412 to 2472 MHz. Channel 14 is 2484 MHz and requires specific radio and regional support.</p>
+        <p>5 GHz: channel center frequency is 5000 + channel number × 5 MHz. Channels 36-64 span 5180-5320 MHz; channels 100-165 span 5500-5825 MHz.</p>
+        <p>6 GHz: channels 1-233 have center frequencies from 5955 to 7115 MHz. Support for the upper band depends on the radio and regional profile.</p>
+        <p>These are channel center frequencies. Wider channels occupy more spectrum. Changing region does not remove hardware limits or DFS requirements.</p>
+      </article>
+      <article class="ext-card">
+        <h2>Live radio state</h2>
+        <p id="state" role="status">Loading…</p>
+        <p>Available channels are reported by the running driver. Channel width and AiMesh may further limit selection in ASUS.</p>
+        <div id="radios"></div>
+      </article>
+    </main>
+    <script src="app.js"></script>
+    <script src="translations.js"></script>
+    <script src="/user/ocfusion-i18n.js"></script>
+  </body>
+</html>

@@ -10,12 +10,21 @@ OCFusion is a platform for extending stock ASUSWRT functionality without flashin
 
 - **OpenConnect** - adds OpenConnect VPN support with multiple connection profiles, password and certificate authentication, and manual OTP or automatic TOTP. A selected connection can carry DNS requests for the router and all networks, with automatic WAN fallback when disconnected.
 - **AdGuard Home** - adds DNS filtering with filter lists, custom rules, exceptions and per-client controls. Filtering is disabled by default. It inherits ASUS DNS settings and follows the selected VPN/WAN DNS path, or uses custom upstreams including DoT and DoH. It also works without OpenConnect.
+- **Wi-Fi radio settings** - selects a native ASUS regional profile and shows live radio state, available channels and their frequencies. The profile catalog includes EU, AA, AU, JP, KR and XX; only profiles supported by all radios can be selected. Original settings are retained when switching profiles and can be restored. Applying or restoring a profile requires a reboot. Saved radio settings remain after disabling the module or removing USB; restore the original settings and reboot to undo them.
 
 ## Compatibility
 
 Tested router: **ASUS GT-BE98**, running stock ASUSWRT **3.0.0.6 build 102 / extension 39393**.
 
 Other routers have not been tested.
+
+## Disclaimer
+
+OCFusion is provided "as is", without warranty of any kind, to the extent permitted by applicable law. You use it at your own risk. The warranty disclaimer and limitation of liability in sections 15-17 of [LICENSE](LICENSE) apply.
+
+Installing extensions or changing router settings can interrupt network access, cause loss of configuration or require device recovery. Back up your router configuration before making changes.
+
+Wireless regulations depend on your location. You are responsible for ensuring that the selected country profile, frequencies, channel widths and transmit power comply with applicable rules. A setting being available in the firmware does not establish that its use is permitted at your location.
 
 ## Quick start
 

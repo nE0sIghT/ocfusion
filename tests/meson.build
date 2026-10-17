@@ -1,5 +1,11 @@
 # Host tests never execute ARM64 binaries and do not require a cross compiler.
-foreach module : ['modules/openconnect/daemon', 'modules/vpn/daemon', 'modules/adguard-home/daemon', 'platform']
+foreach module : [
+    'modules/openconnect/daemon',
+    'modules/vpn/daemon',
+    'modules/adguard-home/daemon',
+    'modules/radio-settings/daemon',
+    'platform',
+]
     test(
         module + '-race',
         go,
@@ -52,6 +58,14 @@ test(
 )
 
 if get_option('browser_tests')
+    test(
+        'browser-radio-settings',
+        node,
+        args: [files('test-radio-ui.cjs')],
+        suite: 'browser',
+        timeout: 120,
+    )
+
     test(
         'browser-i18n',
         node,

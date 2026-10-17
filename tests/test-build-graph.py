@@ -84,6 +84,13 @@ def main():
             [*C_TARGETS, "ocfusion-adguard-home", "extd"],
         )
 
+    with changed_mtime(PROJECT_ROOT / "modules/radio-settings/daemon/settings.go"):
+        assert_targets(
+            build_plan(arguments.build_dir),
+            ["ocfusion-radio-settings", "runtime-stage", "runtime"],
+            [*C_TARGETS, "AdGuardHome", "ocfusion-adguard-home", "extd"],
+        )
+
     with changed_mtime(PROJECT_ROOT / "platform/manager.go"):
         assert_targets(
             build_plan(arguments.build_dir),

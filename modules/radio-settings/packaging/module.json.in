@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "id": "radio-settings",
+  "name": "Wi-Fi radio settings",
+  "version": "@VERSION@",
+  "module_api": 1,
+  "entrypoint": "bin/ocfusion-radio-settings",
+  "ui": "ui/index.html",
+  "requires": {"architecture": "aarch64", "platform_api": 1},
+  "actions": ["settings", "apply", "restore"],
+  "capabilities": ["network.wifi"],
+  "resources": {"wifi.region": "router"}
+}

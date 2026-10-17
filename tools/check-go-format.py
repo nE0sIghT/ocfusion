@@ -15,6 +15,7 @@ def main():
             "modules/openconnect/daemon",
             "modules/vpn/daemon",
             "modules/adguard-home/daemon",
+            "modules/radio-settings/daemon",
             "platform",
         )
         for path in (PROJECT_ROOT / module).glob("*.go")
