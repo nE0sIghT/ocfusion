@@ -282,6 +282,46 @@ func (d *DNSRouter) endpointRule(endpoint DNSEndpoint, operation string) error {
 	return xt("iptables", "mangle", operation, "OUTPUT", "-d", endpoint.Address, "-p", endpoint.Protocol, "--dport", strconv.Itoa(endpoint.Port), "-m", "addrtype", "!", "--dst-type", "LOCAL", "-m", "comment", "--comment", "ocfusion:dns-route", "-j", "MARK", "--set-xmark", d.mark)
 }
 
+func (d *DNSRouter) removeRoutingRule() error {
+	_, err := runner("ip", "rule", "del", "fwmark", d.mark, "lookup", d.table, "priority", d.priority)
+	if err == nil {
+		return nil
+	}
+
+	rules, readErr := runner("ip", "rule", "show")
+	if readErr != nil {
+		return errors.Join(err, readErr)
+	}
+
+	for _, line := range strings.Split(rules, "\n") {
+		if strings.HasPrefix(strings.TrimSpace(line), d.priority+":") && strings.Contains(line, "fwmark "+d.mark+" lookup "+d.table) {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (d *DNSRouter) removeDefaultRoute() error {
+	_, err := runner("ip", "route", "del", "default", "dev", d.active, "table", d.table)
+	if err == nil {
+		return nil
+	}
+
+	routes, readErr := runner("ip", "route", "show", "table", d.table)
+	if readErr != nil {
+		return errors.Join(err, readErr)
+	}
+
+	for _, line := range strings.Split(routes, "\n") {
+		if strings.HasPrefix(strings.TrimSpace(line), "default ") && strings.Contains(" "+line+" ", " dev "+d.active+" ") {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (d *DNSRouter) reset() error {
 	var failure error
 	for _, endpoint := range d.endpoints {
@@ -290,8 +330,7 @@ func (d *DNSRouter) reset() error {
 
 	if d.active != "" {
 		failure = errors.Join(failure, xt("iptables", "nat", "del", "POSTROUTING", "-o", d.active, "-m", "mark", "--mark", d.mark, "-m", "comment", "--comment", "ocfusion:dns-nat", "-j", "MASQUERADE"))
-		runner("ip", "rule", "del", "fwmark", d.mark, "lookup", d.table, "priority", d.priority)
-		runner("ip", "route", "del", "default", "dev", d.active, "table", d.table)
+		failure = errors.Join(failure, d.removeRoutingRule(), d.removeDefaultRoute())
 	}
 
 	if failure != nil {

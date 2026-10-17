@@ -115,3 +115,57 @@ func TestDNSMarkExcludesConnectionRestoreMasks(t *testing.T) {
 		t.Fatal("limited restore should leave high bits available")
 	}
 }
+
+func TestDNSRoutingCleanupFailuresRetainRecoveryState(t *testing.T) {
+	for _, resource := range []string{"rule", "route"} {
+		t.Run(resource, func(t *testing.T) {
+			previous := runner
+			t.Cleanup(func() { runner = previous })
+			fail := true
+			runner = func(tool string, args ...string) (string, error) {
+				call := strings.Join(args, " ")
+				if tool == "ip" && strings.HasPrefix(call, resource+" del ") && fail {
+					return "", errors.New("fixture deletion failed")
+				}
+
+				if tool == "ip" && fail {
+					switch call {
+					case "rule show":
+						return "1: from all fwmark 0x10000000/0x10000000 lookup 52100", nil
+					case "route show table 52100":
+						return "default dev ocvpn0 scope link", nil
+					}
+				}
+
+				return "", nil
+			}
+
+			dns := DNSRouter{active: "ocvpn0", mark: "0x10000000/0x10000000", table: "52100", priority: "1"}
+			if dns.reset() == nil || dns.status.Path != "ERROR" || dns.active == "" {
+				t.Fatal("failed routing cleanup lost retry state")
+			}
+
+			fail = false
+			if dns.reset() != nil || dns.active != "" {
+				t.Fatal("routing cleanup retry failed")
+			}
+		})
+	}
+}
+
+func TestDNSRoutingCleanupAcceptsAlreadyAbsentResources(t *testing.T) {
+	previous := runner
+	t.Cleanup(func() { runner = previous })
+	runner = func(tool string, args ...string) (string, error) {
+		if tool == "ip" && strings.Contains(strings.Join(args, " "), " del ") {
+			return "", errors.New("already absent")
+		}
+
+		return "", nil
+	}
+
+	dns := DNSRouter{active: "ocvpn0", mark: "0x10000000/0x10000000", table: "52100", priority: "1"}
+	if err := dns.reset(); err != nil || dns.active != "" {
+		t.Fatal("absent routing resources prevented idempotent cleanup", err)
+	}
+}
