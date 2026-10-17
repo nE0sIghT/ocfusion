@@ -45,10 +45,14 @@ async function uploadConfig(bytes, module, onProgress, kind = "") {
 function busy(value) {
   pending = value;
   settingsFields.disabled = value || !settingsLoaded;
+  document.getElementById("vpn-dns-fields").disabled = value || !settingsLoaded;
+  for (const input of document.querySelectorAll('[form="vpn-settings"]')) {
+    input.disabled = value || !settingsLoaded;
+  }
   button.disabled = value || !file.files.length;
   document
     .querySelectorAll(
-      "[data-action],#settings-save,#settings-reload,#profile-select,#profile-name,#profile-add,#profile-delete,#profile-new,#profile-cancel,#otp-submit,#otp-cancel,#dns-vpn,#dns-wan",
+      "[data-action],#settings-save,#settings-reload,#profile-select,#profile-name,#profile-add,#profile-delete,#profile-new,#profile-cancel,#otp-submit,#otp-cancel,#dns-policy,#dns-apply",
     )
     .forEach((node) => {
       node.disabled =
@@ -99,6 +103,11 @@ async function loadProfiles() {
 document
   .getElementById("profile-select")
   .addEventListener("change", async (event) => {
+    if (!confirmSettingsDiscard()) {
+      event.target.value = selectedProfile;
+      return;
+    }
+
     selectedProfile = event.target.value;
     document.getElementById("profile-delete").disabled =
       selectedProfile === "default";
@@ -116,9 +125,14 @@ document.getElementById("profile-cancel").addEventListener("click", () => {
 });
 
 document.getElementById("profile-add").addEventListener("click", async () => {
+  if (!confirmSettingsDiscard()) {
+    return;
+  }
+
   const id = document.getElementById("profile-name").value.trim();
   if (!/^[a-z][a-z0-9-]{0,31}$/.test(id)) {
-    result.textContent = "Use a lowercase profile ID, up to 32 characters.";
+    settingsResult.textContent =
+      "Use a lowercase profile ID, up to 32 characters.";
     return;
   }
 
@@ -131,7 +145,7 @@ document.getElementById("profile-add").addEventListener("click", async () => {
     await loadProfiles();
     settingsLoaded = false;
   } catch (error) {
-    result.textContent = error.message;
+    settingsResult.textContent = error.message;
   } finally {
     busy(false);
   }
@@ -142,6 +156,15 @@ document.getElementById("profile-add").addEventListener("click", async () => {
 document
   .getElementById("profile-delete")
   .addEventListener("click", async () => {
+    if (
+      !confirmSettingsDiscard() ||
+      !confirmUI(
+        "Delete this profile? Reassign its Wi-Fi/VLAN networks in ASUS first.",
+      )
+    ) {
+      return;
+    }
+
     busy(true);
     try {
       await parent.EXTENSIONS.call(moduleID, "delete-profile", {
@@ -151,7 +174,7 @@ document
       await loadProfiles();
       settingsLoaded = false;
     } catch (error) {
-      result.textContent = error.message;
+      settingsResult.textContent = error.message;
     } finally {
       busy(false);
     }

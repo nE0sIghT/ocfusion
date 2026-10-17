@@ -4,8 +4,12 @@ let otpChallengeID = "";
 function renderConnection(st) {
   if (st.dns_path) {
     const status = document.getElementById("dns-status");
-    status.textContent = st.dns_path === "VPN" ? "DNS uses VPN."
-      : st.dns_path === "WAN" ? "DNS uses WAN." : "Check DNS routing diagnostics";
+    status.textContent =
+      st.dns_path === "VPN"
+        ? "Currently: VPN"
+        : st.dns_path === "WAN"
+          ? "Currently: WAN"
+          : "Check DNS routing diagnostics";
     if (st.dns_reason) {
       const detail = document.createElement("span");
       detail.textContent = st.dns_reason;
@@ -30,7 +34,39 @@ function renderConnection(st) {
 
   const badge = document.getElementById("state-badge");
 
-  badge.textContent = st.state;
+  const labels = {
+    UP: "Connected",
+    DISABLED: "Disconnected",
+    CONNECTING: "Connecting…",
+    STARTING: "Starting…",
+    ERROR: "Connection error",
+    NO_PROFILE: "Not configured",
+    WAIT_NETWORK: "Waiting for network",
+    AUTH_REQUIRED: "Authentication required",
+    WAIT_OTP: "One-time code required",
+    WAIT_TIME: "Waiting for clock synchronization",
+    DOWN: "Disconnected",
+    CONFIG_CONFLICT: "Configuration conflict",
+    NETWORK_CHANGED: "Updating network bindings",
+    WAIT_STORAGE: "USB unavailable",
+    RECONNECTING: "Reconnecting…",
+    STOPPING: "Disconnecting…",
+    STOPPED: "Disconnected",
+  };
+
+  badge.textContent = labels[st.state] || st.state;
+
+  const active = [
+    "UP",
+    "CONNECTING",
+    "RECONNECTING",
+    "STARTING",
+    "WAIT_OTP",
+    "WAIT_TIME",
+    "WAIT_NETWORK",
+  ].includes(st.state);
+  document.querySelector('[data-action="enable"]').hidden = active;
+  document.querySelector('[data-action="disable"]').hidden = !active;
   badge.className =
     "ext-badge" +
     (st.state === "UP"
@@ -39,17 +75,34 @@ function renderConnection(st) {
         ? " error"
         : "");
   document.getElementById("state-message").textContent = st.message || "";
-  document.getElementById("connection-state").textContent =
-    st.state + (st.message ? " - " + st.message : "");
 
-  const lines = (st.networks || []).map(
-    (n) => n.bridge + " · " + n.cidr + " · SDN " + n.sdn_idx,
-  );
+  const networks = document.getElementById("networks");
+  networks.replaceChildren();
 
-  for (const id of ["network-summary", "networks"]) {
-    document.getElementById(id).textContent =
-      lines.join("\n") ||
-      "Assign the VPN Fusion profile shown above to your network in ASUS.";
+  if (st.networks?.length) {
+    const table = document.createElement("table");
+    table.className = "ocf-network-table";
+    const heading = table.createTHead().insertRow();
+
+    for (const label of ["Network", "Interface", "SDN"]) {
+      const cell = document.createElement("th");
+      cell.scope = "col";
+      cell.textContent = label;
+      heading.append(cell);
+    }
+
+    const body = table.createTBody();
+    for (const network of st.networks) {
+      const row = body.insertRow();
+      for (const value of [network.cidr, network.bridge, network.sdn_idx]) {
+        row.insertCell().textContent = value;
+      }
+    }
+
+    networks.append(table);
+  } else {
+    networks.textContent =
+      "No networks assigned. Choose this VPN Fusion profile in ASUS to route a network through this VPN.";
   }
 
   document.getElementById("api-error").hidden = true;
@@ -60,6 +113,10 @@ file.addEventListener("change", () => {
 });
 
 button.addEventListener("click", async () => {
+  if (!confirmSettingsDiscard()) {
+    return;
+  }
+
   busy(true);
   result.textContent = "Checking file…";
 
@@ -151,7 +208,7 @@ async function refreshConnection() {
     node.hidden = false;
     node.textContent = error.message;
     document.getElementById("state-badge").textContent = "UNKNOWN";
-    document.getElementById("connection-state").textContent = error.message;
+    document.getElementById("state-message").textContent = error.message;
   }
 }
 
@@ -184,9 +241,10 @@ for (const operation of ["submit-otp", "cancel-otp"]) {
         profile: selectedProfile,
         data: { challenge: otpChallengeID, code },
       });
-      output.textContent = operation === "cancel-otp"
-        ? "OTP challenge cancelled."
-        : "Code accepted by the worker. Waiting for server authentication.";
+      output.textContent =
+        operation === "cancel-otp"
+          ? "OTP challenge cancelled."
+          : "Code accepted by the worker. Waiting for server authentication.";
     } catch (error) {
       output.textContent = error.message;
     } finally {

@@ -1,0 +1,66 @@
+.ocf-connection-header {
+  margin-bottom: 24px;
+}
+.ocf-connection-header .ext-card {
+  border: 0;
+  padding: 0;
+  background: transparent;
+}
+.ocf-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 20px 0;
+  border-bottom: 1px solid var(--ext-line);
+}
+.ocf-tabs button {
+  float: none;
+  margin: 0;
+  border-radius: 5px 5px 0 0;
+}
+.ocf-tabs [aria-selected="true"] {
+  border-bottom: 3px solid var(--ext-accent);
+}
+
+.ocf-profile-toolbar {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 16px 0;
+}
+.ocf-profile-toolbar > .ext-field {
+  flex: 1;
+  min-width: 180px;
+}
+.ocf-profile-toolbar button {
+  margin: 0;
+}
+.ocf-network-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.ocf-network-table th,
+.ocf-network-table td {
+  text-align: left;
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--ext-line);
+}
+#panel-diagnostics > .ext-card-heading {
+  margin: 24px 0 16px;
+}
+
+.ocf-connection-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.ocf-connection-controls button {
+  margin: 0;
+}
+#vpn-dns-fields {
+  border: 0;
+  padding: 0;
+  margin: 0;
+}

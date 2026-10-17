@@ -28,6 +28,8 @@ runtime_assets = files(
     '../modules/openconnect/ui/settings.js',
     '../modules/openconnect/ui/index.html',
     '../modules/openconnect/ui/app.js',
+    '../modules/openconnect/ui/layout.js',
+    '../modules/openconnect/ui/layout.css',
     '../modules/openconnect/ui/connection.js',
     '../modules/openconnect/ui/translations.js',
     '../web/logo.png',

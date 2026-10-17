@@ -7,31 +7,41 @@
     <link rel="stylesheet" href="/index_style.css" />
     <link rel="stylesheet" href="/form_style.css" />
     <link rel="stylesheet" href="/user/extensions-panel.css" />
+    <link rel="stylesheet" href="layout.css" />
   </head>
   <body class="bg">
     <main class="ext-shell ext-module">
-      <article class="ext-card">
-        <h2>Connection profiles</h2>
-        <div class="ext-fields">
+      <header class="ocf-connection-header">
+        <div class="ext-card-heading">
+          <h1>OpenConnect</h1>
+
+          <div class="ocf-connection-controls">
+            <span id="state-badge" class="ext-badge">Loading…</span
+            ><button data-action="enable">Connect</button
+            ><button data-action="disable" class="ext-secondary">
+              Disconnect
+            </button>
+          </div>
+        </div>
+
+        <div class="ocf-profile-toolbar">
           <div class="ext-field">
             <label for="profile-select">Connection profile</label>
             <select id="profile-select">
               <option value="default">Default profile</option>
             </select>
           </div>
-        </div>
-        <p>
-          <button id="profile-new" type="button">Add profile</button>
-          <button
+          <button id="profile-new" type="button">Add profile</button
+          ><button
             id="profile-delete"
             class="ext-secondary"
             type="button"
-            disabled
+            disabled=""
           >
             Delete profile
           </button>
-        </p>
-        <div id="profile-create" hidden>
+        </div>
+        <div id="profile-create" hidden="">
           <div class="ext-fields">
             <div class="ext-field">
               <label for="profile-name">New profile ID</label>
@@ -45,70 +55,81 @@
             </button>
           </p>
         </div>
-        <p>
-          Reassign its Wi-Fi/VLAN networks in ASUS before deleting a profile.
-        </p>
-      </article>
-      <article class="ext-card">
-        <div class="ext-card-heading">
-          <h2>OpenConnect</h2>
-          <span id="state-badge" class="ext-badge">Loading…</span>
-        </div>
         <p id="state-message" role="status"></p>
-        <div id="network-summary"></div>
-      </article>
-      <section>
-        <h1>OpenConnect</h1>
-        <p class="ext-description">VPN settings and assigned networks.</p>
-        <p>
-          <span>VPN Fusion profile</span>:
-          <strong id="fusion-profile-name"></strong>
-        </p>
-        <article class="ext-card">
-          <h2>Router DNS</h2>
-          <p>Use this VPN for router DNS while connected. DNS falls back to WAN when unavailable.</p>
-          <button id="dns-vpn" type="button">Use this VPN for DNS</button>
-          <button id="dns-wan" class="ext-secondary" type="button">Use WAN for DNS</button>
-          <p id="dns-status" role="status"></p>
-        </article>
-        <article class="ext-card">
-          <h2>Connection</h2>
-          <p id="connection-state">Loading…</p>
-          <button data-action="enable">Connect</button>
-          <button data-action="disable" class="ext-secondary">
-            Disconnect
+        <p id="action-result" role="status"></p>
+        <div id="otp-challenge" hidden="">
+          <label for="otp-code">One-time code</label>
+          <input
+            id="otp-code"
+            inputmode="numeric"
+            autocomplete="one-time-code"
+            maxlength="8"
+          />
+          <button id="otp-submit" type="button">Submit code</button>
+          <button id="otp-cancel" class="ext-secondary" type="button">
+            Cancel code
           </button>
-          <button data-action="reconnect" class="ext-secondary">
-            Reconnect
-          </button>
-          <p id="action-result" role="status"></p>
-          <div id="otp-challenge" hidden>
-            <label for="otp-code">One-time code</label>
-            <input id="otp-code" inputmode="numeric" autocomplete="one-time-code" maxlength="8" />
-            <button id="otp-submit" type="button">Submit code</button>
-            <button id="otp-cancel" class="ext-secondary" type="button">Cancel code</button>
-            <p id="otp-result" role="status"></p>
-          </div>
-        </article>
+          <p id="otp-result" role="status"></p>
+        </div>
+      </header>
+      <p id="settings-result" role="status">
+        Open settings to load the current profile.
+      </p>
+      <nav class="ocf-tabs" role="tablist" aria-label="OpenConnect">
+        <button
+          type="button"
+          id="tab-connection"
+          class="tabClicked"
+          role="tab"
+          aria-controls="panel-connection"
+          aria-selected="true"
+          tabindex="0"
+        >
+          Connection</button
+        ><button
+          type="button"
+          id="tab-networks"
+          class="tab"
+          role="tab"
+          aria-controls="panel-networks"
+          aria-selected="false"
+          tabindex="-1"
+        >
+          DNS</button
+        ><button
+          type="button"
+          id="tab-diagnostics"
+          class="tab"
+          role="tab"
+          aria-controls="panel-diagnostics"
+          aria-selected="false"
+          tabindex="-1"
+        >
+          Diagnostics
+        </button>
+      </nav>
+      <section
+        id="panel-connection"
+        role="tabpanel"
+        aria-labelledby="tab-connection"
+      >
         <article class="ext-card">
           <div class="ext-card-heading">
-            <h2>VPN settings</h2>
+            <h2>Connection settings</h2>
             <button id="settings-reload" class="ext-secondary" type="button">
               Reload
             </button>
           </div>
-          <p id="settings-result" role="status">
-            Open settings to load the current profile.
-          </p>
+
           <form id="vpn-settings" autocomplete="off">
-            <fieldset id="settings-fields" disabled>
+            <fieldset id="settings-fields" disabled="">
               <div class="ext-fields">
                 <div class="ext-field ext-wide">
                   <label for="vpn-server">Server address</label
                   ><input
                     id="vpn-server"
                     type="url"
-                    required
+                    required=""
                     placeholder="https://vpn.example.org/?secret"
                   /><small
                     >Full HTTPS URL including port, path and query
@@ -144,14 +165,7 @@
                     >Usually not required for certificate authentication.</small
                   >
                 </div>
-                <div class="ext-field">
-                  <label for="vpn-authgroup">Authentication group</label
-                  ><input
-                    id="vpn-authgroup"
-                    type="text"
-                    placeholder="Default"
-                  />
-                </div>
+
                 <div class="ext-field ext-wide">
                   <label for="vpn-password">New password</label
                   ><input
@@ -164,35 +178,41 @@
                     password</label
                   >
                 </div>
-                <div class="ext-field">
-                  <label class="ext-check"><input id="vpn-native-dns" type="checkbox" />Use ASUS DNS settings for assigned networks</label>
-                  <label for="vpn-dns">VPN DNS</label
-                  ><input
-                    id="vpn-dns"
-                    type="text"
-                    placeholder="Provided by server"
-                  /><small>IPv4 addresses separated by commas or spaces.</small>
-                </div>
-                <div class="ext-field">
-                  <label for="vpn-mtu">MTU</label
-                  ><input
-                    id="vpn-mtu"
-                    type="number"
-                    min="576"
-                    max="1500"
-                    placeholder="Automatic"
-                  />
-                </div>
-                <div class="ext-field ext-wide">
-                  <label class="ext-check"
-                    ><input id="vpn-dtls" type="checkbox" checked />Use
-                    DTLS</label
-                  ><label class="ext-check"
-                    ><input id="vpn-enabled" type="checkbox" checked />Connect
-                    automatically</label
-                  >
-                </div>
+
+                <label class="ext-check"
+                  ><input id="vpn-enabled" type="checkbox" checked="" />Connect
+                  automatically</label
+                >
               </div>
+              <details class="ext-certificates">
+                <summary>Advanced settings</summary>
+                <div class="ext-fields">
+                  <div class="ext-field">
+                    <label for="vpn-authgroup">Authentication group</label
+                    ><input
+                      id="vpn-authgroup"
+                      type="text"
+                      placeholder="Default"
+                    />
+                  </div>
+                  <div class="ext-field">
+                    <label for="vpn-mtu">MTU</label
+                    ><input
+                      id="vpn-mtu"
+                      type="number"
+                      min="576"
+                      max="1500"
+                      placeholder="Automatic"
+                    />
+                  </div>
+                  <div class="ext-field ext-wide">
+                    <label class="ext-check"
+                      ><input id="vpn-dtls" type="checkbox" checked="" />Use
+                      DTLS</label
+                    >
+                  </div>
+                </div>
+              </details>
               <details class="ext-certificates">
                 <summary>One-time passwords</summary>
                 <div class="ext-fields">
@@ -206,15 +226,32 @@
                   </div>
                   <div class="ext-field">
                     <label for="otp-field">OTP field (optional)</label>
-                    <input id="otp-field" maxlength="64" placeholder="secondary_password" />
-                    <small>AnyConnect / ocserv. Set password for a certificate-plus-OTP form.</small>
+                    <input
+                      id="otp-field"
+                      maxlength="64"
+                      placeholder="secondary_password"
+                    />
+                    <small
+                      >AnyConnect / ocserv. Set password for a
+                      certificate-plus-OTP form.</small
+                    >
                   </div>
                   <div class="ext-field ext-wide">
                     <label for="otp-secret">New TOTP secret</label>
-                    <input id="otp-secret" type="password" autocomplete="new-password" />
+                    <input
+                      id="otp-secret"
+                      type="password"
+                      autocomplete="new-password"
+                    />
                     <small id="otp-secret-state"></small>
-                    <label class="ext-check"><input id="clear-otp-secret" type="checkbox" />Remove saved TOTP secret</label>
-                    <small>Base32 or otpauth URI. Automatic TOTP uses six digits and requires synchronized time.</small>
+                    <label class="ext-check"
+                      ><input id="clear-otp-secret" type="checkbox" />Remove
+                      saved TOTP secret</label
+                    >
+                    <small
+                      >Base32 or otpauth URI. Automatic TOTP uses six digits and
+                      requires synchronized time.</small
+                    >
                   </div>
                 </div>
               </details>
@@ -288,40 +325,112 @@
               accept=".occonf,.json,application/json"
             />
           </p>
-          <button id="import" disabled>Import</button>
+          <button id="import" disabled="">Import</button>
           <p id="result" role="status"></p>
           <p class="ext-description">
             Import replaces the connection profile. Wi-Fi/VLAN bindings are
             preserved.
           </p>
         </details>
+      </section>
+      <section
+        id="panel-networks"
+        role="tabpanel"
+        aria-labelledby="tab-networks"
+        hidden=""
+      >
         <article class="ext-card">
-          <p class="ext-managed-notice">
-            Managed by OCFusion. Do not enable, edit or delete this profile;
-            configure the VPN in the OCFusion panel.
-          </p>
-          <h2>Wi-Fi / VLAN</h2>
+          <h2>VPN connection DNS</h2>
+          <p>DNS servers for networks assigned to this VPN profile.</p>
+          <form id="vpn-dns-form">
+            <fieldset id="vpn-dns-fields" disabled="">
+              <div class="ext-field">
+                <label for="vpn-dns-mode">DNS servers</label
+                ><select id="vpn-dns-mode">
+                  <option value="server">Provided by VPN server</option>
+                  <option value="manual">Specify manually</option>
+                  <option value="router">Use router DNS</option>
+                </select>
+              </div>
+              <div class="ext-field" id="vpn-dns-addresses" hidden="">
+                <label for="vpn-dns">DNS server addresses</label
+                ><input
+                  id="vpn-dns"
+                  type="text"
+                  placeholder="1.1.1.1, 9.9.9.9"
+                /><small>IPv4 addresses separated by commas or spaces.</small>
+              </div>
+              <button type="submit">Apply</button>
+            </fieldset>
+            <p id="vpn-dns-result" role="status"></p>
+          </form>
+        </article>
+        <article class="ext-card">
+          <h2>Global router DNS</h2>
+          <div class="ext-field">
+            <label for="dns-policy">Send DNS requests</label
+            ><select id="dns-policy">
+              <option value="">Select a DNS policy</option>
+              <option value="dns-wan">Through WAN</option>
+              <option value="dns-vpn">Through selected VPN</option></select
+            ><small>If the VPN is unavailable, WAN is used.</small>
+          </div>
+          <button id="dns-apply" type="button">Apply</button>
+          <p id="dns-status" role="status"></p>
+          <details>
+            <summary>Which devices does this affect?</summary>
+            <p>The router itself and devices using it as their DNS server.</p>
+          </details>
+        </article>
+      </section>
+      <section
+        id="panel-diagnostics"
+        role="tabpanel"
+        aria-labelledby="tab-diagnostics"
+        hidden=""
+      >
+        <div class="ext-card-heading">
+          <h2>Diagnostics</h2>
+          <button id="diagnostics-copy" type="button">Copy report</button>
+        </div>
+        <article class="ext-card">
+          <h2>Networks using this VPN</h2>
+
           <div id="networks"></div>
           <p>
-            Configure network bindings in the
-            <a href="/Guest_network.asp">ASUS interface</a>. Keep this
-            connection's VPN Fusion profile switched OFF.
+            <a href="/Guest_network.asp">Change network assignments in ASUS</a>
           </p>
+          <p>
+            <span>VPN Fusion profile</span>:
+            <strong id="fusion-profile-name"></strong>
+          </p>
+          <details>
+            <summary>About the VPN Fusion profile</summary>
+            <p>
+              Managed by OCFusion. Configure this connection here; keep its VPN
+              Fusion profile switched off in ASUS.
+            </p>
+          </details>
         </article>
+
         <details class="ext-card">
-          <summary>Diagnostics</summary>
+          <summary>Technical status</summary>
           <pre id="status">Loading…</pre>
         </details>
+        <article class="ext-card">
+          <h2>SSH diagnostics</h2>
+          <pre>
+/tmp/opt/ocfusion/modules/openconnect/bin/ocfusion-openconnect doctor</pre
+          >
+        </article>
       </section>
-      <article class="ext-card">
-        <h2>SSH diagnostics</h2>
-        <pre>/jffs/ocfusion/ocfusion doctor</pre>
-      </article>
-      <p id="api-error" role="alert" hidden></p>
+      <p id="api-error" role="alert" hidden=""></p>
     </main>
+
     <script src="app.js"></script>
     <script src="settings.js"></script>
     <script src="connection.js"></script>
+    <script src="layout.js"></script>
     <script src="translations.js"></script>
     <script src="/user/ocfusion-i18n.js"></script>
   </body>

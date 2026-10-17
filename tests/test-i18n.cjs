@@ -372,7 +372,70 @@ async function testModuleUI(browser, address, language) {
     await frame.locator("#vpn-server").inputValue(),
     "https://vpn.example/",
   );
-  await frame.locator("#connection-state").filter({ hasText: "UP" }).waitFor();
+  await frame
+    .locator("#state-badge")
+    .filter({ hasText: ru ? "Подключено" : "Connected" })
+    .waitFor();
+  assert.equal(
+    await frame.locator('[data-action="enable"]').isVisible(),
+    false,
+  );
+  assert.equal(
+    await frame.locator('[data-action="disable"]').isVisible(),
+    true,
+  );
+  assert.equal(await frame.locator("#profile-new").isVisible(), true);
+  assert.equal(await frame.locator('[data-action="reconnect"]').count(), 0);
+  await frame.locator("#vpn-server").fill("https://unsaved.example/");
+  await frame.locator("#tab-diagnostics").click();
+  await frame.locator("#networks").waitFor();
+  await frame.locator("body").evaluate(() => {
+    renderConnection({
+      state: "UP",
+      networks: [{ bridge: "br55", cidr: "192.168.52.0/24", sdn_idx: "4" }],
+    });
+  });
+  assert.equal(await frame.locator(".ocf-network-table tbody tr").count(), 1);
+  assert.equal(
+    await frame.locator(".ocf-network-table tbody td").first().textContent(),
+    "192.168.52.0/24",
+  );
+  await frame.locator("#tab-networks").click();
+  await frame.locator("#dns-policy:not([disabled])").waitFor();
+  assert.equal(
+    await frame.locator("#vpn-dns").evaluate((node) => node.form.id),
+    "vpn-dns-form",
+  );
+  await frame.locator("#vpn-dns-mode").selectOption("manual");
+  await frame.locator("#vpn-dns").fill("1.1.1.1");
+  await frame.locator('#vpn-dns-form button[type="submit"]').click();
+  await frame
+    .locator("#vpn-dns-result")
+    .filter({ hasText: ru ? "Настройки DNS сохранены" : "DNS settings saved" })
+    .waitFor();
+  const dnsRequest = requests.find(
+    (request) => request.operation === "update-settings",
+  );
+  assert.deepEqual(dnsRequest.config.data.fields, {
+    native_dns: false,
+    dns: ["1.1.1.1"],
+  });
+  await frame.locator("#dns-policy").selectOption("dns-vpn");
+  await frame.locator("#dns-apply").click();
+  await frame.locator("#dns-policy:not([disabled])").waitFor();
+  assert(requests.some((request) => request.operation === "dns-vpn"));
+  await frame.locator("#tab-connection").click();
+  assert.equal(
+    await frame.locator("#vpn-server").inputValue(),
+    "https://unsaved.example/",
+  );
+  page.once("dialog", (dialog) => dialog.dismiss());
+  await frame.locator("#settings-reload").click();
+  assert.equal(
+    await frame.locator("#vpn-server").inputValue(),
+    "https://unsaved.example/",
+  );
+  await frame.locator("#vpn-server").fill("https://vpn.example/");
   assert.equal(
     await page.locator("dd[data-router-model]").textContent(),
     "TEST-ROUTER",
@@ -383,6 +446,11 @@ async function testModuleUI(browser, address, language) {
   );
 
   if (language === "EN") {
+    await frame
+      .locator("details")
+      .filter({ has: frame.locator("#vpn-mtu") })
+      .locator("summary")
+      .click();
     await frame.locator("#vpn-mtu").fill("1400");
     await frame.locator("#settings-save").click();
     await frame

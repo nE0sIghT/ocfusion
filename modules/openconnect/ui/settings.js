@@ -18,7 +18,6 @@ function fillSettings(s) {
     "vpn-username": s.username,
     "vpn-authgroup": s.authgroup,
     "vpn-servercert": s.servercert,
-    "vpn-dns": (s.dns || []).join(", "),
     "vpn-mtu": s.mtu || "",
     "otp-mode": s.otp_mode,
     "otp-field": s.otp_field,
@@ -30,7 +29,17 @@ function fillSettings(s) {
 
   document.getElementById("vpn-auth").value =
     s.has_certificate && s.has_private_key ? "certificate" : "password";
-  document.getElementById("vpn-native-dns").checked = s.native_dns;
+  if (!dnsDirty || dnsProfile !== selectedProfile) {
+    document.getElementById("vpn-dns-mode").value = s.native_dns
+      ? "router"
+      : s.dns?.length
+        ? "manual"
+        : "server";
+    document.getElementById("vpn-dns").value = (s.dns || []).join(", ");
+    dnsDirty = false;
+    dnsProfile = selectedProfile;
+    updateDNSFields();
+  }
   document.getElementById("vpn-dtls").checked = !s.no_dtls;
   document.getElementById("vpn-enabled").checked = s.enabled;
   document.getElementById("vpn-password").value = "";
@@ -59,8 +68,12 @@ function fillSettings(s) {
 
   document.getElementById("otp-secret").value = "";
   document.getElementById("clear-otp-secret").checked = false;
-  document.getElementById("otp-secret-state").textContent = s.has_otp_secret ? "Saved on the router." : "Not configured.";
+  document.getElementById("otp-secret-state").textContent = s.has_otp_secret
+    ? "Saved on the router."
+    : "Not configured.";
 
+  settingsDirty = false;
+  updateAuthenticationFields();
   settingsLoaded = true;
   settingsFields.disabled = false;
   settingsResult.textContent = s.revision
@@ -93,9 +106,11 @@ async function loadSettings(force = false) {
   }
 }
 
-document
-  .getElementById("settings-reload")
-  .addEventListener("click", () => loadSettings(true));
+document.getElementById("settings-reload").addEventListener("click", () => {
+  if (confirmSettingsDiscard()) {
+    loadSettings(true);
+  }
+});
 
 settingsForm.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -124,24 +139,7 @@ settingsForm.addEventListener("submit", async (event) => {
       throw Error("MTU: 576 to 1500, or leave blank.");
     }
 
-    const dns = document
-      .getElementById("vpn-dns")
-      .value.trim()
-      .split(/[\s,;]+/)
-      .filter(Boolean);
-
-    if (
-      dns.some(
-        (ip) =>
-          !/^\d{1,3}(\.\d{1,3}){3}$/.test(ip) ||
-          ip.split(".").some((n) => Number(n) > 255),
-      )
-    ) {
-      throw Error("DNS: enter IPv4 addresses.");
-    }
-
     const fields = {
-      native_dns: document.getElementById("vpn-native-dns").checked,
       otp_mode: document.getElementById("otp-mode").value,
       otp_field: document.getElementById("otp-field").value.trim(),
       server,
@@ -149,7 +147,6 @@ settingsForm.addEventListener("submit", async (event) => {
       username: document.getElementById("vpn-username").value,
       authgroup: document.getElementById("vpn-authgroup").value,
       servercert: document.getElementById("vpn-servercert").value.trim(),
-      dns,
       mtu,
       no_dtls: !document.getElementById("vpn-dtls").checked,
       enabled: document.getElementById("vpn-enabled").checked,
@@ -275,22 +272,22 @@ settingsForm.addEventListener("submit", async (event) => {
   }
 });
 
-for (const action of ["dns-vpn", "dns-wan"]) {
-  document.getElementById(action).addEventListener("click", async () => {
-    if (pending) {
-      return;
-    }
+document.getElementById("dns-apply").addEventListener("click", async () => {
+  const action = document.getElementById("dns-policy").value;
+  if (pending || !action) {
+    return;
+  }
 
-    busy(true);
-    const output = document.getElementById("dns-status");
+  busy(true);
+  const output = document.getElementById("dns-status");
 
-    try {
-      const status = await request(action);
-      output.textContent = status.path === "VPN" ? "DNS uses VPN." : "DNS uses WAN.";
-    } catch (error) {
-      output.textContent = error.message;
-    } finally {
-      busy(false);
-    }
-  });
-}
+  try {
+    const status = await request(action);
+    output.textContent =
+      status.path === "VPN" ? "Currently: VPN" : "Currently: WAN";
+  } catch (error) {
+    output.textContent = error.message;
+  } finally {
+    busy(false);
+  }
+});
