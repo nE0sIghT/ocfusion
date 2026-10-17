@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 )
 
@@ -45,6 +46,56 @@ func TestPublishedLifecycle(t *testing.T) {
 		}
 		if status.State != expected || status.Updated == 0 {
 			t.Fatalf("unexpected lifecycle: %+v, expected %s", status, expected)
+		}
+	}
+}
+
+func TestPublishedModuleOrderSurvivesStatusUpdates(t *testing.T) {
+	oldWeb, oldRAM := webRoot, ram
+	webRoot, ram = t.TempDir(), t.TempDir()
+
+	t.Cleanup(func() {
+		webRoot, ram = oldWeb, oldRAM
+	})
+
+	ids := []string{"vpn", "radio-settings", "openconnect", "adguard-home"}
+	m := &Manager{
+		registry: Registry{Modules: map[string]Installed{}},
+		workers:  map[string]*Worker{},
+	}
+	for _, id := range ids {
+		m.registry.Modules[id] = Installed{
+			Manifest: Module{ID: id, Name: id},
+		}
+		m.workers[id] = &Worker{state: "RUNNING"}
+	}
+
+	want := []string{"adguard-home", "openconnect", "radio-settings", "vpn"}
+	for update := 0; update < 32; update++ {
+		m.workers[ids[update%len(ids)]].state = "STOPPED"
+		m.publish()
+
+		data, err := os.ReadFile(filepath.Join(webRoot, "extensions-modules.json"))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		var status struct {
+			Modules []struct {
+				ID string `json:"id"`
+			} `json:"modules"`
+		}
+		if err := json.Unmarshal(data, &status); err != nil {
+			t.Fatal(err)
+		}
+
+		var got []string
+		for _, module := range status.Modules {
+			got = append(got, module.ID)
+		}
+
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("module order changed on update %d: got %v, want %v", update, got, want)
 		}
 	}
 }

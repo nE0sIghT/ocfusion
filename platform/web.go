@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 )
@@ -71,8 +72,17 @@ func (m *Manager) publish() {
 	m.publishContributions()
 
 	modules := []map[string]any{}
+	ids := make([]string, 0, len(m.registry.Modules))
 
-	for id, item := range m.registry.Modules {
+	for id := range m.registry.Modules {
+		ids = append(ids, id)
+	}
+
+	sort.Strings(ids)
+
+	for _, id := range ids {
+		item := m.registry.Modules[id]
+
 		state := "STOPPED"
 		if w := m.workers[id]; w != nil && !m.stopping {
 			state = w.state
