@@ -121,6 +121,11 @@ module API is experimental and may change.
 See the [architecture overview](docs/architecture.md) for how the platform and
 modules work together.
 
+## AI disclosure
+
+OCFusion is developed with the assistance of modern AI tools, under human
+architectural direction and with human testing.
+
 ## Project and support
 
 [GitHub](https://github.com/nE0sIghT/ocfusion) |
