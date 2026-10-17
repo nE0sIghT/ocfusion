@@ -62,6 +62,7 @@ Example manifest:
 | `provides_api`         | Optional positive provider API version                                                                                                                             |
 | `dependencies`         | Required module IDs and exact compatible provider API versions, for example `[{"id":"vpn","api":1}]`                                                               |
 | `install`              | Opt into the preflight/install hooks for persistent runtime setup                                                                                                  |
+| `transaction_hooks`    | Opt into private `backup`/`restore` hooks for external state during installation rollback                                                                          |
 | `state_paths`          | Owned top-level `/jffs/ocfusion*` directories included in distribution update backup and explicit prune; must not include platform state or overlap another module |
 | `stock_pages`          | Optional stock-page script contributions: supported stock-page path, relative script path within the package                                                       |
 | `resources`            | Map of resource namespace to value; duplicate namespace/value ownership is rejected                                                                                |
@@ -223,9 +224,10 @@ is discarded before dispatch; a matching HTTP upload response alone is not
 acknowledgement. Calls/configuration data are limited to 16 KiB and sent in one
 request, without chunks or browser Web Crypto. Calls up to 1024 bytes work over
 HTTP and HTTPS; larger calls/configuration require HTTPS to protect private data
-in transit. Browser JSON action responses remain limited to 2048 bytes after
-compaction; the CLI output bound remains 32 KiB. Entry failure rejects the
-Promise with a generic message; stderr and raw errors are not exposed.
+in transit. Browser JSON action responses are limited to 16 KiB after
+compaction. The escaped reply envelope is bounded to 128 KiB; the CLI output
+bound remains 32 KiB. Entry failure rejects the Promise with a generic message;
+stderr and raw errors are not exposed.
 
 The shared inbox/reply can be overwritten by concurrent tabs. Each panel rejects
 overlapping local transactions, but there is no cross-tab locking or delivery
@@ -368,6 +370,42 @@ executable inputs copied during installation. Use the former when recording a
 persistent package reference. Default removal must retain configuration; refuse
 removal while external resources still depend on your module.
 
+## Installation transaction hooks
+
+Set `transaction_hooks: true` when a module changes state outside its owned
+files during installation. Implement both `backup` and `restore`. The platform
+still copies `state_paths` automatically; do not duplicate those files in the
+hook.
+
+The platform supplies `EXT_BACKUP_PATH`, an absolute private directory, and the
+normal entrypoint envelope. `backup` writes the module's additional state there
+without modifying live settings. `restore` restores it idempotently and returns
+a nonzero exit status if any write or commit fails. Files may contain secrets:
+use mode 0600, do not publish them or include them in stdout. Both hooks use the
+normal one-shot timeout and JSON success response.
+
+For distribution updates, backup runs in dependency order after preflight.
+Rollback restores module-owned directories, then invokes restore hooks in
+reverse order and restores platform files last. The transaction retains a
+verified copy of each hook's package, so restoration does not depend on the
+updated or deleted installation payload. An individual `extctl install` also
+invokes these hooks when declared, including for modules without
+`install: true`.
+
+Successful installation removes the temporary backup. Restore failure retains
+the copy, reports the failure and prevents restarting affected modules,
+including after a manager restart or router reboot. Distribution copies remain
+in `/jffs/ocfusion-update-backup`; individual module copies remain in
+`/jffs/ocfusion-platform/module-backups`. After resolving the cause, retry
+distribution installation to resume recovery. Failed distribution rollback also
+removes the owned ASUS Apps startup entry so an older manager cannot
+automatically restart services before recovery; a successful reinstall restores
+the entry. For an individual module transaction, use
+`extd restore-state BACKUP_PATH` with the private path reported by the CLI
+before retrying the module installation. Restart the module only after
+restoration succeeds. Native VPN NVRAM snapshots belong to the VPN provider; the
+platform does not interpret their keys or file contents.
+
 ## Scripts on stock ASUS pages
 
 Use `stock_pages` to add a script to a supported stock page through the
@@ -441,8 +479,9 @@ from bypassing an active IPv4 DNS path.
 AdGuard Home inherits per-network native DNS using client/CIDR upstream mapping.
 Its administrator API is available only on a private mode-0600 Unix socket; the
 module exposes settings and bounded aggregate statistics through normal platform
-actions. `catalog` returns the curated list choices; `filter-status` returns
-bounded rule counts, last successful updates and failure flags.
+actions. `catalog` returns the curated list choices with stable numeric IDs;
+`filter-status` identifies lists by those IDs and returns bounded rule counts,
+last successful updates and failure flags without repeating full list URLs.
 `refresh-filters` queues an asynchronous update of saved lists. Downloads start
 automatically and repeat every 24 hours while protection is enabled. Failed
 updates retain the loaded copy. List cache and statistics use RAM; after reboot

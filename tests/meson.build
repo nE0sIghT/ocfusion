@@ -27,6 +27,7 @@ endforeach
 
 foreach script : [
     'tests/test-installer.py',
+    'tests/test-update-baseline.py',
     'tests/test-usb.py',
     'tests/test-version.py',
     'tests/test-release.py',

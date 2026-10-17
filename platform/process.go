@@ -22,6 +22,10 @@ type Worker struct {
 }
 
 func invoke(item Installed, payload, op string, config json.RawMessage) (json.RawMessage, error) {
+	return invokeWithEnvironment(item, payload, op, config, nil)
+}
+
+func invokeWithEnvironment(item Installed, payload, op string, config json.RawMessage, environment []string) (json.RawMessage, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
@@ -41,6 +45,7 @@ func invoke(item Installed, payload, op string, config json.RawMessage) (json.Ra
 	})
 	cmd.Stdin = strings.NewReader(string(input))
 	cmd.Env = append(os.Environ(), "PATH=/usr/bin:/bin:/usr/sbin:/sbin", "EXT_MODULE_ID="+item.Manifest.ID, "EXT_PACKAGE_PATH="+item.Path, "EXT_PAYLOAD_PATH="+payload)
+	cmd.Env = append(cmd.Env, environment...)
 
 	out := &limitedBuffer{limit: 32768}
 	cmd.Stdout = out
@@ -97,6 +102,12 @@ func (m *Manager) stop(id string) {
 }
 
 func (m *Manager) start(id string) error {
+	if m.transaction != id {
+		if err := pendingModuleTransaction(id); err != nil {
+			return err
+		}
+	}
+
 	if _, err := dependencyOrder(m.registry.Modules); err != nil {
 		return err
 	}

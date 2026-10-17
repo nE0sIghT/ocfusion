@@ -199,13 +199,21 @@ dependency license notices; build inputs remain in the source archive.
 
 The installer verifies payload checksums and validates the bundled package set.
 It runs opted-in preflight hooks before changes, backs up platform and
-manifest-declared module state together with native VPN records and custom
-fields, then swaps owned files. Installation hooks run in dependency order
-before the bundled package set is registered atomically. Updates preserve
-private profiles, the Fusion index and SDN bindings. Empty bundled sets are
-supported; independently installed modules remain registered. Interrupted
-updates use owned backups for recovery; successful updates remove temporary
-backups. Service restart briefly interrupts VPN traffic.
+manifest-declared module state, then invokes opted-in module backup hooks for
+external settings before swapping owned files. The VPN provider snapshots native
+VPN records and custom fields in its own hook. Installation hooks run in
+dependency order before the bundled package set is registered atomically.
+Updates preserve private profiles, the Fusion index and SDN bindings. Empty
+bundled sets are supported; independently installed modules remain registered.
+Interrupted updates use owned backups for recovery; successful updates remove
+temporary backups. Rollback restores module-owned files, runs restore hooks in
+reverse dependency order from verified saved packages and restores platform
+files last; a restore failure retains the backup and prevents restart.
+Individual module transactions keep recovery packages and data in
+`/jffs/ocfusion-platform/module-backups`; incomplete rollback blocks automatic
+startup until restoration succeeds. Recovery of a released installer's older
+private backup format is delegated to the restoration executable saved with that
+transaction. Service restart briefly interrupts VPN traffic.
 
 Updates retain the current connection registry and private OpenConnect profiles.
 Additional profiles use separate persistent and RAM directories. The normal

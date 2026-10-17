@@ -14,6 +14,7 @@ import (
 var catalogJSON []byte
 
 type FilterSource struct {
+	ID          uint64 `json:"id"`
 	Name        string `json:"name"`
 	URL         string `json:"url"`
 	Description string `json:"description"`
@@ -24,6 +25,10 @@ type FilterSource struct {
 func filterCatalog() []FilterSource {
 	var sources []FilterSource
 	json.Unmarshal(catalogJSON, &sources)
+
+	for index := range sources {
+		sources[index].ID = filterID(sources[index].URL)
+	}
 
 	return sources
 }
@@ -82,7 +87,7 @@ func filterStatus() (map[string]any, error) {
 		}
 
 		safe := map[string]any{}
-		for _, key := range []string{"url", "rules_count", "last_updated", "update_failed"} {
+		for _, key := range []string{"id", "rules_count", "last_updated", "update_failed"} {
 			safe[key] = filter[key]
 		}
 		filters = append(filters, safe)

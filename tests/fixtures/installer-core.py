@@ -37,6 +37,9 @@ def backup_state():
 
 
 def restore_state():
+    if os.environ.get("TEST_RESTORE_FAIL") == "1":
+        sys.exit(1)
+
     directory = Path(sys.argv[2])
     for name, existed in json.loads((directory / "state.json").read_text()).items():
         path = Path(name)

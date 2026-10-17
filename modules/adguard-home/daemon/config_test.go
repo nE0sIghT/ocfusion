@@ -62,3 +62,30 @@ func TestNativeClientCannotSpanBackends(t *testing.T) {
 		}
 	}
 }
+
+func TestSettingsResponsesFitBrowserBound(t *testing.T) {
+	config := Config{Rules: []string{}}
+	for index := 0; index < 128; index++ {
+		config.Rules = append(config.Rules, "||ads.example.org^")
+	}
+
+	data, _ := json.Marshal(config)
+	accepted, err := parseConfig(data)
+	if err != nil || len(data) <= 2048 {
+		t.Fatal("ordinary large settings rejected", err)
+	}
+
+	response, _ := json.Marshal(accepted)
+	if len(response) > 16384 {
+		t.Fatal("accepted settings cannot be read back")
+	}
+
+	// The request fits, but HTML escaping in the settings response would not.
+	data = []byte(`{"rules":["` + strings.Repeat("<", 512) + `"` + strings.Repeat(`,"`+strings.Repeat("<", 512)+`"`, 9) + `]}`)
+	if len(data) >= 16384 {
+		t.Fatal("fixture request exceeds its bound")
+	}
+	if _, err := parseConfig(data); err == nil {
+		t.Fatal("accepted settings whose response exceeds the browser bound")
+	}
+}

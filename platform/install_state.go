@@ -4,7 +4,6 @@ package main
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -12,10 +11,11 @@ import (
 )
 
 type StateBackup struct {
-	Native     bool              `json:"native,omitempty"`
-	Paths      map[string]bool   `json:"paths"`
-	ClientList string            `json:"client_list"`
-	Custom     map[string]string `json:"custom"`
+	Module   string          `json:"module,omitempty"`
+	Restored bool            `json:"restored,omitempty"`
+	Schema   int             `json:"schema"`
+	Paths    map[string]bool `json:"paths"`
+	Hooks    []Installed     `json:"hooks,omitempty"`
 }
 
 var stateRoot = "/jffs"
@@ -41,6 +41,10 @@ func backupState(directory, backup string) error {
 
 	for _, id := range order {
 		item := packages[id]
+		if err := pendingModuleTransaction(id); err != nil {
+			return err
+		}
+
 		if item.Manifest.Install {
 			if _, err := invoke(item, item.Path, "preflight", nil); err != nil {
 				return err
@@ -59,12 +63,11 @@ func backupState(directory, backup string) error {
 		}
 	}
 
-	os.MkdirAll(backup, 0700)
-	snapshot := StateBackup{Native: true, Paths: paths, ClientList: nvget("vpnc_clientlist"), Custom: map[string]string{}}
-	for unit := 1; unit <= 5; unit++ {
-		key := fmt.Sprintf("vpn_client%d_custom", unit)
-		snapshot.Custom[key] = nvget(key)
+	if err := os.MkdirAll(backup, 0700); err != nil {
+		return err
 	}
+
+	snapshot := StateBackup{Schema: 1, Paths: paths}
 
 	for path := range paths {
 		if _, err := os.Stat(path); os.IsNotExist(err) {
@@ -81,6 +84,12 @@ func backupState(directory, backup string) error {
 		snapshot.Paths[path] = true
 	}
 
+	for _, id := range order {
+		if err := backupTransactionHook(packages[id], backup, &snapshot); err != nil {
+			return err
+		}
+	}
+
 	return atomicJSON(filepath.Join(backup, "state.json"), snapshot)
 }
 
@@ -95,33 +104,67 @@ func restoreState(backup string) error {
 		return err
 	}
 
-	for path, existed := range snapshot.Paths {
+	if snapshot.Schema == 0 {
+		// Released installers saved their restoration tool with platform state.
+		// Let that tool interpret its own private transaction format.
+		tool := filepath.Join(backup, filepath.Base(base), "extd")
+		if err := exec.Command(tool, "restore-state", backup).Run(); err != nil {
+			return errors.New("previous installer could not restore its backup; backup retained")
+		}
+
+		return nil
+	}
+
+	if snapshot.Schema != 1 {
+		return errors.New("unsupported installation backup")
+	}
+
+	for path := range snapshot.Paths {
 		if !ownedStatePath(path) && path != base {
 			return errors.New("invalid backup state path")
 		}
+	}
 
-		os.RemoveAll(path)
-		if existed {
-			source := filepath.Join(backup, filepath.Base(path))
-			if err := exec.Command("/bin/cp", "-Rp", source, path).Run(); err != nil {
-				return err
-			}
+	for _, item := range snapshot.Hooks {
+		if _, _, err := backupHookItem(item, backup); err != nil {
+			return err
 		}
 	}
 
-	if snapshot.Native {
-		for key, value := range snapshot.Custom {
-			if err := nvset(key, value); err != nil {
-				return err
-			}
+	for path, existed := range snapshot.Paths {
+		if path == base {
+			continue
 		}
 
-		if err := nvset("vpnc_clientlist", snapshot.ClientList); err != nil {
+		if err := restoreBackupPath(backup, path, existed); err != nil {
 			return err
 		}
+	}
 
-		_, err = runner("nvram", "commit")
+	for index := len(snapshot.Hooks) - 1; index >= 0; index-- {
+		if err := restoreTransactionHook(snapshot.Hooks[index], backup); err != nil {
+			return err
+		}
+	}
+
+	if existed, included := snapshot.Paths[base]; included {
+		if err := restoreBackupPath(backup, base, existed); err != nil {
+			return err
+		}
+	}
+
+	snapshot.Restored = true
+	return atomicJSON(filepath.Join(backup, "state.json"), snapshot)
+}
+
+func restoreBackupPath(backup, path string, existed bool) error {
+	if err := os.RemoveAll(path); err != nil {
 		return err
+	}
+
+	if existed {
+		source := filepath.Join(backup, filepath.Base(path))
+		return exec.Command("/bin/cp", "-Rp", source, path).Run()
 	}
 
 	return nil
@@ -159,12 +202,17 @@ func pruneState(directory string) error {
 }
 
 func backupModuleState(item Installed) (string, error) {
-	backup, err := os.MkdirTemp(ram, "install-state-")
+	directory := filepath.Join(base, "module-backups")
+	if err := os.MkdirAll(directory, 0700); err != nil {
+		return "", err
+	}
+
+	backup, err := os.MkdirTemp(directory, item.Manifest.ID+"-")
 	if err != nil {
 		return "", err
 	}
 
-	snapshot := StateBackup{Paths: map[string]bool{}}
+	snapshot := StateBackup{Schema: 1, Module: item.Manifest.ID, Paths: map[string]bool{}}
 	for _, path := range item.Manifest.StatePaths {
 		if !ownedStatePath(path) || path == base {
 			os.RemoveAll(backup)
@@ -185,6 +233,11 @@ func backupModuleState(item Installed) (string, error) {
 		}
 
 		snapshot.Paths[path] = true
+	}
+
+	if err := backupTransactionHook(item, backup, &snapshot); err != nil {
+		os.RemoveAll(backup)
+		return "", err
 	}
 
 	if err := atomicJSON(filepath.Join(backup, "state.json"), snapshot); err != nil {

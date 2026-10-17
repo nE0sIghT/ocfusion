@@ -49,6 +49,14 @@ remove_incomplete_installation() {
     [ "$CREATED_OPT" = 0 ] || rm -f /tmp/opt
 }
 
+suspend_failed_startup() {
+    if rm -f "$APP_ROOT/etc/init.d/S95ocfusion"; then
+        echo "ROLLBACK FAILED: backup retained at $BACKUP. Automatic startup disabled; resolve the error and rerun install.sh." >&2
+    else
+        echo "ROLLBACK FAILED: backup retained at $BACKUP. Cannot remove the startup entry; do not restart services before recovery." >&2
+    fi
+}
+
 cleanup() {
     if [ "$SUCCESS" != 1 ]; then
         echo 'INSTALL FAILED: restoring previous owned files where possible.' >&2
@@ -58,7 +66,9 @@ cleanup() {
         fi
         "$HERE/bin/extd" web-reset >/dev/null 2>&1 || true
         if [ "$MODE" = update ]; then
-            restore_previous_installation
+            if ! restore_previous_installation; then
+                suspend_failed_startup
+            fi
         else
             remove_incomplete_installation
         fi

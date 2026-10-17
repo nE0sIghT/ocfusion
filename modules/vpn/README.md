@@ -9,6 +9,10 @@ Disconnecting or losing a client retains its network guards. Removal requires
 reassignment of its native networks. The platform web transport is independent
 of Fusion profiles; removing a connection does not remove web transport.
 
+The module's transaction hooks preserve and restore native Fusion records and
+OpenVPN custom fields during installation rollback. The platform stores these
+private snapshots without interpreting their contents.
+
 `daemon/` builds `ocfusion-vpn`, `packaging/` contains its manifest and `ui/`
 contains the stock Fusion contribution. This API-only module has no settings
 page. See the

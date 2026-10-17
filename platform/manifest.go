@@ -12,22 +12,23 @@ type Dependency struct {
 }
 
 type Module struct {
-	StatePaths   []string          `json:"state_paths,omitempty"`
-	Install      bool              `json:"install,omitempty"`
-	Schema       int               `json:"schema"`
-	ID           string            `json:"id"`
-	Name         string            `json:"name"`
-	Version      string            `json:"version"`
-	API          int               `json:"module_api"`
-	Entry        string            `json:"entrypoint"`
-	UI           string            `json:"ui,omitempty"`
-	Actions      []string          `json:"actions,omitempty"`
-	Capabilities []string          `json:"capabilities,omitempty"`
-	Requires     Requirements      `json:"requires,omitempty"`
-	ProvidesAPI  int               `json:"provides_api,omitempty"`
-	Dependencies []Dependency      `json:"dependencies,omitempty"`
-	StockPages   []StockPage       `json:"stock_pages,omitempty"`
-	Resources    map[string]string `json:"resources,omitempty"`
+	TransactionHooks bool              `json:"transaction_hooks,omitempty"`
+	StatePaths       []string          `json:"state_paths,omitempty"`
+	Install          bool              `json:"install,omitempty"`
+	Schema           int               `json:"schema"`
+	ID               string            `json:"id"`
+	Name             string            `json:"name"`
+	Version          string            `json:"version"`
+	API              int               `json:"module_api"`
+	Entry            string            `json:"entrypoint"`
+	UI               string            `json:"ui,omitempty"`
+	Actions          []string          `json:"actions,omitempty"`
+	Capabilities     []string          `json:"capabilities,omitempty"`
+	Requires         Requirements      `json:"requires,omitempty"`
+	ProvidesAPI      int               `json:"provides_api,omitempty"`
+	Dependencies     []Dependency      `json:"dependencies,omitempty"`
+	StockPages       []StockPage       `json:"stock_pages,omitempty"`
+	Resources        map[string]string `json:"resources,omitempty"`
 }
 
 type Installed struct {

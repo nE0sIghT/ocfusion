@@ -175,6 +175,7 @@ function createFixtureServer() {
             : q.module === "adguard-home" && q.operation === "catalog"
               ? [
                   {
+                    id: 1,
                     name: "AdGuard DNS filter",
                     url: "https://adguardteam.github.io/HostlistsRegistry/assets/filter_1.txt",
                     homepage:
@@ -427,10 +428,7 @@ async function testModuleUI(browser, address, language) {
   );
   const assignments = frame.locator('a[href="/SDN.asp"]');
   assert.equal(await assignments.getAttribute("target"), "_top");
-  assert.equal(
-    await page.locator('.ext-menu a[href="/SDN.asp"]').count(),
-    1,
-  );
+  assert.equal(await page.locator('.ext-menu a[href="/SDN.asp"]').count(), 1);
   await frame.locator("#tab-networks").click();
   await frame.locator("#dns-policy:not([disabled])").waitFor();
   assert.equal(await frame.locator("#vpn-dns-form").count(), 0);

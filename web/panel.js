@@ -150,7 +150,7 @@ async function request(action, data = {}) {
 
     const text = await response.text();
 
-    if (text.length > 16384) {
+    if (new TextEncoder().encode(text).length > 128 * 1024) {
       continue;
     }
 
@@ -172,6 +172,14 @@ async function request(action, data = {}) {
     }
 
     const result = JSON.parse(envelope.payload);
+
+    if (
+      new TextEncoder().encode(JSON.stringify(result.request_data ?? null))
+        .length >
+      16 * 1024
+    ) {
+      throw Error("Module response exceeds 16 KiB");
+    }
 
     if (result.request_id !== id) {
       continue;

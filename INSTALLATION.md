@@ -280,6 +280,14 @@ After removal, safely eject USB and reboot. Other ASUS Apps files are left in
 place. Removing USB and rebooting without uninstalling only disables OCFusion
 and retains its settings.
 
+## Failed update recovery
+
+If rollback fails, the installer keeps `/jffs/ocfusion-update-backup` and
+removes its ASUS Apps startup entry to prevent automatic service startup with
+partially restored settings. Retain the backup, resolve the reported cause and
+rerun the installer with the USB drive connected. Recovery retries before a new
+update; successful installation restores automatic startup.
+
 ## Reports
 
 Report problems through

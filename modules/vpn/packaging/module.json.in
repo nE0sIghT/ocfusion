@@ -7,6 +7,7 @@
   "provides_api": 1,
   "entrypoint": "bin/ocfusion-vpn",
   "install": true,
+  "transaction_hooks": true,
   "state_paths": [
     "/jffs/ocfusion-vpn"
   ],

@@ -227,6 +227,7 @@ function renderCatalog() {
     const status = document.createElement("p");
     status.className = "agh-list-status";
     status.dataset.url = source.url;
+    status.dataset.id = String(source.id);
     status.textContent = "Not downloaded";
     const link = document.createElement("a");
     link.href = source.homepage;
@@ -248,7 +249,7 @@ async function updateFilters() {
     const data = await parent.EXTENSIONS.action(moduleID, "filter-status");
     for (const node of document.querySelectorAll(".agh-list-status")) {
       const filter = (data.filters || []).find(
-        (filter) => filter.url === node.dataset.url,
+        (filter) => String(filter.id) === node.dataset.id,
       );
       node.textContent = !(settings.filters || []).includes(node.dataset.url)
         ? "Not selected"

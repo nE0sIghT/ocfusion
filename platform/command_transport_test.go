@@ -134,7 +134,7 @@ func TestCommandCRCExpiryAndReplies(t *testing.T) {
 	runModuleCommand = func(args ...string) (json.RawMessage, error) {
 		calls++
 
-		return json.RawMessage(`{"label":"Привет"}`), nil
+		return json.RawMessage(`{"label":"Привет","rules":"` + strings.Repeat("<", 15000) + `"}`), nil
 	}
 
 	p, fd, err := prepareCommandTransport()
@@ -178,6 +178,10 @@ func TestCommandCRCExpiryAndReplies(t *testing.T) {
 		CRC32   string `json:"crc32"`
 	}
 	raw, err := os.ReadFile(path)
+	if len(raw) <= 16384 || len(raw) > 128*1024 {
+		t.Fatal("escaped large response has unexpected wire size", len(raw))
+	}
+
 	if err != nil || json.Unmarshal(raw, &reply) != nil || calls != 1 || reply.ID != request.ID || reply.CRC32 != payloadCRC(reply.Payload) || !strings.Contains(reply.Payload, "Привет") {
 		t.Fatal("invalid checked reply", string(raw), calls, err)
 	}

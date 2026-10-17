@@ -62,6 +62,10 @@ func main() {
 		if len(envelope.Config) != 0 && string(envelope.Config) != "null" && string(envelope.Config) != "{}" {
 			err = errors.New("VPN connection is managed through API 1")
 		}
+	case "backup":
+		err = backupNative(os.Getenv("EXT_BACKUP_PATH"))
+	case "restore":
+		err = restoreNative(os.Getenv("EXT_BACKUP_PATH"))
 	case "preflight":
 		var registry Connections
 		registry, err = readConnections()

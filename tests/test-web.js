@@ -106,7 +106,7 @@ function crc32(payload) {
   return ((crc ^ 0xffffffff) >>> 0).toString(16).padStart(8, "0");
 }
 
-function createMailbox(acknowledge) {
+function createMailbox(acknowledge, responseData = { result: "accepted" }) {
   let reply = null;
   const requests = [];
   const instance = "0123456789abcdef0123456789abcdef";
@@ -150,8 +150,8 @@ function createMailbox(acknowledge) {
     const payload = JSON.stringify({
       request_id: id,
       request_ok: true,
-      request_data: { result: "accepted" },
-    });
+      request_data: responseData,
+    }).replaceAll("<", "\\u003c");
 
     reply = {
       id,
@@ -376,7 +376,31 @@ async function testHTTPWithoutWebCrypto() {
   assert.equal(mailbox.requests.length, 1);
 }
 
+async function testLargeModuleResponses() {
+  for (const size of [6000, 16384, 16385]) {
+    const data = {
+      value: "<".repeat(size - Buffer.byteLength('{"value":""}')),
+    };
+    const mailbox = createMailbox(true, data);
+    const context = createContext(createNodes(), mailbox);
+    vm.createContext(context);
+    vm.runInContext(panelScript, context);
+    await vm.runInContext("loadModules()", context);
+
+    const call = vm.runInContext(
+      'window.EXTENSIONS.action("example", "settings")',
+      context,
+    );
+    if (size <= 16384) {
+      assert.equal((await call).value, data.value);
+    } else {
+      await assert.rejects(call, /Module response exceeds 16 KiB/);
+    }
+  }
+}
+
 async function main() {
+  await testLargeModuleResponses();
   await testHTTPWithoutWebCrypto();
   await testPublicStatusReads();
   await testUnavailablePlatform();

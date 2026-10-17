@@ -2,6 +2,7 @@
 "use strict";
 
 const OCF_TRANSLATIONS = {
+  "Module response exceeds 16 KiB": "Ответ модуля превышает 16 КиБ",
   "Wi-Fi radio settings": "Настройки радиомодулей Wi-Fi",
   "Public status unavailable": "Публичный статус пока недоступен",
   "OCFusion is stopping. Please wait.": "OCFusion останавливается. Подождите.",

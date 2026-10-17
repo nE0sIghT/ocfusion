@@ -4,6 +4,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -11,14 +12,15 @@ import (
 )
 
 type Manager struct {
-	mu       sync.Mutex
-	stopping bool
-	stopped  bool
-	registry Registry
-	workers  map[string]*Worker
+	transaction string
+	mu          sync.Mutex
+	stopping    bool
+	stopped     bool
+	registry    Registry
+	workers     map[string]*Worker
 }
 
-func (m *Manager) handle(q Request) (any, error) {
+func (m *Manager) handle(q Request) (result any, resultErr error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -113,7 +115,11 @@ func (m *Manager) handle(q Request) (any, error) {
 			}
 		}
 
-		if next.Manifest.Install {
+		if next.Manifest.Install || next.Manifest.TransactionHooks {
+			if err := pendingModuleTransaction(id); err != nil {
+				return nil, err
+			}
+
 			backup, backupErr := backupModuleState(next)
 			if backupErr != nil {
 				return nil, backupErr
@@ -123,12 +129,22 @@ func (m *Manager) handle(q Request) (any, error) {
 			m.stopDependents(id)
 			m.stop(id)
 			committed := false
+			m.transaction = id
 			defer func() {
+				defer func() { m.transaction = "" }()
 				if !committed {
-					restoreState(backup)
+					m.stopDependents(id)
+					m.stop(id)
+					if err := restoreState(backup); err != nil {
+						resultErr = errors.Join(resultErr, fmt.Errorf("module rollback failed; backup retained at %s: %w", backup, err))
+						return
+					}
+
 					if existed && old.Enabled {
 						m.registry.Modules[id] = old
-						m.start(id)
+						if err := m.start(id); err != nil {
+							resultErr = errors.Join(resultErr, err)
+						}
 					}
 				}
 
@@ -137,11 +153,14 @@ func (m *Manager) handle(q Request) (any, error) {
 
 			installCommitted = &committed
 
-			if _, e = invoke(next, payload, "preflight", nil); e != nil {
-				return nil, e
-			}
-			if _, e = invoke(next, payload, "install", nil); e != nil {
-				return nil, e
+			if next.Manifest.Install {
+				if _, e = invoke(next, payload, "preflight", nil); e != nil {
+					return nil, e
+				}
+
+				if _, e = invoke(next, payload, "install", nil); e != nil {
+					return nil, e
+				}
 			}
 		}
 
@@ -176,7 +195,9 @@ func (m *Manager) handle(q Request) (any, error) {
 			if e = m.start(id); e != nil {
 				if ok {
 					m.registry.Modules[id] = old
-					m.start(id)
+					if installCommitted == nil {
+						m.start(id)
+					}
 				} else {
 					delete(m.registry.Modules, id)
 				}
@@ -191,7 +212,7 @@ func (m *Manager) handle(q Request) (any, error) {
 			m.stop(id)
 			if ok {
 				m.registry.Modules[id] = old
-				if old.Enabled {
+				if old.Enabled && installCommitted == nil {
 					m.start(id)
 				}
 			} else {

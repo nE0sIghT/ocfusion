@@ -6,6 +6,7 @@ platform_go = files(
     'dependencies.go',
     'public_status.go',
     'install_state.go',
+    'transaction_hooks.go',
     'ipc.go',
     'mailbox.go',
     'main.go',

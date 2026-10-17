@@ -90,3 +90,25 @@ func TestInlineModuleCall(t *testing.T) {
 		t.Fatal("invalid module accepted")
 	}
 }
+
+func TestModuleResponseBounds(t *testing.T) {
+	for _, size := range []int{6000, moduleResponseLimit, moduleResponseLimit + 1} {
+		data := []byte(`{"rules":"` + strings.Repeat("x", size-len(`{"rules":""}`)) + `"}`)
+		result, err := compactModuleResponse(data)
+		if size <= moduleResponseLimit {
+			if err != nil || len(result) != size {
+				t.Fatalf("response size %d: %v", size, err)
+			}
+		} else if err == nil {
+			t.Fatal("oversized module response accepted")
+		}
+	}
+
+	if _, err := compactModuleResponse([]byte(`{"invalid":`)); err == nil {
+		t.Fatal("invalid JSON accepted")
+	}
+
+	if _, err := compactModuleResponse([]byte(`{"text":"` + strings.Repeat("界", 6000) + `"}`)); err == nil {
+		t.Fatal("response bound measured characters instead of UTF-8 bytes")
+	}
+}

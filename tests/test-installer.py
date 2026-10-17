@@ -179,13 +179,19 @@ esac
         (self.bundle / "SHA256SUMS").unlink(missing_ok=True)
 
     def install(
-        self, fail=False, architecture="aarch64", arguments=(), removal_fail=False
+        self,
+        fail=False,
+        architecture="aarch64",
+        arguments=(),
+        removal_fail=False,
+        restore_fail=False,
     ):
         environment = dict(
             os.environ,
             TEST_FAIL="1" if fail else "0",
             TEST_ARCH=architecture,
             TEST_REMOVE_FAIL="1" if removal_fail else "0",
+            TEST_RESTORE_FAIL="1" if restore_fail else "0",
         )
         return subprocess.run(
             ["/bin/sh", str(self.bundle / "install.sh"), *arguments],
@@ -262,6 +268,20 @@ def test_interrupted_update_recovery(router):
     assert not backup.exists()
 
 
+def test_failed_rollback_suspends_startup(router):
+    failed = router.install(fail=True, restore_fail=True)
+    backup = router.jffs / "ocfusion-update-backup"
+    entry = router.apps / "etc/init.d/S95ocfusion"
+    assert failed.returncode != 0
+    assert "ROLLBACK FAILED" in failed.stderr
+    assert backup.exists() and not entry.exists()
+    assert router.profile.read_text() == "secret-config"
+
+    assert_success(router.install())
+    assert entry.exists() and not backup.exists()
+    assert router.profile.read_text() == "secret-config"
+
+
 def main():
     with tempfile.TemporaryDirectory() as temporary:
         router = RouterFixture(Path(temporary))
@@ -280,6 +300,7 @@ def main():
         test_fresh_and_repeated_install(router)
         test_failed_update_and_retry(router)
         test_interrupted_update_recovery(router)
+        test_failed_rollback_suspends_startup(router)
         unrelated = router.apps / "other-app"
         unrelated.mkdir()
         failed_removal = router.install(

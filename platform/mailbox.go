@@ -14,6 +14,8 @@ import (
 )
 
 // Fixed declared actions only; no untrusted paths or shell commands.
+const moduleResponseLimit = 16 * 1024
+
 var moduleIDRE = regexp.MustCompile(`^[a-z][a-z0-9-]{0,31}$`)
 
 type webRequest struct {
@@ -118,8 +120,12 @@ func moduleCommand(args ...string) (json.RawMessage, error) {
 		return nil, err
 	}
 
+	return compactModuleResponse(output)
+}
+
+func compactModuleResponse(output []byte) (json.RawMessage, error) {
 	var compact bytes.Buffer
-	if json.Compact(&compact, output) != nil || compact.Len() > 2048 {
+	if json.Compact(&compact, output) != nil || compact.Len() > moduleResponseLimit {
 		return nil, errors.New("invalid/oversized module response")
 	}
 

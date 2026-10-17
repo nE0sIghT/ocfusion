@@ -125,6 +125,12 @@ Keep a build directory associated with its compiler environment; use a separate
 directory or `meson setup --wipe` when switching hosts/toolchains. The container
 is the controlled CI build environment.
 
+The unit suite also checks updates from `v0.3.1` using native manager builds
+from that tag and the current sources. It relocates filesystem paths, UID/PATH
+checks and NVRAM commands into host fixtures; it does not modify the host's
+router settings. This historical test skips when the released tag is
+unavailable, such as in an extracted source archive.
+
 ## Outputs, reproducibility and CI
 
 Release versions come from Git tags such as `v0.4`. Untagged commits use a

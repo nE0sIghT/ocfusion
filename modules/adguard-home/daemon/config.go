@@ -122,6 +122,11 @@ func parseConfig(data []byte) (Config, error) {
 		}
 	}
 
+	encoded, err := json.Marshal(config)
+	if err != nil || len(encoded) > 16384 {
+		return config, errors.New("AdGuard settings exceed bounds")
+	}
+
 	return config, nil
 }
 
