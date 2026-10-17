@@ -15,6 +15,7 @@ modify the read-only root filesystem.
 | `modules/openconnect/daemon/`    | VPN profiles and credentials, OpenConnect supervision, authentication, DTLS and tunnel events                                                                 |
 | `modules/openconnect/packaging/` | Module manifest/lifecycle adapter, tunnel hook and profile example                                                                                            |
 | `modules/openconnect/ui/`        | Client settings, status, actions and translations                                                                                                             |
+| `modules/radio-settings/`        | Native regional selectors, original-setting recovery, radio diagnostics and wireless-page contribution                                                        |
 | `modules/adguard-home/`          | DNS filtering adapter, private upstream control, UI and source patches                                                                                        |
 | `modules/vpn/ui/`                | Managed Fusion notice script                                                                                                                                  |
 | `packaging/`                     | Router installation, USB preparation/bootstrap and ASUS Apps entrypoints                                                                                      |
@@ -123,24 +124,25 @@ provider owns connection records by module/profile and allocates native
 bindings, interfaces and routing resources independently. The managed binding's
 switch stays OFF. Firmware version changes do not block existing connections.
 ASUS owns Wi-Fi/VLAN/SDN topology. The VPN provider discovers assigned bridges
-and installs policy routes and forwarding/NAT rules. A tunnel default route
-is paired with an unreachable fallback; assigned IPv6 traffic is blocked.
+and installs policy routes and forwarding/NAT rules. A tunnel default route is
+paired with an unreachable fallback; assigned IPv6 traffic is blocked.
 Server-advertised split exclusions are ignored for the managed IPv4 full tunnel.
 
 The managed OpenConnect patch keeps its hook environment bounded when a server
 advertises a large route list. OpenConnect normalizes hook events into
-interface/address/MTU parameters and sends them to the VPN provider. The
-client reports UP only after the provider acknowledges application. Each
-connection has independent runtime state and rules. The provider independently
-expires client heartbeats, detects loss of the tunnel interface and reconciles
-network rules. Client authentication credentials and server trust are separate:
-public roots plus an optional additional CA validate the server, while the
-client certificate/key authenticate the client.
+interface/address/MTU parameters and sends them to the VPN provider. The client
+reports UP only after the provider acknowledges application. Each connection has
+independent runtime state and rules. The provider independently expires client
+heartbeats, detects loss of the tunnel interface and reconciles network rules.
+Client authentication credentials and server trust are separate: public roots
+plus an optional additional CA validate the server, while the client
+certificate/key authenticate the client.
 
 DNS servers for each Wi-Fi/VLAN network remain configured in ASUS. The provider
-does not intercept port 53 traffic or apply tunnel-advertised DNS. Requests to
-external DNS addresses follow the network's normal VPN routes and kill switch;
-requests to the router use its DNS service and the global DNS policy below.
+does not redirect queries addressed to external DNS servers or apply
+tunnel-advertised DNS. Requests to external DNS addresses follow the network's
+normal VPN routes and kill switch; requests to the router use its DNS service
+and the global DNS policy below.
 
 ## Global DNS and filtering
 
@@ -154,7 +156,7 @@ on WAN in this IPv4 implementation. Existing per-network VPN forwarding guards
 are independent of this global DNS policy.
 
 The independent AdGuard Home module registers a short resolver lease with the
-provider without allocating a Fusion profile. The provider captures queries
+provider without allocating a Fusion profile. The provider captures IPv4 queries
 addressed to router DNS, preserving client source IP. AdGuard listens on a
 separate DNS port and uses marked backend sockets to avoid recursive capture. By
 default, per-network client mappings send allowed requests to that network's

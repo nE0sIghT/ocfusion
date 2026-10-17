@@ -107,31 +107,68 @@ configuration example. To import through SSH:
 rm -f /tmp/profile.occonf
 ```
 
-In the ASUS settings for the desired SDN Wi-Fi/VLAN network, select the
-**OCFusion (managed)** VPN Fusion profile as its VPN connection. Leave this
-profile's switch **OFF** in VPN Fusion; OCFusion controls the tunnel.
+In the ASUS settings for the desired SDN Wi-Fi/VLAN network, select the VPN
+Fusion profile displayed by the selected OpenConnect profile as its VPN
+connection. Leave this profile's switch **OFF** in VPN Fusion; OCFusion controls
+the tunnel.
 
 The panel follows the ASUS language setting and supports English and Russian.
 Other languages use English. Save form edits before switching languages because
 the page reloads.
 
+## Additional modules
+
+Additional modules are installed through SSH. Obtain a module archive from its
+publisher and transfer it to the router, for example from your computer:
+
+```sh
+ssh admin@192.168.50.1 'cat > /tmp/module.tar.gz' < module.tar.gz
+```
+
+Then run on the router:
+
+```sh
+/jffs/ocfusion-platform/extctl install /tmp/module.tar.gz
+/jffs/ocfusion-platform/extctl list
+rm -f /tmp/module.tar.gz
+```
+
+The module appears under **Modules** in OCFusion. Modules with a settings page
+also appear in the menu. Install only modules from publishers you trust: they
+run with administrator privileges. The archive contains `module.json` and its
+payload directly at the root, without an enclosing directory.
+
+Use the ID reported by `extctl list` to manage it:
+
+```sh
+/jffs/ocfusion-platform/extctl disable MODULE_ID
+/jffs/ocfusion-platform/extctl enable MODULE_ID
+/jffs/ocfusion-platform/extctl remove MODULE_ID
+```
+
+Update by installing a newer module archive. Removal retains saved module data
+and invokes its cleanup hook. Reboot if the removal result reports
+`reboot_required: true`. The [module development guide](docs/modules.md)
+describes packaging, dependencies and the API, with a runnable example.
+
 ## Router DNS and VPN
 
-In OpenConnect, select **Use this VPN for DNS** to send the router's external
-DNS requests through that profile while connected. The setting applies to the
-whole router and all networks. Native ASUS DNS settings, including DoT, remain
-in use. When the VPN disconnects, DNS returns to WAN; this option is not a DNS
-kill switch. **Use WAN for DNS** clears that profile's selection.
+In OpenConnect, open **DNS** and set **Send DNS requests** to **Through selected
+VPN**, then click **Apply**. This sends the router's external DNS requests
+through the selected profile while connected. The setting applies to the whole
+router and all networks. Native ASUS DNS settings, including DoT, remain in use.
+When the VPN disconnects, DNS returns to WAN; this option is not a DNS kill
+switch. **Through WAN** clears that profile's selection.
 
 Local names and cached answers remain available. Switching paths restarts
 encrypted upstream connections and can interrupt queries already in flight.
 Applications retry normally. Native IPv6 upstream configurations currently use
 WAN and show that reason in DNS status; the managed tunnel is IPv4.
 
-For a VPN network that should keep using the router resolver independently of
-the global selection, enable **Use ASUS DNS settings for assigned networks** in
-the connection settings. Otherwise the existing tunnel-DNS behavior remains
-available.
+Configure per-network DNS servers in the native ASUS Wi-Fi/VLAN settings
+(`/SDN.asp`). The default uses the router resolver; explicitly configured
+external DNS servers follow that network's routing. This does not automatically
+select DNS servers advertised by the VPN server.
 
 ## AdGuard Home
 
@@ -140,10 +177,19 @@ disabled. Empty custom-upstream settings inherit ASUS DNS for each network;
 AdGuard transparently follows the selected VPN/WAN policy. No OpenConnect
 profile is needed to run filtering.
 
-Add HTTPS filter-list URLs or AdGuard rules, one per line. Use `@@` exceptions
-and optional client IP/CIDR entries followed by `on` or `off`. Native DHCP and
-the router's resolver remain active. Disable filtering to restore direct native
-DNS handling.
+In **Filter lists**, select a list and save. A new installation selects
+**AdGuard DNS filter**. Selected lists download automatically while protection
+is enabled and update every 24 hours. **Update now** requests an immediate
+refresh. Failed downloads retain previously loaded rules; the list status shows
+failures and the last successful update. After reboot, lists download again
+because the cache is in RAM.
+
+Under **Advanced**, add custom HTTPS filter-list URLs or AdGuard rules, one per
+line. Use `@@` exceptions and optional client IP/CIDR entries followed by `on`
+or `off`. Native DHCP and the router's resolver remain active. Disable filtering
+to restore direct native DNS handling. Filtering currently captures IPv4 queries
+addressed to the router; client queries over IPv6 or directly to external DNS
+servers are not captured. Browser/application DoH can also bypass router DNS.
 
 Optional custom upstreams accept an IP, `tls://host` or
 `https://host/dns-query`. Add a connection IP after a space when needed; the
@@ -205,8 +251,8 @@ startup but retains settings; it does not uninstall OCFusion.
 ## Uninstall
 
 Keep USB connected and extract the runtime archive on it. First change every
-Wi-Fi/VLAN network assigned to **OCFusion (managed)** to another VPN or to no
-VPN in ASUS.
+Wi-Fi/VLAN network assigned to an OCFusion-managed profile to another VPN or to
+no VPN in ASUS.
 
 From the extracted `ocfusion` directory on the router, run:
 

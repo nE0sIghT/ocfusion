@@ -15,10 +15,11 @@ OCFusion is running.
   profiles, password and certificate authentication, and manual OTP or automatic
   TOTP. A selected connection can carry DNS requests for the router and all
   networks, with automatic WAN fallback when disconnected.
-- **AdGuard Home** - adds DNS filtering with filter lists, custom rules,
-  exceptions and per-client controls. Filtering is disabled by default. It
-  inherits ASUS DNS settings and follows the selected VPN/WAN DNS path, or uses
-  custom upstreams including DoT and DoH. It also works without OpenConnect.
+- **AdGuard Home** - adds IPv4 router DNS filtering with filter lists, custom
+  rules, exceptions and per-client controls. Filtering is disabled by default.
+  It inherits ASUS DNS settings and follows the selected VPN/WAN DNS path, or
+  uses custom upstreams including DoT and DoH. It also works without
+  OpenConnect.
 - **Wi-Fi radio settings** - selects a native ASUS regional profile and shows
   live radio state, available channels and their frequencies. The profile
   catalog includes EU, AA, AU, JP, KR and XX; only profiles supported by all
@@ -30,7 +31,7 @@ OCFusion is running.
 ## Compatibility
 
 Tested router: **ASUS GT-BE98**, running stock ASUSWRT **3.0.0.6 build 102 /
-extension 39393**.
+extension 39393 and 39447**.
 
 Other routers have not been tested.
 
@@ -108,6 +109,13 @@ interrupts the VPN connection.
 ### VPN settings
 
 <img src="docs/screenshots/settings.png" alt="OpenConnect connection settings" width="900">
+
+## Additional modules
+
+Install third-party module archives through the router's SSH account using
+`/jffs/ocfusion-platform/extctl install /tmp/module.tar.gz`. See
+[installation and management](INSTALLATION.md#additional-modules) for transfer,
+updates and removal.
 
 ## Development
 
