@@ -429,6 +429,61 @@ async function loadModules() {
   }
 }
 
+let moduleSizeObserver = null;
+let moduleSizeRequest = 0;
+
+function resizeModuleFrame() {
+  cancelAnimationFrame(moduleSizeRequest);
+  moduleSizeRequest = requestAnimationFrame(() => {
+    const frame = document.getElementById("module-frame");
+    if (frame.hidden || !frame.offsetParent) {
+      return;
+    }
+
+    const body = frame.contentDocument?.body;
+    const content = body?.querySelector(".ext-module") || body;
+    if (!content) {
+      return;
+    }
+
+    const contentStyle = frame.contentWindow.getComputedStyle(content);
+    const bottomMargin = parseFloat(contentStyle.marginBottom) || 0;
+    const contentHeight =
+      content.getBoundingClientRect().bottom +
+      frame.contentWindow.scrollY +
+      bottomMargin +
+      4;
+    const documentTop = frame.getBoundingClientRect().top + window.scrollY;
+    const availableHeight = Math.max(
+      200,
+      window.innerHeight - documentTop - 24,
+    );
+    const height = Math.ceil(Math.max(contentHeight, availableHeight));
+    if (frame.style.height !== height + "px") {
+      frame.style.height = height + "px";
+    }
+  });
+}
+
+function observeModuleSize() {
+  moduleSizeObserver?.disconnect();
+
+  const frame = document.getElementById("module-frame");
+  const body = frame.contentDocument?.body;
+  if (!body) {
+    return;
+  }
+
+  moduleSizeObserver = new ResizeObserver(resizeModuleFrame);
+  moduleSizeObserver.observe(body.querySelector(".ext-module") || body);
+  resizeModuleFrame();
+}
+
+document
+  .getElementById("module-frame")
+  .addEventListener("load", observeModuleSize);
+window.addEventListener("resize", resizeModuleFrame);
+
 function navigate() {
   const page = location.hash.slice(1) || "overview";
   const known = ["overview", "modules", "system"];
@@ -461,6 +516,8 @@ function navigate() {
     } else if (frame.getAttribute("src") !== module.ui) {
       frame.setAttribute("src", module.ui);
     }
+
+    resizeModuleFrame();
   }
 }
 

@@ -177,25 +177,29 @@ function createFixtureServer() {
               ? {filters: [], updating: false}
             : q.module === "adguard-home" && q.operation === "statistics"
               ? { num_dns_queries: 3, num_blocked_filtering: 1 }
-            : q.operation === "profiles"
-            ? profiles
-            : q.operation === "settings"
-              ? {
-                  revision: "revision1",
-                  server: "https://vpn.example/",
-                  enabled: true,
-                  has_certificate: true,
-                  has_private_key: true,
-                }
-              : q.operation === "diagnose"
-                ? {
-                    state: "UP",
-                    message: "IPv4 full tunnel; Wi-Fi/VLAN bindings active",
-                    networks: [
-                      { bridge: "br55", cidr: "192.168.52.0/24", sdn_idx: "4" },
-                    ],
-                  }
-                : { ok: true };
+              : q.operation === "profiles"
+                ? profiles
+                : q.operation === "settings"
+                  ? {
+                      revision: "revision1",
+                      server: "https://vpn.example/",
+                      enabled: true,
+                      has_certificate: true,
+                      has_private_key: true,
+                    }
+                  : q.operation === "diagnose"
+                    ? {
+                        state: "UP",
+                        message: "IPv4 full tunnel; Wi-Fi/VLAN bindings active",
+                        networks: [
+                          {
+                            bridge: "br55",
+                            cidr: "192.168.52.0/24",
+                            sdn_idx: "4",
+                          },
+                        ],
+                      }
+                    : { ok: true };
 
         mailbox = {
           state: "UP",
@@ -259,7 +263,9 @@ function createFixtureServer() {
       }
 
       if (relative.startsWith("adguard-home/ui/")) {
-        filename = "modules/adguard-home/ui/" + relative.slice("adguard-home/ui/".length);
+        filename =
+          "modules/adguard-home/ui/" +
+          relative.slice("adguard-home/ui/".length);
       }
 
       if (relative.startsWith("heartbeat/ui/")) {
@@ -427,28 +433,110 @@ async function testModuleUI(browser, address, language) {
     });
     await frame.locator("#otp-code").fill("123456");
     await frame.locator("#otp-submit").click();
-    await frame.locator("#otp-result").filter({hasText: "Code accepted"}).waitFor();
+    await frame
+      .locator("#otp-result")
+      .filter({ hasText: "Code accepted" })
+      .waitFor();
     assert.equal(await frame.locator("#otp-code").inputValue(), "");
-    assert(requests.some((q) =>
-      q.operation === "submit-otp" &&
-      q.config.data.challenge === "fixture-challenge" &&
-      q.config.data.code === "123456",
-    ));
+    assert(
+      requests.some(
+        (q) =>
+          q.operation === "submit-otp" &&
+          q.config.data.challenge === "fixture-challenge" &&
+          q.config.data.code === "123456",
+      ),
+    );
   }
+
+  const moduleHeight = () =>
+    page.locator("#module-frame").evaluate((node) => node.clientHeight);
+  await page.waitForFunction(() => {
+    const node = document.getElementById("module-frame");
+    const content = node.contentDocument.querySelector(".ext-module");
+    return (
+      content &&
+      node.clientHeight >= Math.ceil(content.getBoundingClientRect().bottom)
+    );
+  });
+  const originalHeight = await moduleHeight();
+  await frame.locator(".ext-module").evaluate((node) => {
+    const extra = document.createElement("div");
+    extra.id = "resize-probe";
+    extra.style.height = "1200px";
+    node.appendChild(extra);
+  });
+  await page.waitForFunction(
+    (height) =>
+      document.getElementById("module-frame").clientHeight >= height + 1100,
+    originalHeight,
+  );
+  assert.equal(
+    await page.locator("#module-frame").getAttribute("scrolling"),
+    "no",
+  );
+  await frame.locator("#resize-probe").evaluate((node) => node.remove());
+  await page.waitForFunction(
+    (height) =>
+      document.getElementById("module-frame").clientHeight <= height + 4,
+    originalHeight,
+  );
 
   await page.locator('#module-menu a[href="#module-adguard-home"]').click();
   await frame.locator("#fields:not([disabled])").waitFor();
-  assert.equal((await frame.locator('button[type="submit"]').textContent()).trim(),
-    ru ? "Сохранить настройки" : "Save settings");
+  await frame.locator("#tab-advanced").click();
+  await frame.locator("#panel-advanced details > summary").click();
+  for (const selector of ["#upstreams", "#filters", "#rules", "#clients"]) {
+    const field = frame.locator(selector);
+    assert.equal(
+      await field.evaluate((node) => getComputedStyle(node).backgroundColor),
+      "rgb(16, 16, 16)",
+    );
+    assert.equal(
+      await field.evaluate((node) => getComputedStyle(node).color),
+      "rgb(238, 238, 238)",
+    );
+    await field.focus();
+    assert.equal(
+      await field.evaluate((node) => getComputedStyle(node).outlineColor),
+      "rgb(239, 146, 47)",
+    );
+  }
+  await frame.locator("#upstreams").evaluate((node) => {
+    node.disabled = true;
+  });
+  assert.equal(
+    await frame
+      .locator("#upstreams")
+      .evaluate((node) => getComputedStyle(node).color),
+    "rgb(153, 153, 153)",
+  );
+  await frame.locator("#upstreams").evaluate((node) => {
+    node.disabled = false;
+  });
+
+  assert.equal(
+    (await frame.locator('button[type="submit"]').textContent()).trim(),
+    ru ? "Сохранить настройки" : "Save settings",
+  );
   await frame.locator("#tab-lists").click();
   await frame.locator("#catalog input").check();
   await frame.locator("#tab-protection").click();
   await frame.locator("#stats").click();
-  await frame.locator("#statistics").filter({hasText: "3"}).waitFor();
+  await frame
+    .locator("#statistics")
+    .filter({ hasText: "3" })
+    .waitFor();
   await frame.locator("#enabled").check();
   await frame.locator('button[type="submit"]').click();
-  await frame.locator("#result").filter({hasText: ru ? "Настройки сохранены" : "Settings saved"}).waitFor();
-  assert(requests.some((q) => q.action === "module.configure" && q.module === "adguard-home"));
+  await frame
+    .locator("#result")
+    .filter({ hasText: ru ? "Настройки сохранены" : "Settings saved" })
+    .waitFor();
+  assert(
+    requests.some(
+      (q) => q.action === "module.configure" && q.module === "adguard-home",
+    ),
+  );
 
   await page.locator('a[data-page="system"]').click();
   assert.equal(await page.locator("#transport-test").count(), 0);
@@ -534,15 +622,27 @@ async function testHeader(browser) {
   });
 
   await page.locator("#asus_extensions_link").waitFor();
-  assert.equal(await page.locator("#status_block > :first-child").getAttribute("id"), "asus_extensions_link");
-  assert.equal(await page.locator("#asus_extensions_link").getAttribute("href"), "/user/extensions.html");
-  assert.equal(await page.locator("#asus_extensions_link").evaluate((link) => link.style.marginRight), "16px");
+  assert.equal(
+    await page.locator("#status_block > :first-child").getAttribute("id"),
+    "asus_extensions_link",
+  );
+  assert.equal(
+    await page.locator("#asus_extensions_link").getAttribute("href"),
+    "/user/extensions.html",
+  );
+  assert.equal(
+    await page
+      .locator("#asus_extensions_link")
+      .evaluate((link) => link.style.marginRight),
+    "16px",
+  );
 
   await page.addScriptTag({ path: script });
   assert.equal(await page.locator("#asus_extensions_link").count(), 1);
 
   await page.evaluate(() => {
-    document.getElementById("status_block").innerHTML = '<button id="reboot">Reboot</button>';
+    document.getElementById("status_block").innerHTML =
+      '<button id="reboot">Reboot</button>';
   });
 
   await page.locator("#asus_extensions_link").waitFor();

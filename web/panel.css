@@ -13,6 +13,7 @@ body.bg {
     sans-serif;
 }
 .ext-shell {
+  color-scheme: dark;
   width: 1050px;
   max-width: calc(100% - 40px);
   margin: 12px auto 40px;
@@ -266,10 +267,15 @@ body.bg {
   color: #aaa;
   line-height: 1.5;
 }
-.ext-field input:not([type="checkbox"]):not([type="file"]),
-.ext-field select {
+.ext-shell
+  input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not(
+    [type="hidden"]
+  ),
+.ext-shell select,
+.ext-shell textarea {
   box-sizing: border-box;
-  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   font: inherit;
   background: #101010;
   color: #eee;
@@ -277,9 +283,47 @@ body.bg {
   border-radius: 3px;
   padding: 10px;
 }
-.ext-field input:focus,
-.ext-field select:focus {
-  outline: 1px solid var(--ext-accent);
+.ext-field input:not([type="checkbox"]):not([type="file"]),
+.ext-field select,
+.ext-field textarea {
+  width: 100%;
+}
+.ext-shell textarea {
+  resize: vertical;
+}
+.ext-shell select option {
+  background: #101010;
+  color: #eee;
+}
+.ext-shell input:focus,
+.ext-shell select:focus,
+.ext-shell textarea:focus {
+  outline: 2px solid var(--ext-accent);
+  outline-offset: 1px;
+}
+.ext-shell input:disabled,
+.ext-shell select:disabled,
+.ext-shell textarea:disabled,
+.ext-shell select option:disabled {
+  color: #999;
+  border-color: #444;
+  cursor: default;
+}
+.ext-shell input[type="checkbox"],
+.ext-shell input[type="radio"] {
+  accent-color: var(--ext-accent);
+}
+.ext-shell fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+#module-frame {
+  display: block;
+  width: 100%;
+  min-height: 200px;
+  border: 0;
 }
 .ext-check {
   display: flex;
@@ -294,12 +338,6 @@ body.bg {
   border-top: 1px solid #514332;
   padding-top: 16px;
   margin-bottom: 16px;
-}
-#settings-fields {
-  border: 0;
-  margin: 0;
-  padding: 0;
-  min-width: 0;
 }
 #settings-fields:disabled {
   opacity: 0.55;

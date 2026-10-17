@@ -63,7 +63,7 @@ Example manifest:
 | `dependencies`         | Required module IDs and exact compatible provider API versions, for example `[{"id":"vpn","api":1}]`                                                               |
 | `install`              | Opt into the preflight/install hooks for persistent runtime setup                                                                                                  |
 | `state_paths`          | Owned top-level `/jffs/ocfusion*` directories included in distribution update backup and explicit prune; must not include platform state or overlap another module |
-| `stock_pages`          | Optional stock-page script contributions: supported path `/VPN/vpnc.html`, relative script path within the package                                                 |
+| `stock_pages`          | Optional stock-page script contributions: supported stock-page path, relative script path within the package                                                 |
 | `resources`            | Map of resource namespace to value; duplicate namespace/value ownership is rejected                                                                                |
 
 Dependencies must exist, be enabled when their consumer is enabled and provide
@@ -158,8 +158,11 @@ Use `extctl` to install and manage your module:
 ## Module UI
 
 Pages are published under `/user/extensions-modules/<id>/...` and opened in the
-common panel's module iframe. Use relative paths for your own assets. ASUS
-supplies login and the common CSS; do not bundle firmware files.
+common panel's module iframe. The panel adjusts the iframe height to its content
+so scrolling stays in the main browser window. Changes to the module page size
+are observed automatically; no module resize calls are needed. Use relative
+paths for your own assets. ASUS supplies login and the common CSS; do not bundle
+firmware files.
 
 This is the same contract for modules shipped in the distribution and
 independently installed packages. The manager generates menu entries and
@@ -365,7 +368,7 @@ Stock-page contributions do not require a module UI:
 }
 ```
 
-Currently only `/VPN/vpnc.html` is supported. Contributions are loaded for
+Supported paths are `/VPN/vpnc.html` and `/Advanced_Wireless_Content.asp`. Contributions are loaded for
 enabled modules. API-only modules omit `ui`; they appear in the module inventory
 but have no menu entry or overview card. Make your script idempotent, preserve
 stock controls and use the existing authenticated server. Link to your module
@@ -472,3 +475,10 @@ changes instead of overwriting them. Removal restores owned selectors when
 possible; a reboot is still required. Disable and USB removal leave saved native
 settings in place. Restore and reboot before removing the module for immediate
 confirmation of the original live state.
+
+The radio module contributes a script to the stock wireless settings page. It
+rebuilds the 6 GHz PSC subset from the channel set already selected by ASUS,
+retaining hardware, bandwidth and AiMesh restrictions. It does not change
+`territory_code`, NVRAM, channel selection or the native automatic-channel
+algorithm. The contribution is best effort and is omitted when the module is
+disabled or removed; reload an open stock page to remove its loaded script.

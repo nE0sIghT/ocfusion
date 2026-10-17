@@ -6,6 +6,7 @@
   "module_api": 1,
   "entrypoint": "bin/ocfusion-radio-settings",
   "ui": "ui/index.html",
+  "stock_pages": [{"path": "/Advanced_Wireless_Content.asp", "script": "ui/stock-channels.js"}],
   "requires": {"architecture": "aarch64", "platform_api": 1},
   "actions": ["settings", "apply", "restore"],
   "capabilities": ["network.wifi"],

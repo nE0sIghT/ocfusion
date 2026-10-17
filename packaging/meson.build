@@ -3,6 +3,7 @@ runtime_assets = files(
     '../modules/radio-settings/ui/index.html',
     '../modules/radio-settings/ui/app.js',
     '../modules/radio-settings/ui/translations.js',
+    '../modules/radio-settings/ui/stock-channels.js',
     '../modules/adguard-home/packaging/module.json.in',
     '../modules/adguard-home/ui/index.html',
     '../modules/adguard-home/ui/app.js',

@@ -244,6 +244,12 @@ to reload them. Read-only startup/polling compares the boot identity, saved
 selectors and live radio country. A saved profile is not reported active before
 a reboot and matching live state.
 
+The module's stock wireless-page contribution removes the additional factory-SKU
+cutoff from the 6 GHz PSC subset. It uses the stock channel set, leaving
+hardware, channel-width and Mesh constraints intact. It changes only the page
+model and selector, not NVRAM, factory territory or native automatic channel
+selection.
+
 The regional catalog maps native ASUS selectors to country/revision pairs.
 Driver revision support determines availability; matching live state after
 reboot confirms application. Profile changes retain the original snapshot and

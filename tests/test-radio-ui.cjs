@@ -21,6 +21,35 @@ async function testPage(browser, address, language) {
   await frame.locator("#fields:not([disabled])").waitFor();
   assert.equal(await apply.isEnabled(), false);
   assert.equal(await frame.locator("#profile").inputValue(), "stock");
+  assert.deepEqual(
+    await frame
+      .locator("#profile option")
+      .evaluateAll((options) => options.map((option) => option.value)),
+    language === "RU" ? ["stock", "AU", "AA", "XX", "KR"] : ["stock", "AU", "KR", "AA", "XX"],
+  );
+  assert.match(
+    await frame.locator('#profile option[value="AA"]').innerText(),
+    language === "RU" ? /^США \(US\/102\)$/ : /^United States \(US\/102\)$/,
+  );
+  const region = frame.locator("#profile");
+  assert.deepEqual(
+    await region.evaluate((node) => ({
+      background: getComputedStyle(node).backgroundColor,
+      color: getComputedStyle(node).color,
+      scheme: getComputedStyle(node).colorScheme,
+    })),
+    {
+      background: "rgb(16, 16, 16)",
+      color: "rgb(238, 238, 238)",
+      scheme: "dark",
+    },
+  );
+  await region.focus();
+  assert.equal(
+    await region.evaluate((node) => getComputedStyle(node).outlineColor),
+    "rgb(239, 146, 47)",
+  );
+
   assert.equal(await frame.locator("#restore").isDisabled(), true);
   assert.equal(await frame.locator("#radios article").count(), 3);
   assert.match(await frame.locator("#radios").innerText(), /100 104 108 140/);
@@ -32,9 +61,10 @@ async function testPage(browser, address, language) {
     await frame.locator('#profile option[value="XX"]').isDisabled(),
     true,
   );
-  assert.equal(await frame.locator("#preview-bands .radio-band").count(), 0);
+  assert.equal(await frame.locator("#preview-bands").isVisible(), false);
+  assert.equal(await frame.locator("#preview-note").isVisible(), false);
   assert.match(
-    await frame.locator("#radios").innerText(),
+    await frame.locator("#radios").textContent(),
     /5500, 5520, 5540, 5700/,
   );
   if (language === "RU") {
@@ -43,11 +73,51 @@ async function testPage(browser, address, language) {
       .filter({ hasText: "Австралия" })
       .waitFor({ state: "attached" });
   }
+  assert.equal(await frame.locator("#radios details[open]").count(), 0);
+  assert.equal(await frame.locator("#preview-bands .radio-band").count(), 0);
+  assert.equal(
+    await frame.locator("#radios").getByText("23 (0x17)").isVisible(),
+    false,
+  );
+  await frame.locator("#radios summary").first().click();
+  assert.equal(
+    await frame.locator("#radios").getByText("23 (0x17)").isVisible(),
+    true,
+  );
   assert.deepEqual(await page.evaluate(() => window.changes), []);
   assert.equal(await frame.locator("#reboot-notice").isVisible(), false);
 
   await frame.locator("#profile").selectOption("KR");
-  assert.match(await frame.locator("#profile-preview").innerText(), /GT-BE98/);
+  assert.match(
+    await frame.locator("#selection-status").innerText(),
+    language === "RU" ? /не сохранены/ : /not saved/,
+  );
+  await frame.locator("#profile-preview summary").click();
+  assert.equal(await frame.locator("#region-comparison tr").count(), 6);
+  assert.deepEqual(
+    await frame
+      .locator("#region-comparison tr")
+      .evaluateAll((rows) => rows.map((row) => row.dataset.profile)),
+    language === "RU"
+      ? ["AU", "EU", "AA", "XX", "KR", "JP"]
+      : ["AU", "EU", "JP", "KR", "AA", "XX"],
+  );
+  assert.match(
+    await frame.locator('tr[data-profile="KR"]').innerText(),
+    /1-229/,
+  );
+  assert.equal(
+    await frame.locator('tr[data-profile="KR"]').getAttribute("data-selected"),
+    "true",
+  );
+  assert.match(
+    await frame.locator('tr[data-profile="XX"]').innerText(),
+    language === "RU" ? /Недоступен/ : /Unavailable/,
+  );
+  assert.match(
+    await frame.locator("#profile-preview").textContent(),
+    /GT-BE98/,
+  );
   assert.match(await frame.locator("#preview-bands").innerText(), /5955-7095/);
   assert.match(
     await frame.locator("#preview-bands").innerText(),
@@ -61,14 +131,12 @@ async function testPage(browser, address, language) {
   await apply.click();
   await frame.locator("#restore:not([disabled])").waitFor();
   assert.equal(await apply.isDisabled(), true);
+  assert.equal(await frame.locator("#selection-status").innerText(), "");
   assert.equal(await frame.locator("#reboot-notice").isVisible(), true);
   const noticeBox = await frame.locator("#reboot-notice").boundingBox();
   const fieldsBox = await frame.locator("#fields").boundingBox();
   assert(noticeBox.y < fieldsBox.y, "Reboot notice must precede the controls");
-  assert.match(
-    await frame.locator("#result").innerText(),
-    language === "RU" ? /Требуется перезагрузка/ : /Reboot required/,
-  );
+  assert.equal(await frame.locator("#result").innerText(), "");
   assert.deepEqual(await page.evaluate(() => window.changes), [
     { operation: "apply", data: { revision: 0, profile: "AU" } },
   ]);
@@ -77,9 +145,30 @@ async function testPage(browser, address, language) {
   await frame.locator("#restore[disabled]").waitFor();
   assert.equal(await frame.locator("#profile").inputValue(), "stock");
   assert.equal(await apply.isDisabled(), true);
+  assert.equal(await frame.locator("#selection-status").innerText(), "");
   const changes = await page.evaluate(() => window.changes);
   assert.equal(changes[1].operation, "restore");
   assert.equal(changes[1].data.revision, 1);
+
+  await page.evaluate(() => {
+    window.saved = {
+      ...window.saved,
+      mode: "AA",
+      phase: "APPLIED",
+      can_apply: true,
+    };
+  });
+  await frame.locator("#reload").click();
+  await frame.locator("#fields:not([disabled])").waitFor();
+  await frame.locator("#profile").selectOption("AU");
+  await page.waitForTimeout(5200);
+  assert.match(await frame.locator("#state").innerText(), /US\/102/);
+  assert.doesNotMatch(await frame.locator("#state").innerText(), /AU\/100/);
+  assert.match(
+    await frame.locator("#selection-status").innerText(),
+    language === "RU" ? /не сохранены/ : /not saved/,
+  );
+  assert.equal(await frame.locator("#result").innerText(), "");
 
   await page.evaluate(() => {
     window.available = false;
@@ -100,12 +189,17 @@ async function main() {
     "/module/app.js": "modules/radio-settings/ui/app.js",
     "/module/translations.js": "modules/radio-settings/ui/translations.js",
     "/user/ocfusion-i18n.js": "web/i18n.js",
+    "/user/extensions-panel.css": "web/panel.css",
   };
   const server = http.createServer((request, response) => {
     const url = new URL(request.url, "http://localhost");
     response.setHeader(
       "Content-Type",
-      url.pathname.endsWith(".js") ? "text/javascript" : "text/html",
+      url.pathname.endsWith(".js")
+        ? "text/javascript"
+        : url.pathname.endsWith(".css")
+          ? "text/css"
+          : "text/html",
     );
 
     if (url.pathname === "/") {
@@ -128,11 +222,12 @@ async function main() {
           },
           call: async (id, operation, data) => {
             window.changes.push({operation, data});
-            window.saved = {revision: data.revision + 1, mode: operation === "apply" ? data.profile : "stock", phase: "REBOOT_REQUIRED", can_apply: false};
+            window.saved = {...window.saved, revision: data.revision + 1, mode: operation === "apply" ? data.profile : "stock", phase: "REBOOT_REQUIRED", can_apply: false};
             return {...window.saved};
           },
           status: async () => ({data: window.available ? {
             state: window.saved.phase,
+            mode: window.saved.mode,
             revision: window.saved.revision,
             radios: [
               {interface: "wl1", band: "5 GHz", country: "DE (E0/101)", current: "100/160", channels: "100 104 108 140", base_mask: "23 (0x17)", user_mask: "0"},

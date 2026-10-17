@@ -1,5 +1,29 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 window.OCF_MODULE_TRANSLATIONS = {
+  "Europe (E0/101)": "Европа (E0/101)",
+  "United States (US/102)": "США (US/102)",
+  "Australia (AU/100)": "Австралия (AU/100)",
+  "Japan (JP/101)": "Япония (JP/101)",
+  "South Korea (KR/100)": "Южная Корея (KR/100)",
+  "United States (US/104)": "США (US/104)",
+  "Regional channel comparison": "Сравнение каналов по регионам",
+  "20 MHz channels by region": "Каналы 20 МГц по регионам",
+  Availability: "Доступность",
+  Supported: "Поддерживается",
+  Unavailable: "Недоступен",
+  "Changes not saved": "Изменения не сохранены",
+  "Saved region is active": "Сохранённый регион действует",
+  "Active region": "Действующий регион",
+  "Choose the region used for Wi-Fi channel and power limits. Changing the region requires a router reboot. Removing the USB drive does not restore the original settings.":
+    "Выберите регион для настройки каналов и ограничений мощности Wi-Fi. Для смены региона потребуется перезагрузка роутера. Извлечение USB-накопителя не восстанавливает исходные настройки.",
+  "Channel availability": "Доступные каналы",
+  "Reference channels for the selected region.":
+    "Справочный список каналов выбранного региона.",
+  "About these channel lists": "О списках каналов",
+  "Hardware, firmware, channel width and AiMesh can limit availability. DFS requirements still apply.":
+    "Оборудование, прошивка, ширина канала и AiMesh могут ограничивать доступность. Требования DFS сохраняются.",
+  "Saving and restoring": "Сохранение и восстановление",
+  "Technical details": "Технические сведения",
   "Selected region": "Выбранный регион",
   "20 MHz channels": "Каналы 20 МГц",
   "Channel widths": "Ширина канала",
@@ -32,7 +56,6 @@ window.OCF_MODULE_TRANSLATIONS = {
   "Settings are saved. Reboot the router through ASUS to apply them.":
     "Настройки сохранены. Перезагрузите роутер через ASUS, чтобы применить их.",
   "Reboot required": "Требуется перезагрузка",
-  "Native profile active": "Штатный профиль применён",
   "Live profile differs from saved settings. Inspect radio state before making further changes.":
     "Действующий профиль отличается от сохранённых настроек. Проверьте состояние радиомодулей перед дальнейшими изменениями.",
   "Saving was interrupted. Restore the original settings.":

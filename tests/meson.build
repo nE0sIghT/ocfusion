@@ -59,6 +59,14 @@ test(
 
 if get_option('browser_tests')
     test(
+        'browser-stock-channels',
+        node,
+        args: [files('test-stock-channels.cjs')],
+        suite: 'browser',
+        timeout: 120,
+    )
+
+    test(
         'browser-radio-settings',
         node,
         args: [files('test-radio-ui.cjs')],
@@ -94,6 +102,7 @@ foreach suite : ['unit', 'example']
 endforeach
 
 if get_option('browser_tests')
+
     run_target(
         'test-browser',
         command: [

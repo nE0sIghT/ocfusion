@@ -7,6 +7,92 @@
     <link rel="stylesheet" href="/index_style.css" />
     <link rel="stylesheet" href="/form_style.css" />
     <link rel="stylesheet" href="/user/extensions-panel.css" />
+    <style>
+      .radio-table-scroll {
+        overflow-x: auto;
+        margin: 16px 0;
+      }
+
+      .radio-table {
+        width: 100%;
+        border-collapse: collapse;
+        text-align: left;
+      }
+
+      .radio-table caption {
+        text-align: left;
+        margin-bottom: 12px;
+      }
+
+      .radio-table th,
+      .radio-table td {
+        padding: 10px 12px;
+        border-bottom: 1px solid #484038;
+        vertical-align: top;
+      }
+
+      .radio-table th {
+        color: #aaa;
+      }
+      .radio-table tr[data-selected="true"] {
+        background: #392b1c;
+      }
+      #selection-status {
+        color: #ef922f;
+      }
+
+      .radio-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr));
+        gap: 16px;
+        margin: 16px 0;
+      }
+
+      .radio-band {
+        background: #181818;
+        border: 1px solid #484038;
+        border-radius: 4px;
+        padding: 16px;
+        min-width: 0;
+      }
+
+      .radio-band h4,
+      .radio-band h3 {
+        margin: 0 0 14px;
+      }
+      .radio-band dl {
+        margin: 0;
+      }
+      .radio-band dt {
+        color: #aaa;
+        margin-top: 12px;
+      }
+      .radio-band dd {
+        margin: 4px 0 0;
+        overflow-wrap: anywhere;
+      }
+      .radio-details {
+        margin-top: 16px;
+      }
+      .radio-details summary {
+        cursor: pointer;
+        color: #ef922f;
+      }
+      .radio-actions,
+      .radio-heading {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+
+      .radio-actions {
+        margin-top: 20px;
+      }
+      .radio-heading {
+        justify-content: space-between;
+      }
+    </style>
   </head>
   <body class="bg">
     <main class="ext-shell ext-module">
@@ -15,40 +101,84 @@
         <h2>Reboot required</h2>
         <p>Settings are saved. Reboot the router through ASUS to apply them.</p>
       </div>
-      <p>Inspect live radio capabilities and select a native ASUS regional profile.</p>
       <article class="ext-card">
-        <h2>Regional profile</h2>
-        <p>The regional profile sets channel and transmit power limits for all radios. Select settings permitted at your location.</p>
-        <p>Saving does not restart Wi-Fi. Reboot the router through ASUS to apply or restore the profile.</p>
-        <p>Saved settings remain after USB removal or module disable. Restore the original settings before removal; restoration also requires a reboot.</p>
+        <h2>Region</h2>
+        <p id="region-help">
+          Choose the region used for Wi-Fi channel and power limits. Changing
+          the region requires a router reboot. Removing the USB drive does not
+          restore the original settings.
+        </p>
         <fieldset id="fields" disabled>
-          <label for="profile">Region</label>
-          <select id="profile" aria-describedby="profile-help"></select>
-          <p id="profile-help">Only profiles supported by every radio can be selected. Channel availability depends on the firmware, radio and channel width.</p>
-          <section id="profile-preview" aria-live="polite">
-            <h3>Selected region</h3>
-            <p>Reference data: ASUS GT-BE98, CLM BE98_20240925 (v17.6).</p>
-            <p id="preview-note">Loading…</p>
-            <div id="preview-bands"></div>
+          <div class="ext-field">
+            <label for="profile">Region</label>
+            <select id="profile" aria-describedby="region-help"></select>
+          </div>
+          <p id="selection-status" role="status"></p>
+          <section id="profile-preview">
+            <details class="radio-details">
+              <summary>About these channel lists</summary>
+              <h3>Channel availability</h3>
+              <p id="preview-note">Loading…</p>
+              <div id="preview-bands" class="radio-grid"></div>
+              <div
+                class="radio-table-scroll"
+                tabindex="0"
+                role="region"
+                aria-label="Regional channel comparison"
+              >
+                <table class="radio-table">
+                  <caption>
+                    20 MHz channels by region
+                  </caption>
+                  <thead>
+                    <tr>
+                      <th scope="col">Region</th>
+                      <th scope="col">2.4 GHz</th>
+                      <th scope="col">5 GHz</th>
+                      <th scope="col">6 GHz</th>
+                      <th scope="col">Availability</th>
+                    </tr>
+                  </thead>
+                  <tbody id="region-comparison"></tbody>
+                </table>
+              </div>
+              <p>Reference data: ASUS GT-BE98, CLM BE98_20240925 (v17.6).</p>
+              <p>
+                Hardware, firmware, channel width and AiMesh can limit
+                availability. DFS requirements still apply.
+              </p>
+            </details>
           </section>
-          <button id="apply" type="button">Save region</button>
-          <button id="restore" class="ext-secondary" type="button">Restore original settings</button>
+          <div class="radio-actions">
+            <button id="apply" type="button">Save region</button>
+            <button id="restore" class="ext-secondary" type="button">
+              Restore original settings
+            </button>
+          </div>
         </fieldset>
-        <button id="reload" class="ext-secondary" type="button">Reload</button>
         <p id="result" role="status">Loading…</p>
+        <details class="radio-details">
+          <summary>Saving and restoring</summary>
+          <p>
+            Saving does not restart Wi-Fi. Reboot the router through ASUS to
+            apply or restore the profile.
+          </p>
+          <p>
+            Saved settings remain after USB removal or module disable. Restore
+            the original settings before removal; restoration also requires a
+            reboot.
+          </p>
+        </details>
       </article>
       <article class="ext-card">
-        <h2>Channels and frequencies</h2>
-        <p>2.4 GHz: channels 1-13 have center frequencies from 2412 to 2472 MHz. Channel 14 is 2484 MHz and requires specific radio and regional support.</p>
-        <p>5 GHz: channel center frequency is 5000 + channel number × 5 MHz. Channels 36-64 span 5180-5320 MHz; channels 100-165 span 5500-5825 MHz.</p>
-        <p>6 GHz: channels 1-233 have center frequencies from 5955 to 7115 MHz. Support for the upper band depends on the radio and regional profile.</p>
-        <p>These are channel center frequencies. Wider channels occupy more spectrum. Changing region does not remove hardware limits or DFS requirements.</p>
-      </article>
-      <article class="ext-card">
-        <h2>Live radio state</h2>
+        <div class="radio-heading">
+          <h2>Live radio state</h2>
+          <button id="reload" class="ext-secondary" type="button">
+            Reload
+          </button>
+        </div>
         <p id="state" role="status">Loading…</p>
-        <p>Available channels are reported by the running driver. Channel width and AiMesh may further limit selection in ASUS.</p>
-        <div id="radios"></div>
+        <div id="radios" class="radio-grid"></div>
       </article>
     </main>
     <script src="app.js"></script>

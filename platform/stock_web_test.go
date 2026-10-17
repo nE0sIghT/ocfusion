@@ -84,3 +84,38 @@ func TestStockContributionWithoutUI(t *testing.T) {
 		t.Fatalf("contribution not published: %v", err)
 	}
 }
+
+func TestStockPageManifestSupport(t *testing.T) {
+	for _, path := range []string{"/VPN/vpnc.html", "/Advanced_Wireless_Content.asp"} {
+		directory := t.TempDir()
+		fixture(t, directory, "1.0", "echo '{}'")
+		manifestPath := filepath.Join(directory, "module.json")
+		data, err := os.ReadFile(manifestPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		var manifest Module
+		if err := json.Unmarshal(data, &manifest); err != nil {
+			t.Fatal(err)
+		}
+
+		manifest.StockPages = []StockPage{{Path: path, Script: "bin/module"}}
+		if err := atomicJSON(manifestPath, manifest); err != nil {
+			t.Fatal(err)
+		}
+
+		if _, err := readPackage(directory); err != nil {
+			t.Fatal("supported contribution rejected", path, err)
+		}
+
+		manifest.StockPages[0].Path = "/unknown.asp"
+		if err := atomicJSON(manifestPath, manifest); err != nil {
+			t.Fatal(err)
+		}
+
+		if _, err := readPackage(directory); err == nil {
+			t.Fatal("unsupported contribution accepted")
+		}
+	}
+}

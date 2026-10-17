@@ -9,19 +9,19 @@ const messages = {
   APPLYING: "Saving settings",
   RESTORING: "Restoring settings",
   REBOOT_REQUIRED: "Reboot required",
-  APPLIED: "Native profile active",
+  APPLIED: "Saved region is active",
   VERIFY_REQUIRED:
     "Live profile differs from saved settings. Inspect radio state before making further changes.",
   RECOVERY_REQUIRED: "Saving was interrupted. Restore the original settings.",
   UNAVAILABLE: "Service unavailable",
 };
 const profileNames = {
-  EU: "Europe",
-  AA: "ASUS AA",
-  AU: "Australia",
-  JP: "Japan",
-  KR: "South Korea",
-  XX: "ASUS XX",
+  EU: "Europe (E0/101)",
+  AA: "United States (US/102)",
+  AU: "Australia (AU/100)",
+  JP: "Japan (JP/101)",
+  KR: "South Korea (KR/100)",
+  XX: "United States (US/104)",
 };
 let settings = null;
 let pending = false;
@@ -92,14 +92,72 @@ const profilePlans = {
 };
 
 function previewRow(container, label, value) {
-  const row = document.createElement("p");
-  const title = document.createElement("strong");
+  const title = document.createElement("dt");
+  const text = document.createElement("dd");
   title.textContent = label;
-  row.append(title, document.createTextNode(": " + value));
-  container.appendChild(row);
+  text.textContent = value;
+  container.append(title, text);
+}
+
+function compareProfiles(left, right) {
+  const language = window.OCF_I18N?.language || "en";
+  const label = (id) => {
+    const name = profileNames[id] || id;
+    return window.OCF_I18N?.translate(name, language) || name;
+  };
+
+  return label(left).localeCompare(label(right), language, { numeric: true });
+}
+
+function channelRanges(ranges) {
+  return ranges
+    .map(([first, last]) =>
+      first === last ? String(first) : first + "-" + last,
+    )
+    .join(", ");
+}
+
+function showComparison() {
+  const body = document.getElementById("region-comparison");
+  const selected = document.getElementById("profile").value;
+  const profiles = settings?.profiles || [];
+  const rows = Object.entries(profilePlans)
+    .sort(([left], [right]) => compareProfiles(left, right))
+    .map(([id, plan]) => {
+      const profile = profiles.find((entry) => entry.id === id);
+      const row = document.createElement("tr");
+      row.dataset.selected = String(id === selected);
+      row.dataset.profile = id;
+      for (const value of [
+        profileNames[id],
+        "1-" + plan.two,
+        channelRanges(plan.five),
+        "1-" + plan.six,
+        profile?.available ? "Supported" : "Unavailable",
+      ]) {
+        const cell = document.createElement(row.children.length ? "td" : "th");
+        if (!row.children.length) {
+          cell.scope = "row";
+        }
+        cell.textContent = value;
+        row.appendChild(cell);
+      }
+
+      return row;
+    });
+  body.replaceChildren(...rows);
+}
+
+function showSelection() {
+  const status = document.getElementById("selection-status");
+  const selected = document.getElementById("profile").value;
+  status.textContent =
+    settings && selected !== settings.mode ? "Changes not saved" : "";
 }
 
 function showPreview() {
+  showComparison();
+  showSelection();
   const note = document.getElementById("preview-note");
   const bands = document.getElementById("preview-bands");
   const id = document.getElementById("profile").value;
@@ -111,8 +169,7 @@ function showPreview() {
     return;
   }
 
-  note.textContent =
-    "Reference channel plan. Hardware, firmware, channel width and AiMesh can further limit availability. Changing region also changes power limits.";
+  note.textContent = "Reference channels for the selected region.";
   const definitions = [
     {
       band: "2.4 GHz",
@@ -145,19 +202,18 @@ function showPreview() {
     const section = document.createElement("section");
     const heading = document.createElement("h4");
     heading.textContent = definition.band;
+    section.className = "radio-band";
     section.appendChild(heading);
-    const step = definition.band === "2.4 GHz" ? 1 : 4;
-    const channels = definition.ranges.flatMap(([first, last]) => {
-      const values = [];
-      for (let channel = first; channel <= last; channel += step) {
-        values.push(channel);
-      }
-
-      return values;
-    });
-    previewRow(section, "20 MHz channels", channels.join(", "));
+    const rows = document.createElement("dl");
+    section.appendChild(rows);
+    const channels = definition.ranges
+      .map(([first, last]) =>
+        first === last ? String(first) : first + "-" + last,
+      )
+      .join(", ");
+    previewRow(rows, "20 MHz channels", channels);
     previewRow(
-      section,
+      rows,
       "Channel center frequencies, MHz",
       definition.ranges
         .map(
@@ -169,12 +225,12 @@ function showPreview() {
         )
         .join(", "),
     );
-    previewRow(section, "Channel widths", definition.widths);
+    previewRow(rows, "Channel widths", definition.widths);
     if (definition.band === "5 GHz") {
-      previewRow(section, "160 MHz center channels", plan.wide5.join(", "));
+      previewRow(rows, "160 MHz center channels", plan.wide5.join(", "));
     } else if (definition.band === "6 GHz") {
       previewRow(
-        section,
+        rows,
         "320 MHz center channels",
         plan.six === 93 ? "31, 63" : "31, 63, 95, 127, 159, 191",
       );
@@ -182,6 +238,28 @@ function showPreview() {
 
     bands.appendChild(section);
   }
+}
+
+function showLiveState(data) {
+  const state = document.getElementById("state");
+  if (data?.state === "APPLIED" && profileNames[data.mode]) {
+    const label = document.createElement("span");
+    const name = document.createElement("span");
+    label.textContent = "Active region";
+    name.textContent = profileNames[data.mode];
+    state.replaceChildren(label, document.createTextNode(": "), name);
+    return;
+  }
+
+  state.textContent = messages[data?.state] || "Service unavailable";
+}
+
+function settingsMessage(phase) {
+  if (["APPLIED", "STOCK", "REBOOT_REQUIRED"].includes(phase)) {
+    return "";
+  }
+
+  return messages[phase] || "Service unavailable";
 }
 
 function showReboot(phase) {
@@ -201,7 +279,9 @@ function controls() {
 
 function showProfiles() {
   const select = document.getElementById("profile");
-  const profiles = settings.profiles || [];
+  const profiles = [...(settings.profiles || [])].sort((left, right) =>
+    compareProfiles(left.id, right.id),
+  );
   select.replaceChildren();
   const original = document.createElement("option");
   original.value = "stock";
@@ -214,11 +294,6 @@ function showProfiles() {
     option.value = profile.id;
     option.appendChild(
       document.createTextNode(profileNames[profile.id] || profile.id),
-    );
-    option.appendChild(
-      document.createTextNode(
-        " (" + profile.country + "/" + profile.country_revision + ")",
-      ),
     );
     option.disabled = !profile.available;
     select.appendChild(option);
@@ -248,7 +323,7 @@ async function loadSettings() {
       (profile) => profile.available,
     )
       ? "No supported regional profiles are available."
-      : messages[settings.phase] || "Service unavailable";
+      : settingsMessage(settings.phase);
   } catch (error) {
     settings = null;
     result.textContent = error.message;
@@ -280,29 +355,37 @@ function channelFrequencies(radio) {
 
 function radioCard(radio) {
   const article = document.createElement("article");
+  article.className = "radio-band";
   const heading = document.createElement("h3");
-  heading.textContent = radio.interface + " · " + radio.band;
+  heading.textContent = radio.band + " · " + radio.interface;
   article.appendChild(heading);
 
-  const rows = [
+  const rows = document.createElement("dl");
+  previewRow(rows, "Current channel and width", radio.current || "UNAVAILABLE");
+  previewRow(
+    rows,
+    "Available 20 MHz channels",
+    radio.channels || "UNAVAILABLE",
+  );
+  article.appendChild(rows);
+
+  const details = document.createElement("details");
+  details.className = "radio-details";
+  const summary = document.createElement("summary");
+  summary.textContent = "Technical details";
+  details.appendChild(summary);
+  const technical = document.createElement("dl");
+  for (const [label, value] of [
     ["Driver country", radio.country],
-    ["Current channel and width", radio.current],
-    ["Available 20 MHz channels", radio.channels],
     ["Channel center frequencies, MHz", channelFrequencies(radio)],
     ["Base exclusion mask", radio.base_mask],
     ["Additional exclusion mask", radio.user_mask],
-  ];
-
-  for (const [label, value] of rows) {
-    const paragraph = document.createElement("p");
-    const title = document.createElement("strong");
-    const text = document.createElement("span");
-    title.textContent = label;
-    text.textContent = value || "UNAVAILABLE";
-    paragraph.append(title, document.createTextNode(": "), text);
-    article.appendChild(paragraph);
+  ]) {
+    previewRow(technical, label, value || "UNAVAILABLE");
   }
 
+  details.appendChild(technical);
+  article.appendChild(details);
   return article;
 }
 
@@ -315,11 +398,21 @@ async function updateStatus() {
     if (data && (!settings || data.revision >= settings.revision)) {
       showReboot(data.state);
     }
-    document.getElementById("state").textContent =
-      messages[data?.state] || "Service unavailable";
+    showLiveState(data);
 
     const radios = document.getElementById("radios");
-    radios.replaceChildren(...(data?.radios || []).map(radioCard));
+    const expanded = new Set(
+      [...radios.children]
+        .filter((card) => card.querySelector("details")?.open)
+        .map((card) => card.dataset.interface),
+    );
+    const cards = (data?.radios || []).map((radio) => {
+      const card = radioCard(radio);
+      card.dataset.interface = radio.interface;
+      card.querySelector("details").open = expanded.has(radio.interface);
+      return card;
+    });
+    radios.replaceChildren(...cards);
   } catch (error) {
     currentRadios = [];
     showPreview();
@@ -351,7 +444,7 @@ async function changeProfile(operation) {
         .getElementById("reboot-notice")
         .scrollIntoView({ block: "start" });
     }
-    result.textContent = messages[response.phase] || "Service unavailable";
+    result.textContent = settingsMessage(response.phase);
   } catch (error) {
     settings = null;
     result.textContent = error.message;
@@ -374,6 +467,8 @@ document
   .addEventListener("click", () => changeProfile("restore"));
 document.getElementById("reload").addEventListener("click", loadSettings);
 
-loadSettings();
-updateStatus();
-setInterval(updateStatus, 5000);
+window.addEventListener("DOMContentLoaded", () => {
+  loadSettings();
+  updateStatus();
+  setInterval(updateStatus, 5000);
+});

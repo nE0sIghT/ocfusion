@@ -22,6 +22,7 @@ for (const directory of [
   "modules/openconnect/ui",
   "modules/vpn/ui",
   "modules/adguard-home/ui",
+  "modules/radio-settings/ui",
 ]) {
   for (const filename of fs.readdirSync(__dirname + "/../" + directory)) {
     if (!filename.endsWith(".js")) {
@@ -52,6 +53,7 @@ const nodeIds = [
   "module-list",
   "module-overview",
   "module-menu",
+  "module-frame",
   "state-badge",
   "state-message",
   "connection-state",
@@ -78,6 +80,9 @@ function createNodes() {
       hidden: false,
       listeners: {},
       replaceChildren() {},
+      removeAttribute(name) {
+        delete this[name];
+      },
       addEventListener(event, handler) {
         this.listeners[event] = handler;
       },

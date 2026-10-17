@@ -57,7 +57,7 @@ func readPackage(dir string) (Installed, error) {
 	}
 
 	for _, contribution := range m.StockPages {
-		if contribution.Path != "/VPN/vpnc.html" || !safePath(contribution.Script) {
+		if !supportedStockPage(contribution.Path) || !safePath(contribution.Script) {
 			return item, errors.New("unsupported stock-page contribution")
 		}
 	}
@@ -249,4 +249,13 @@ func snapshot(item Installed) (string, error) {
 	}
 
 	return dir, nil
+}
+
+func supportedStockPage(path string) bool {
+	switch path {
+	case "/VPN/vpnc.html", "/Advanced_Wireless_Content.asp":
+		return true
+	default:
+		return false
+	}
 }
