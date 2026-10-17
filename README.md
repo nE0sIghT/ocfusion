@@ -106,9 +106,17 @@ interrupts the VPN connection.
 
 <img src="docs/screenshots/openconnect.png" alt="OpenConnect profiles and connection status" width="900">
 
-### VPN settings
+### AdGuard Home
 
-<img src="docs/screenshots/settings.png" alt="OpenConnect connection settings" width="900">
+<img src="docs/screenshots/adguard-home.png" alt="AdGuard Home protection and DNS statistics" width="900">
+
+### Wi-Fi radio settings
+
+<img src="docs/screenshots/radio-settings.png" alt="Wi-Fi region selection and original settings restoration" width="900">
+
+<img src="docs/screenshots/radio-state.png" alt="Live radio state and available channels" width="900">
+
+<img src="docs/screenshots/radio-regions.png" alt="Reference comparison of Wi-Fi channels by region" width="900">
 
 ## Additional modules
 
