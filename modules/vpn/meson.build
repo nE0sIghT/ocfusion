@@ -32,3 +32,14 @@ vpn_service = custom_target(
         revision,
     ],
 )
+
+module_specs += {
+    'vpn': {
+        'binaries': [vpn_service],
+        'assets': files(
+            'packaging/module.json.in',
+            'ui/fusion.js',
+        ),
+        'notices': [],
+    },
+}

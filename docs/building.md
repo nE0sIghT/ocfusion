@@ -104,6 +104,54 @@ proprietary ASUS firmware assets. Optional native-header checks may use a
 separately supplied inspected state.js through `ASUS_STATE_JS_FIXTURE`; it is
 never distributed.
 
+## Optional modules and standalone packages
+
+Prebuilt releases and the default runtime build include VPN integration,
+OpenConnect and AdGuard Home. Wi-Fi radio settings is excluded by default.
+To include it in a source build, configure with:
+
+```sh
+meson setup build/meson --cross-file build-env/armv8-a-crypto-crc.ini -Dmodules=all
+```
+
+The `modules` array selects the runtime composition. Use `-Dmodules=all` for
+all modules, `-Dmodules=vpn,openconnect` for a selected set, or `-Dmodules=[]`
+for the platform alone. Dependencies are checked against module manifests at
+configuration time; include `vpn` when selecting OpenConnect or AdGuard Home.
+Unknown IDs and incomplete dependency sets are rejected.
+
+For an existing build directory, use
+`meson configure build/meson -Dmodules=all` and rebuild. To return to the
+standard composition, set `-Dmodules=vpn,openconnect,adguard-home`. Staging
+removes files from modules omitted from the new selection. Source archives
+always include all modules.
+
+Each built-in module can also be built and packaged independently:
+
+```sh
+meson compile -C build/meson module-vpn
+meson compile -C build/meson module-openconnect
+meson compile -C build/meson module-adguard-home
+meson compile -C build/meson module-radio-settings
+```
+
+These explicit targets are available regardless of the `modules` selection. Each
+builds only that module's payload and dependencies, without assembling the
+platform distribution. Outputs are under `build/meson/packaging/`, named
+`ocfusion-<module>-<version>-aarch64.tar.gz`. Package files, including
+`module.json`, are directly at the archive root, ready for `extctl install`.
+Each archive includes the project license and required third-party notices.
+OpenConnect and AdGuard Home require a compatible VPN provider module to be
+installed separately; building their packages does not bundle that provider.
+Standalone packages are not automatically included in release uploads.
+
+Module build descriptions are registered in `module_specs` by each module's
+`meson.build`. A description declares binary targets, static assets, verified
+data and third-party notices. Common packaging generates its runtime file map,
+standalone target and verification inputs from that description. The same
+module package is used independently and inside the full distribution. Adding
+a module does not require Python dispatch branches or module-specific flags.
+
 ## Optional container environment
 
 Docker provides the build tools when you prefer not to install them on the host.

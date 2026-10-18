@@ -31,6 +31,7 @@ foreach script : [
     'tests/test-usb.py',
     'tests/test-version.py',
     'tests/test-release.py',
+    'tests/test-packaging.py',
     'tools/check-source.py',
     'tools/check-go-format.py',
 ]

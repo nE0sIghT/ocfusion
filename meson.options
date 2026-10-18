@@ -24,3 +24,10 @@ option(
     value: '',
     description: 'Override the Git tag version for local or source-archive builds',
 )
+
+option(
+    'modules',
+    type: 'array',
+    value: ['vpn', 'openconnect', 'adguard-home'],
+    description: 'Modules included in the runtime distribution; use all for every module',
+)

@@ -42,3 +42,20 @@ adguard_home = custom_target(
         '--build-root', build_root,
     ],
 )
+
+module_specs += {
+    'adguard-home': {
+        'binaries': [adguard_home, adguard_adapter],
+        'assets': files(
+            'packaging/module.json.in',
+            'ui/index.html',
+            'ui/app.js',
+            'ui/layout.css',
+            'ui/translations.js',
+        ),
+        'notices': [
+            build_root / 'licenses/AdGuardHome-and-dependencies.txt',
+        ],
+        'data': [{'source': downloads['cacert-2026-09-25.pem'], 'name': 'ca-bundle.crt'}],
+    },
+}

@@ -75,6 +75,7 @@ if get_option('runtime')
 
     subdir('third_party')
     subdir('platform')
+    module_specs = {}
     subdir('modules/vpn')
     subdir('modules/openconnect')
     subdir('modules/adguard-home')

@@ -20,13 +20,14 @@ OCFusion is running.
   It inherits ASUS DNS settings and follows the selected VPN/WAN DNS path, or
   uses custom upstreams including DoT and DoH. It also works without
   OpenConnect.
-- **Wi-Fi radio settings** - selects a native ASUS regional profile and shows
+- **Wi-Fi radio settings** (optional, source builds only) - selects a native ASUS regional profile and shows
   live radio state, available channels and their frequencies. The profile
   catalog includes EU, AA, AU, JP, KR and XX; only profiles supported by all
   radios can be selected. Original settings are retained when switching profiles
   and can be restored. Applying or restoring a profile requires a reboot. Saved
   radio settings remain after disabling the module or removing USB; restore the
-  original settings and reboot to undo them.
+  original settings and reboot to undo them. This module is excluded from
+  prebuilt releases and disabled in the default build configuration.
 
 ## Compatibility
 
@@ -110,7 +111,7 @@ interrupts the VPN connection.
 
 <img src="docs/screenshots/adguard-home.png" alt="AdGuard Home protection and DNS statistics" width="900">
 
-### Wi-Fi radio settings
+### Wi-Fi radio settings (optional source build)
 
 <img src="docs/screenshots/radio-settings.png" alt="Wi-Fi region selection and original settings restoration" width="900">
 

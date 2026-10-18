@@ -34,3 +34,30 @@ supervisor = custom_target(
         revision,
     ],
 )
+
+module_specs += {
+    'openconnect': {
+        'binaries': [openconnect, supervisor],
+        'assets': files(
+            'packaging/module.json.in',
+            'packaging/scripts/module.sh',
+            'packaging/scripts/vpnc-script',
+            'packaging/examples/profile.occonf',
+            'ui/settings.js',
+            'ui/index.html',
+            'ui/app.js',
+            'ui/layout.js',
+            'ui/layout.css',
+            'ui/connection.js',
+            'ui/translations.js',
+        ),
+        'notices': [
+            build_root / 'licenses/OpenConnect-LGPL-2.1.txt',
+            build_root / 'licenses/OpenSSL-Apache-2.0.txt',
+            build_root / 'licenses/libxml2-Copyright.txt',
+            build_root / 'licenses/musl-COPYRIGHT.txt',
+            build_root / 'licenses/zlib-README.txt',
+        ],
+        'data': [{'source': downloads['cacert-2026-09-25.pem'], 'name': 'ca-bundle.crt'}],
+    },
+}

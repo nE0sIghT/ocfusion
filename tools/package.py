@@ -39,15 +39,6 @@ SOURCE_FILES = (
     "package.json",
     "package-lock.json",
 )
-EXECUTABLES = (
-    "modules/radio-settings/bin/ocfusion-radio-settings",
-    "modules/adguard-home/bin/AdGuardHome",
-    "modules/adguard-home/bin/ocfusion-adguard-home",
-    "modules/openconnect/bin/openconnect",
-    "modules/openconnect/bin/ocfusion-openconnect",
-    "modules/vpn/bin/ocfusion-vpn",
-    "bin/extd",
-)
 
 
 def sha256_file(path):
@@ -70,6 +61,13 @@ def write_archive(target, entries, timestamp, source_version="", source_revision
         tarfile.open(fileobj=compressed, mode="w") as archive,
     ):
         for name, path in sorted(entries):
+            if path.is_dir():
+                entry = tarfile.TarInfo(name)
+                entry.type = tarfile.DIRTYPE
+                entry.mtime = timestamp
+                entry.mode = 0o755
+                archive.addfile(entry)
+                continue
             if not path.is_file():
                 continue
             data = path.read_bytes()
@@ -93,7 +91,7 @@ def write_archive(target, entries, timestamp, source_version="", source_revision
 
 def runtime_entries(runtime_tree):
     for path in runtime_tree.rglob("*"):
-        if path.is_file():
+        if path.is_file() or (path.is_dir() and not any(path.iterdir())):
             name = PurePosixPath("ocfusion") / path.relative_to(runtime_tree)
             yield str(name), path
 
@@ -124,9 +122,9 @@ def main():
     output_directory = arguments.output_dir.resolve()
     version = arguments.version
     timestamp = int(os.environ.get("SOURCE_DATE_EPOCH", "0"))
-    assert all((runtime_tree / name).is_file() for name in EXECUTABLES), (
-        "run meson compile before packaging"
-    )
+    assert (runtime_tree / "bin/extd").is_file(), "run meson compile before packaging"
+    for module in (runtime_tree / "modules").iterdir():
+        assert (module / "module.json").is_file(), module.name
     output_directory.mkdir(exist_ok=True)
 
     runtime_files = sorted(

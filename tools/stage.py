@@ -12,15 +12,15 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DOCUMENTS = ("README.md", "INSTALLATION.md")
 
 
-def render_version(runtime_tree, version):
-    for template in sorted((runtime_tree / "modules").glob("*/module.json.in")):
-        manifest = json.loads(template.read_text())
-        manifest["version"] = version
-        (template.parent / "module.json").write_text(
-            json.dumps(manifest, indent=2) + "\n"
-        )
-        template.unlink()
+def render_module_version(package, version):
+    template = package / "module.json.in"
+    manifest = json.loads(template.read_text())
+    manifest["version"] = version
+    (package / "module.json").write_text(json.dumps(manifest, indent=2) + "\n")
+    template.unlink()
 
+
+def render_version(runtime_tree, version):
     installer = runtime_tree / "install.sh"
     installer.write_text(
         installer.read_text().replace("Version: @VERSION@", "Version: " + version)
@@ -43,56 +43,47 @@ def copy_documentation(runtime_tree):
         (runtime_tree / name).write_text(document)
 
 
-def combine_notices(runtime_tree, build_directory):
+def combine_notices(runtime_tree, specifications):
     sections = ["# Third-party licenses and notices\n"]
-    notice_directories = (
-        PROJECT_ROOT / "third_party/notices",
-        build_directory / "licenses",
-    )
+    notices = sorted((PROJECT_ROOT / "third_party/notices").iterdir())
+    for specification in specifications:
+        notices.extend(Path(name) for name in specification["notices"])
 
-    for directory in notice_directories:
-        for notice in sorted(directory.iterdir()):
-            sections.append(f"\n## {notice.name}\n\n{notice.read_text()}\n")
+    for notice in notices:
+        sections.append(f"\n## {notice.name}\n\n{notice.read_text()}\n")
 
     (runtime_tree / "THIRD-PARTY.md").write_text("".join(sections))
 
 
-def copy_module_assets(runtime_tree, module_id):
-    module_root = PROJECT_ROOT / "modules" / module_id
-    package = runtime_tree / "modules" / module_id
-    package.mkdir(parents=True)
-    shutil.copy(module_root / "packaging/module.json.in", package)
-    for name in ("examples", "scripts"):
-        if (module_root / "packaging" / name).is_dir():
-            shutil.copytree(module_root / "packaging" / name, package / name)
-    shutil.copytree(module_root / "ui", package / "ui")
-    (package / "bin").mkdir()
+def stage_module(package, specification, version):
+    for source in specification["verified_files"]:
+        verify_data_source(Path(source))
+
+    for source, destination in specification["files"]:
+        target = package / destination
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy(source, target)
+    render_module_version(package, version)
 
 
-def verify_ca_bundle(path):
+def verify_data_source(path):
     sources = json.loads((PROJECT_ROOT / "third_party/sources.lock.json").read_text())[
         "sources"
     ]
     source = next(item for item in sources if item["name"] == path.name)
     if hashlib.sha256(path.read_bytes()).hexdigest() != source["sha256"]:
-        raise SystemExit("CA bundle checksum mismatch")
+        raise SystemExit("Data source checksum mismatch")
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--build-dir", type=Path, required=True)
-    parser.add_argument("--client", type=Path, required=True)
-    parser.add_argument("--supervisor", type=Path, required=True)
-    parser.add_argument("--vpn-service", type=Path, required=True)
-    parser.add_argument("--adguard", type=Path, required=True)
-    parser.add_argument("--adguard-adapter", type=Path, required=True)
-    parser.add_argument("--radio-service", type=Path, required=True)
     parser.add_argument("--manager", type=Path, required=True)
-    parser.add_argument("--ca", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--version", required=True)
+    parser.add_argument("--spec", type=Path, action="append", default=[])
     arguments = parser.parse_args()
-    verify_ca_bundle(arguments.ca)
+    specifications = [json.loads(path.read_text()) for path in arguments.spec]
     runtime_tree = arguments.build_dir.resolve() / "runtime/ocfusion"
     if runtime_tree.exists():
         shutil.rmtree(runtime_tree)
@@ -101,28 +92,20 @@ def main():
     shutil.copytree(PROJECT_ROOT / "packaging/scripts", runtime_tree / "scripts")
     shutil.copytree(PROJECT_ROOT / "packaging/init", runtime_tree / "init")
     shutil.copytree(PROJECT_ROOT / "web", runtime_tree / "web")
-    for module_id in ("vpn", "openconnect", "adguard-home", "radio-settings"):
-        copy_module_assets(runtime_tree, module_id)
+    (runtime_tree / "modules").mkdir()
+    for specification in specifications:
+        stage_module(
+            runtime_tree / "modules" / specification["id"],
+            specification,
+            arguments.version,
+        )
     (runtime_tree / "bin").mkdir()
 
     version = arguments.version
     render_version(runtime_tree, version)
     copy_documentation(runtime_tree)
-    for executable, name in [
-        (arguments.client, "modules/openconnect/bin/openconnect"),
-        (arguments.supervisor, "modules/openconnect/bin/ocfusion-openconnect"),
-        (arguments.vpn_service, "modules/vpn/bin/ocfusion-vpn"),
-        (arguments.manager, "bin/extd"),
-        (arguments.radio_service, "modules/radio-settings/bin/ocfusion-radio-settings"),
-        (arguments.adguard, "modules/adguard-home/bin/AdGuardHome"),
-        (arguments.adguard_adapter, "modules/adguard-home/bin/ocfusion-adguard-home"),
-    ]:
-        shutil.copy(executable, runtime_tree / name)
-    for module_id in ("openconnect", "adguard-home"):
-        shutil.copy(
-            arguments.ca, runtime_tree / "modules" / module_id / "ca-bundle.crt"
-        )
-    combine_notices(runtime_tree, arguments.build_dir)
+    shutil.copy(arguments.manager, runtime_tree / "bin/extd")
+    combine_notices(runtime_tree, specifications)
     arguments.output.write_text(version + "\n")
 
 

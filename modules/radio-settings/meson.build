@@ -19,3 +19,17 @@ radio_service = custom_target(
         '--revision', revision,
     ],
 )
+
+module_specs += {
+    'radio-settings': {
+        'binaries': [radio_service],
+        'assets': files(
+            'packaging/module.json.in',
+            'ui/index.html',
+            'ui/app.js',
+            'ui/translations.js',
+            'ui/stock-channels.js',
+        ),
+        'notices': [],
+    },
+}

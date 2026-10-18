@@ -79,6 +79,14 @@ are copied to a RAM snapshot before execution. This detects unexpected changes
 but does not authenticate the package author. There is no signed package
 repository in this release.
 
+## Building a built-in module separately
+
+The `module-<id>` Meson targets produce independently installable archives for
+all built-in modules, including the optional radio module. See
+[standalone module builds](building.md#optional-modules-and-standalone-packages)
+for commands, outputs and build options. Installation uses the same `extctl
+install` operation as third-party modules; dependencies remain separate modules.
+
 ## Lifecycle and IPC
 
 The entrypoint receives one argument, the operation name. Implement:
