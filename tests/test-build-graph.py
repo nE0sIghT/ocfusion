@@ -12,7 +12,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-C_TARGETS = ("musl", "zlib", "openssl", "libxml2", "openconnect")
+C_TARGETS = ("musl", "zlib", "openssl", "libxml2", "openconnect", "3proxy")
 
 
 def build_plan(build_directory):
@@ -84,6 +84,12 @@ def main():
         selected = modules
 
     changes = [
+        (
+            "http-proxy",
+            "modules/http-proxy/daemon/config.go",
+            ["ocfusion-http-proxy"],
+            [*C_TARGETS, "extd", "ocfusion-vpn"],
+        ),
         (
             "openconnect",
             "modules/openconnect/daemon/main.go",

@@ -5,6 +5,7 @@ vpn_go = files(
     'daemon/dns.go',
     'daemon/resolver.go',
     'daemon/broker.go',
+    'daemon/egress.go',
     'daemon/main.go',
     'daemon/registry.go',
     'daemon/network.go',

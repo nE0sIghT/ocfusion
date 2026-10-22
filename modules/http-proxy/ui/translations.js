@@ -1,0 +1,22 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+window.OCF_MODULE_TRANSLATIONS = {
+  "HTTP proxy": "HTTP-прокси",
+  "Loading…": "Загрузка…",
+  "HTTP and HTTPS connections through a selected VPN. Requests are blocked when the VPN is unavailable.": "HTTP- и HTTPS-подключения через выбранный VPN. При недоступности VPN запросы блокируются.",
+  "Enable proxy": "Включить прокси",
+  "Select a VPN connection": "Выберите VPN-подключение",
+  "VPN connection": "VPN-подключение",
+  "LAN network": "Локальная сеть",
+  Port: "Порт",
+  "Allowed clients": "Разрешённые клиенты",
+  "One IPv4 address or subnet per line. Empty allows all clients in the selected LAN.": "Один IPv4-адрес или подсеть в строке. Пустое поле разрешает всех клиентов выбранной локальной сети.",
+  "DNS servers": "DNS-серверы",
+  "One IPv4 address per line. These servers are reached through the selected VPN.": "Один IPv4-адрес в строке. Запросы к этим серверам идут через выбранный VPN.",
+  Apply: "Применить",
+  Reload: "Перечитать",
+  Disabled: "Выключен",
+  "Waiting for VPN": "Ожидание VPN",
+  Running: "Работает",
+  "DNS servers must be external to the router.": "DNS-сервер должен находиться вне роутера.",
+  Unavailable: "Недоступен",
+};

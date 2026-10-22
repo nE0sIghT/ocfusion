@@ -34,12 +34,13 @@ type vpnRequest struct {
 }
 
 type vpnResponse struct {
-	DNSStatus json.RawMessage `json:"dns_status,omitempty"`
-	OK        bool            `json:"ok"`
-	Manifest  Manifest        `json:"manifest"`
-	Networks  []Network       `json:"networks"`
-	DNS       string          `json:"dns,omitempty"`
-	Error     string          `json:"error,omitempty"`
+	EgressDemand bool            `json:"egress_demand,omitempty"`
+	DNSStatus    json.RawMessage `json:"dns_status,omitempty"`
+	OK           bool            `json:"ok"`
+	Manifest     Manifest        `json:"manifest"`
+	Networks     []Network       `json:"networks"`
+	DNS          string          `json:"dns,omitempty"`
+	Error        string          `json:"error,omitempty"`
 }
 
 var vpnCall = callVPN
@@ -119,6 +120,10 @@ func dnsOnlySelected() bool {
 	response, err := vpnCall(vpnRequest{Operation: "dns-state"})
 	if err != nil {
 		return false
+	}
+
+	if response.EgressDemand {
+		return true
 	}
 
 	var status struct {

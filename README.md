@@ -15,6 +15,10 @@ OCFusion is running.
   profiles, password and certificate authentication, and manual OTP or automatic
   TOTP. A selected connection can carry DNS requests for the router and all
   networks, with automatic WAN fallback when disconnected.
+- **HTTP proxy** - provides LAN-only HTTP/HTTPS proxy access through an existing
+  OCFusion or native ASUS VPN Fusion connection. Supports client IPv4/subnet
+  allowlists. Proxy traffic and DNS are blocked when the selected VPN is
+  unavailable. The proxy is disabled by default.
 - **AdGuard Home** - adds IPv4 router DNS filtering with filter lists, custom
   rules, exceptions and per-client controls. Filtering is disabled by default.
   It inherits ASUS DNS settings and follows the selected VPN/WAN DNS path, or

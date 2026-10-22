@@ -104,13 +104,16 @@ def build_component(arguments, config):
     apply_patches(recipe, source_directory)
 
     try:
-        run(
-            expand(recipe["configure"], parameters),
-            source_directory,
-            environment,
-            configure_log,
-        )
-        run(["make", "clean"], source_directory, environment, make_log)
+        if recipe["configure"]:
+            run(
+                expand(recipe["configure"], parameters),
+                source_directory,
+                environment,
+                configure_log,
+            )
+
+        make_arguments = expand(recipe.get("make_arguments", []), parameters)
+        run(["make", *make_arguments, "clean"], source_directory, environment, make_log)
         make_command = ["make", f"-j{arguments.jobs}"]
         for name in recipe.get("remove_before_make", []):
             (source_directory / name).unlink(missing_ok=True)

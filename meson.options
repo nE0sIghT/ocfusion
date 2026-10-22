@@ -28,6 +28,6 @@ option(
 option(
     'modules',
     type: 'array',
-    value: ['vpn', 'openconnect', 'adguard-home'],
+    value: ['vpn', 'openconnect', 'adguard-home', 'http-proxy'],
     description: 'Modules included in the runtime distribution; use all for every module',
 )

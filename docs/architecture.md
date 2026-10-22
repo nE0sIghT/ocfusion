@@ -17,6 +17,7 @@ modify the read-only root filesystem.
 | `modules/openconnect/ui/`        | Client settings, status, actions and translations                                                                                                             |
 | `modules/radio-settings/`        | Native regional selectors, original-setting recovery, radio diagnostics and wireless-page contribution                                                        |
 | `modules/adguard-home/`          | DNS filtering adapter, private upstream control, UI and source patches                                                                                        |
+| `modules/http-proxy/`            | 3proxy process supervision, LAN listener configuration and proxy UI |
 | `modules/vpn/ui/`                | Managed Fusion notice script                                                                                                                                  |
 | `packaging/`                     | Router installation, USB preparation/bootstrap and ASUS Apps entrypoints                                                                                      |
 | `tools/`, `meson.build`          | Pinned-source builds, runtime staging, archive generation and release upload                                                                                  |
@@ -186,6 +187,37 @@ callback and a private per-worker Unix socket. The worker publishes only a
 random challenge ID and expiry. Responses are bounded, generation-bound and
 one-use. Automatic TOTP uses native OpenConnect token generation from a private
 RAM secret file and requires synchronized router time.
+
+## LAN HTTP proxy
+
+The HTTP proxy module runs unmodified 3proxy as an unprivileged worker, with
+HTTP forwarding and HTTPS CONNECT. Its administrator interface uses the normal
+module page. The proxy is disabled by default, binds one explicitly selected
+LAN IPv4 address and accepts only that network or a narrower address allowlist.
+No proxy password is required; access is controlled by the LAN interface and
+source addresses. HTTPS is forwarded without interception.
+
+The VPN provider exposes a redacted catalog of existing managed and native
+Fusion connections. Selecting a proxy target does not allocate a Fusion profile
+or change native assignments. Generic egress leases reserve a dedicated numeric
+worker UID and private routing tables. The consumer launches its worker
+only after the provider has installed the lease. It renews every three seconds
+and terminates the worker when the route is unavailable or its identity changes.
+
+The provider routes the worker's IPv4 sockets, including its explicit DNS
+servers, through the selected live point-to-point VPN interface. An unreachable
+default prevents WAN fallback. UID policy rules precede global router DNS
+policies, and IPv6 uses an unreachable table. A scoped rule returns listener replies to LAN without
+routing proxy requests there. These policies survive native firewall resets.
+Router-local proxy destinations and DNS upstreams are rejected. Native profiles
+must already be connected; the module does not activate or configure them. TAP interfaces and
+IPv6 proxy egress are not supported.
+
+Lease state remains in private RAM for provider recovery. Expiry blocks routing;
+it does not release a UID that may still own live sockets. The consumer stops
+its worker before releasing the lease and removing its network resources.
+Uninstalling the module leaves existing VPN connections and global DNS settings
+unchanged.
 
 ## Updates and removal
 

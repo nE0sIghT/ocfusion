@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "id": "http-proxy",
+  "name": "HTTP proxy",
+  "version": "@VERSION@",
+  "module_api": 1,
+  "entrypoint": "bin/ocfusion-http-proxy",
+  "ui": "ui/index.html",
+  "dependencies": [{"id": "vpn", "api": 1}],
+  "actions": ["settings", "targets"],
+  "capabilities": ["network.proxy"],
+  "resources": {"proxy.listener": "http"}
+}

@@ -545,3 +545,49 @@ retaining hardware, bandwidth and AiMesh restrictions. It does not change
 `territory_code`, NVRAM, channel selection or the native automatic-channel
 algorithm. The contribution is best effort and is omitted when the module is
 disabled or removed; reload an open stock page to remove its loaded script.
+
+### Existing-VPN egress leases
+
+A module that needs to send its own process traffic through an existing VPN
+uses API 1 operations below. These do not allocate a Fusion connection. Requests
+include `api: 1` and `client`; `profile` is not required.
+
+| Operation | Effect |
+| --- | --- |
+| `egress-list` | Return redacted `targets` and local IPv4 `networks` |
+| `egress-register` | Create or renew one egress lease owned by this module |
+| `egress-release` | Remove the lease after the consumer has stopped its worker |
+
+Registration includes an `egress` object:
+
+```json
+{
+  "target": "native:7:012345abcdef",
+  "bridge": "br0",
+  "port": 3128,
+  "allowed": ["192.0.2.20", "192.0.2.128/25"]
+}
+```
+
+Use target IDs and bridges returned by discovery rather than constructing them.
+Native target IDs also bind the profile name, protocol and native unit so
+reusing an ASUS profile slot does not silently select a different VPN.
+An empty allowlist permits the selected LAN subnet. Entries outside that subnet
+are rejected. The provider returns `egress.uid`, `address`, `cidr`, `tunnel` and
+`ready`. It installs UID routing, LAN ingress and an unreachable IPv6 route. Launch the
+worker with the assigned UID/GID, cleared supplementary groups and an IPv4-only
+listener bound to `address`; do not run unrelated processes under this UID.
+The listener must enforce the same client allowlist.
+
+Renew within 12 seconds and stop the worker immediately when renewal fails or
+`ready` is false. A changed `tunnel` value requires restarting the worker to
+discard old connections and DNS cache. Stop the worker before releasing or
+changing a lease. The provider retains blocked resources on expiry/restart;
+resources are removed only by explicit release. Consumers must not remove the
+provider's routing or firewall rules themselves.
+
+Only live IPv4 point-to-point interfaces are supported. Managed connections can
+run without network assignments while an egress lease needs them. Their clients
+read `egress_demand` in `dns-state` for their own module/profile pair; this does
+not select or change global DNS policy. Native Fusion connections must be
+activated in ASUS. The provider does not start them on the consumer's behalf.

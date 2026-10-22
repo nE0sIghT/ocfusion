@@ -133,6 +133,25 @@
         "LDFLAGS=-L{prefix}/lib -all-static"
       ],
       "executable": "openconnect"
+    },
+    "3proxy": {
+      "configure": null,
+      "uses_musl": true,
+      "license_file": "copying",
+      "notice_file": "3proxy-license.txt",
+      "install_target": null,
+      "make_arguments": [
+        "-f",
+        "Makefile.Linux",
+        "CC={prefix}/bin/musl-gcc",
+        "LN={prefix}/bin/musl-gcc",
+        "STATIC=true",
+        "OPENSSL_CHECK=false",
+        "WOLFSSL_CHECK=false",
+        "PAM_CHECK=false",
+        "EXTRA_CFLAGS={c_flags}"
+      ],
+      "executable": "bin/3proxy"
     }
   }
 }

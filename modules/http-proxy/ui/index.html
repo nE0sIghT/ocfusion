@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>HTTP proxy - OCFusion</title>
+    <link rel="stylesheet" href="/index_style.css" />
+    <link rel="stylesheet" href="/form_style.css" />
+    <link rel="stylesheet" href="/user/extensions-panel.css" />
+  </head>
+  <body class="bg">
+    <main class="ext-shell ext-module">
+      <div class="ext-card-heading">
+        <h1>HTTP proxy</h1>
+        <span id="state" class="ext-badge" role="status">Loading…</span>
+      </div>
+      <p>
+        HTTP and HTTPS connections through a selected VPN. Requests are blocked
+        when the VPN is unavailable.
+      </p>
+      <p id="endpoint"></p>
+      <form id="settings">
+        <fieldset id="fields" disabled>
+          <label><input id="enabled" type="checkbox" /> Enable proxy</label>
+          <table class="FormTable">
+            <tr>
+              <th><label for="target">VPN connection</label></th>
+              <td><select id="target"></select></td>
+            </tr>
+            <tr>
+              <th><label for="bridge">LAN network</label></th>
+              <td><select id="bridge"></select></td>
+            </tr>
+            <tr>
+              <th><label for="port">Port</label></th>
+              <td><input id="port" type="number" min="1024" max="65535" /></td>
+            </tr>
+            <tr>
+              <th><label for="allowed">Allowed clients</label></th>
+              <td>
+                <textarea id="allowed" rows="4"></textarea>
+                <p>
+                  One IPv4 address or subnet per line. Empty allows all clients
+                  in the selected LAN.
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <th><label for="dns">DNS servers</label></th>
+              <td>
+                <textarea id="dns" rows="2"></textarea>
+                <p>
+                  One IPv4 address per line. These servers are reached through
+                  the selected VPN.
+                </p>
+              </td>
+            </tr>
+          </table>
+          <div class="apply_gen">
+            <button id="save" type="submit">Apply</button>
+            <button id="reload" type="button" class="ext-secondary">
+              Reload
+            </button>
+            <p id="result" role="status"></p>
+          </div>
+        </fieldset>
+      </form>
+    </main>
+    <script src="app.js"></script>
+    <script src="translations.js"></script>
+    <script src="/user/ocfusion-i18n.js"></script>
+  </body>
+</html>

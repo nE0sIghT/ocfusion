@@ -35,6 +35,11 @@
       "name": "AdGuardHome-v0.107.79.tar.gz",
       "url": "https://codeload.github.com/AdguardTeam/AdGuardHome/tar.gz/refs/tags/v0.107.79",
       "sha256": "5f4fa119f24ea741bb8cecfa74203165fe6b86b904cef05ff429fb227b07d425"
+    },
+    {
+      "name": "3proxy-0.9.9.1.tar.gz",
+      "url": "https://github.com/3proxy/3proxy/releases/download/0.9.9.1/3proxy-0.9.9.1.tar.gz",
+      "sha256": "13711040af096f09d5202b0cb516ec08db7c08130ed21719063d2e570215fb34"
     }
   ]
 }

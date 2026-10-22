@@ -13,6 +13,7 @@ foreach name : [
     'openconnect-9.21.tar.gz',
     'cacert-2026-09-25.pem',
     'AdGuardHome-v0.107.79.tar.gz',
+    '3proxy-0.9.9.1.tar.gz',
 ]
     downloads += {
         name: custom_target(
@@ -43,6 +44,7 @@ external_command = [
 # Ordered dependencies stay in Meson; upstream build recipes live in build.json.
 components = [
     {'name': 'musl', 'archive': 'musl-1.2.6.tar.gz', 'dependencies': []},
+    {'name': '3proxy', 'archive': '3proxy-0.9.9.1.tar.gz', 'dependencies': ['musl']},
     {'name': 'zlib', 'archive': 'zlib-1.3.2.tar.gz', 'dependencies': ['musl']},
     {
         'name': 'openssl',
@@ -71,6 +73,10 @@ foreach component : components
 
     inputs = [external_builder, external_config]
     output = name + '.stamp'
+    if name == '3proxy'
+        output = '3proxy'
+    endif
+
     if name == 'openconnect'
         inputs += files(
             '../modules/openconnect/patches/0001-managed-hook-environment.patch',

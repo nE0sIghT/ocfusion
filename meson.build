@@ -77,6 +77,7 @@ if get_option('runtime')
     subdir('platform')
     module_specs = {}
     subdir('modules/vpn')
+    subdir('modules/http-proxy')
     subdir('modules/openconnect')
     subdir('modules/adguard-home')
     subdir('modules/radio-settings')

@@ -6,11 +6,13 @@ import (
 	"path/filepath"
 	"regexp"
 	"strconv"
+	"time"
 )
 
 var identifier = regexp.MustCompile(`^[a-z][a-z0-9-]{0,31}$`)
 
 type Broker struct {
+	egress   map[string]*EgressLease
 	resolver *ResolverLease
 	registry Connections
 	services map[string]*Service
@@ -32,12 +34,16 @@ func (b *Broker) handle(request Request) (Response, error) {
 		return Response{}, errors.New("invalid VPN owner or API")
 	}
 
+	if request.Operation == "egress-list" || request.Operation == "egress-register" || request.Operation == "egress-release" {
+		return b.egressRequest(request)
+	}
+
 	if request.Operation == "resolver-info" || request.Operation == "resolver-register" || request.Operation == "resolver-release" {
 		return b.resolverRequest(request)
 	}
 
 	if request.Operation == "dns-state" {
-		return Response{OK: true, DNSStatus: &b.dns.status}, nil
+		return Response{OK: true, DNSStatus: &b.dns.status, EgressDemand: b.egressDemand(request.Client, request.Profile)}, nil
 	}
 
 	if !identifier.MatchString(request.Profile) {
@@ -134,6 +140,7 @@ func (b *Broker) handle(request Request) (Response, error) {
 	}
 
 	service.dnsOnly = b.dns.policy.Client == request.Client && b.dns.policy.Profile == request.Profile
+	service.dnsOnly = service.dnsOnly || b.egressDemand(request.Client, request.Profile)
 	response, err := service.handle(request)
 	b.dns.reconcile(b.services)
 	response.DNSStatus = &b.dns.status
@@ -159,6 +166,7 @@ func (b *Broker) reconcile() {
 
 	b.dns.reconcile(b.services)
 	b.reconcileResolver()
+	b.reconcileEgress()
 	saveJSON(filepath.Join(runDir, "status.json"), map[string]any{"connections": statuses, "dns": b.dns.status})
 }
 
@@ -197,4 +205,18 @@ func (b *Broker) checkNetworks(target string) error {
 	}
 
 	return nil
+}
+
+func (b *Broker) egressDemand(client, profile string) bool {
+	for _, lease := range b.egress {
+		if time.Since(lease.Heartbeat) > 12*time.Second {
+			continue
+		}
+		for _, m := range b.registry.Items {
+			if m.Client == client && m.Profile == profile && lease.Registration.Target == "managed:"+m.ID {
+				return true
+			}
+		}
+	}
+	return false
 }

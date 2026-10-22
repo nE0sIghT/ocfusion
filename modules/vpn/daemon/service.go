@@ -22,6 +22,7 @@ type Tunnel struct {
 }
 
 type Request struct {
+	Egress     *EgressRegistration   `json:"egress,omitempty"`
 	Resolver   *ResolverRegistration `json:"resolver,omitempty"`
 	PreferDNS  bool                  `json:"prefer_dns,omitempty"`
 	API        int                   `json:"api"`
@@ -33,14 +34,17 @@ type Request struct {
 }
 
 type Response struct {
-	Resolver    *ResolverRegistration `json:"resolver,omitempty"`
-	DNSStatus   *DNSStatus            `json:"dns_status,omitempty"`
-	Connections []Manifest            `json:"connections,omitempty"`
-	OK          bool                  `json:"ok"`
-	Manifest    Manifest              `json:"manifest"`
-	Networks    []Network             `json:"networks"`
-	DNS         string                `json:"dns,omitempty"`
-	Error       string                `json:"error,omitempty"`
+	EgressDemand bool                  `json:"egress_demand,omitempty"`
+	Targets      []EgressTarget        `json:"targets,omitempty"`
+	Egress       *EgressRegistration   `json:"egress,omitempty"`
+	Resolver     *ResolverRegistration `json:"resolver,omitempty"`
+	DNSStatus    *DNSStatus            `json:"dns_status,omitempty"`
+	Connections  []Manifest            `json:"connections,omitempty"`
+	OK           bool                  `json:"ok"`
+	Manifest     Manifest              `json:"manifest"`
+	Networks     []Network             `json:"networks"`
+	DNS          string                `json:"dns,omitempty"`
+	Error        string                `json:"error,omitempty"`
 }
 
 type Service struct {
@@ -221,6 +225,9 @@ func serveUntil(stop <-chan struct{}) error {
 
 	recoverResolverCapture()
 	recoverDNSRouting()
+	if err := service.recoverEgress(); err != nil {
+		return err
+	}
 
 	path := filepath.Join(runDir, "control.sock")
 	os.Remove(path)

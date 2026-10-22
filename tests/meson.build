@@ -2,6 +2,7 @@
 foreach module : [
     'modules/openconnect/daemon',
     'modules/vpn/daemon',
+    'modules/http-proxy/daemon',
     'modules/adguard-home/daemon',
     'modules/radio-settings/daemon',
     'platform',
@@ -60,6 +61,14 @@ test(
 )
 
 if get_option('browser_tests')
+    test(
+        'browser-http-proxy',
+        node,
+        args: [files('test-proxy-ui.cjs')],
+        suite: 'browser',
+        timeout: 60,
+    )
+
     test(
         'browser-stock-channels',
         node,
@@ -177,5 +186,28 @@ if get_option('runtime')
         depends: adguard_fixture,
         suite: 'client',
         timeout: 120,
+    )
+endif
+
+if get_option('runtime')
+    proxy_fixture = custom_target(
+        '3proxy-native',
+        input: downloads['3proxy-0.9.9.1.tar.gz'],
+        output: '3proxy-native',
+        depend_files: files('../tools/build-proxy-fixture.py'),
+        command: [
+            python, files('../tools/build-proxy-fixture.py'),
+            '--archive', '@INPUT@',
+            '--output', '@OUTPUT@',
+        ],
+    )
+
+    test(
+        'http-proxy-client',
+        python,
+        args: [files('test-proxy-client.py'), '--binary', proxy_fixture],
+        depends: proxy_fixture,
+        suite: 'client',
+        timeout: 30,
     )
 endif

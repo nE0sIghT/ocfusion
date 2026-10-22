@@ -198,6 +198,32 @@ ASUS upstreams. While VPN DNS is selected, custom IPv6 connections are rejected
 rather than sent outside the IPv4 tunnel. Query logs, caches and statistics are
 bounded RAM data and do not survive restart.
 
+## HTTP proxy
+
+Open **HTTP proxy** in OCFusion, select an existing VPN connection and a LAN
+network, then enable the proxy and apply. The default port is 3128. Native ASUS
+Fusion connections must already be connected; activate them in ASUS first.
+OpenConnect connections remain controlled by their own module.
+
+The optional client allowlist accepts one IPv4 address or CIDR subnet per line.
+An empty list allows the selected LAN subnet. Other networks and WAN interfaces
+are not accepted. Configure one to four IPv4 DNS servers; their requests use
+the same VPN as the proxy. Router-local DNS addresses are not accepted.
+
+Configure your browser or application with the HTTP proxy address displayed in
+the module. HTTPS uses CONNECT without certificate interception. For example,
+from an allowed LAN client, replacing `ROUTER_LAN_IP` with the selected address:
+
+```sh
+curl --proxy http://ROUTER_LAN_IP:3128 https://example.com/
+```
+
+Disconnect the selected VPN and repeat the request: it must fail rather than
+use WAN. The module waits for the VPN and resumes after it reconnects. Proxy
+outbound connections are IPv4 only. Disabling the proxy stops its connections
+and removes its network rules without disconnecting the VPN or changing global
+router DNS policy.
+
 ## One-time codes
 
 OpenConnect's **OTP mode** supports AnyConnect/ocserv. Choose manual input or
