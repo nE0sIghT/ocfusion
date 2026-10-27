@@ -3,91 +3,552 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>zapret2 - OCFusion</title>
+    <title>
+      zapret2 - OCFusion
+    </title>
     <link rel="stylesheet" href="/index_style.css" />
     <link rel="stylesheet" href="/form_style.css" />
     <link rel="stylesheet" href="/user/extensions-panel.css" />
+    <link rel="stylesheet" href="layout.css" />
   </head>
   <body class="bg">
     <main class="ext-shell ext-module">
       <div class="ext-card-heading">
-        <h1>zapret2</h1>
-        <span id="state" class="ext-badge" role="status">Loading...</span>
+        <h1>
+          zapret2
+        </h1>
+        <span id="state" class="ext-badge" role="status">
+          Loading...
+        </span>
       </div>
-      <p>Process selected connections to reduce DPI interference. Applies to direct WAN traffic; VPN traffic is excluded.</p>
+      <p>
+        Process selected connections to reduce DPI interference.
+      </p>
+      <nav class="ocf-tabs" role="tablist" aria-label="Module sections">
+        <button id="tab-management" type="button" role="tab" class="tabClicked" aria-selected="true" aria-controls="panel-management">
+          Management
+        </button>
+        <button id="tab-strategies" type="button" role="tab" class="tab" aria-selected="false" aria-controls="panel-strategies" tabindex="-1">
+          Strategies
+        </button>
+        <button id="tab-finder" type="button" role="tab" class="tab" aria-selected="false" aria-controls="panel-finder" tabindex="-1">
+          Strategy finder
+        </button>
+        <button id="tab-diagnostics" type="button" role="tab" class="tab" aria-selected="false" aria-controls="panel-diagnostics" tabindex="-1">
+          Diagnostics
+        </button>
+      </nav>
       <form id="settings">
         <fieldset id="fields" disabled>
-          <label><input id="enabled" type="checkbox" /> Enable packet processing</label>
-          <h2>Destinations</h2>
-          <p>Specify IP addresses, subnets or domains. A connection is selected when its IP or domain matches either list. Empty lists disable processing.</p>
-          <table class="FormTable">
-            <tr>
-              <th><label for="networks">IP addresses and subnets</label></th>
-              <td><textarea id="networks" rows="4"></textarea><p>One IPv4/IPv6 address or subnet per line.</p></td>
-            </tr>
-            <tr>
-              <th><label for="domains">Domains</label></th>
-              <td><textarea id="domains" rows="4"></textarea><p>One domain per line, without URLs or wildcards. Includes subdomains. Encrypted or unavailable names cannot be matched.</p></td>
-            </tr>
-          </table>
-          <h2>Strategy presets</h2>
-          <table class="FormTable">
-            <tr><th><label for="preset">Preset</label></th><td><select id="preset"><option value="">Custom settings</option></select><p id="preset-description">Choose a starting point, then apply or adjust its settings.</p></td></tr>
-          </table>
-          <h2>TCP connections</h2>
-          <table class="FormTable">
-            <tr>
-              <th><label for="tcp_strategy">Strategy</label></th>
-              <td><select id="tcp_strategy"><option value="off">Off</option><option value="split">Split packets</option><option value="disorder">Split and reorder packets</option><option value="fake">Fake packets</option><option value="fake-split">Fake packets and split</option><option value="fake-disorder">Fake packets and reorder</option><option value="fakedsplit">Interleave fake and real segments</option><option value="fakeddisorder">Interleave and reorder segments</option><option value="hostfakesplit">Split around a fake hostname</option></select></td>
-            </tr>
-            <tr><th><label for="tcp_ports">TCP ports</label></th><td><input id="tcp_ports" type="text" /><p>Comma-separated port numbers. Up to 15 ports.</p></td></tr>
-            <tr><th><label for="split_positions">Split positions</label></th><td><input id="split_positions" type="text" maxlength="128" /><p>Byte positions or markers, separated by commas: 2, host, midsld+1. Interleaving strategies accept one position.</p></td></tr>
-          </table>
-          <h2>UDP connections</h2>
-          <table class="FormTable">
-            <tr><th><label for="udp_strategy">Strategy</label></th><td><select id="udp_strategy"><option value="off">Off</option><option value="fake-quic">QUIC fake packets</option></select></td></tr>
-            <tr><th><label for="udp_ports">UDP ports</label></th><td><input id="udp_ports" type="text" /></td></tr>
-
-          </table>
-          <details>
-            <summary>Advanced strategy settings</summary>
-            <table class="FormTable">
-              <tr><th><label for="sequence_overlap">TCP sequence overlap</label></th><td><input id="sequence_overlap" type="number" min="0" max="4096" /><p>Extra bytes before a split segment. Zero disables overlap.</p></td></tr>
-              <tr><th><label for="fake_fooling">Fake TCP packet protection</label></th><td><select id="fake_fooling"><option value="ttl">TTL only</option><option value="badseq">TTL and out-of-window sequence</option><option value="md5">TTL and TCP MD5 option</option><option value="badsum">TTL and invalid checksum</option></select><p>Helps the destination reject fake data. Applies only to fake TCP packets.</p></td></tr>
-              <tr><th><label for="fake_sni">Fake hostname</label></th><td><input id="fake_sni" type="text" maxlength="253" /><p>Optional hostname for fake TLS or hostname-splitting strategies. Empty uses the strategy default.</p></td></tr>
-              <tr><th><label for="fake_ttl">Fake packet TTL</label></th><td><input id="fake_ttl" type="number" min="1" max="255" /><p>Also used as fallback when automatic TTL cannot be determined.</p></td></tr>
-              <tr><th><label for="auto_ttl">Automatic TTL</label></th><td><label><input id="auto_ttl" type="checkbox" /> Estimate from server replies</label></td></tr>
-              <tr><th><label for="auto_ttl_delta">TTL distance adjustment</label></th><td><input id="auto_ttl_delta" type="number" min="-20" max="20" /><p>Negative values expire fake packets before the estimated destination.</p></td></tr>
-              <tr><th><label for="auto_ttl_min">Minimum automatic TTL</label></th><td><input id="auto_ttl_min" type="number" min="1" max="255" /></td></tr>
-              <tr><th><label for="auto_ttl_max">Maximum automatic TTL</label></th><td><input id="auto_ttl_max" type="number" min="1" max="255" /></td></tr>
-              <tr><th><label for="fake_repeats">Fake packet repeats</label></th><td><input id="fake_repeats" type="number" min="1" max="20" /><p>Applies to standalone TCP fakes and QUIC fakes.</p></td></tr>
-              <tr><th><label for="packet_limit">Initial packets inspected</label></th><td><input id="packet_limit" type="number" min="4" max="64" /><p>Per direction, per connection. Increase for larger handshakes; higher values add processing overhead.</p></td></tr>
+          <section id="panel-management" role="tabpanel" aria-labelledby="tab-management">
+            <label>
+              <input id="enabled" type="checkbox" />
+              Enable packet processing
+            </label>
+            <h2>
+              Destinations
+            </h2>
+            <p>
+              Specify IP addresses, subnets or domains. A connection is selected when its IP or domain matches either list. Empty lists disable processing.
+            </p>
+            <table class="FormTable ocf-config-table">
+              <tr>
+                <th>
+                  <label for="networks">
+                    IP addresses and subnets
+                  </label>
+                </th>
+                <td>
+                  <textarea id="networks" rows="4">
+                  </textarea>
+                  <p>
+                    One IPv4/IPv6 address or subnet per line.
+                  </p>
+                </td>
+              </tr>
+              <tr>
+                <th>
+                  <label for="domains">
+                    Domains
+                  </label>
+                </th>
+                <td>
+                  <textarea id="domains" rows="4">
+                  </textarea>
+                  <p>
+                    One domain per line, without URLs or wildcards. Includes subdomains. Encrypted or unavailable names cannot be matched.
+                  </p>
+                </td>
+              </tr>
             </table>
-          </details>
-          <p>Strategy effectiveness depends on the connection and provider. Test new connections after applying changes.</p>
-          <div class="apply_gen">
-            <button type="submit">Apply</button>
-            <button id="reload" type="button" class="ext-secondary">Reload</button>
-            <p id="result" role="status"></p>
+          </section>
+          <section id="panel-strategies" role="tabpanel" aria-labelledby="tab-strategies" hidden>
+            <h2>
+              Strategy presets
+            </h2>
+            <table class="FormTable ocf-config-table">
+              <tr>
+                <th>
+                  <label for="preset">
+                    Preset
+                  </label>
+                </th>
+                <td>
+                  <select id="preset">
+                    <option value="">
+                      Custom settings
+                    </option>
+                  </select>
+                  <p id="preset-description">
+                    Choose a starting point, then apply or adjust its settings.
+                  </p>
+                </td>
+              </tr>
+            </table>
+            <dl class="ocf-strategy-summary">
+              <div>
+                <dt>
+                  TCP
+                </dt>
+                <dd id="summary-tcp">
+                  -
+                </dd>
+              </div>
+              <div>
+                <dt>
+                  UDP
+                </dt>
+                <dd id="summary-udp">
+                  -
+                </dd>
+              </div>
+            </dl>
+            <p>
+              Presets fill the form. Review the settings and select Apply to save changes.
+            </p>
+            <details id="custom-strategy">
+              <summary>
+                Customize strategy
+              </summary>
+              <h2>
+                TCP connections
+              </h2>
+              <table class="FormTable ocf-config-table">
+                <tr>
+                  <th>
+                    <label for="tcp_strategy">
+                      Strategy
+                    </label>
+                  </th>
+                  <td>
+                    <select id="tcp_strategy">
+                      <option value="off">
+                        Off
+                      </option>
+                      <option value="split">
+                        Split packets
+                      </option>
+                      <option value="disorder">
+                        Split and reorder packets
+                      </option>
+                      <option value="fake">
+                        Fake packets
+                      </option>
+                      <option value="fake-split">
+                        Fake packets and split
+                      </option>
+                      <option value="fake-disorder">
+                        Fake packets and reorder
+                      </option>
+                      <option value="fakedsplit">
+                        Interleave fake and real segments
+                      </option>
+                      <option value="fakeddisorder">
+                        Interleave and reorder segments
+                      </option>
+                      <option value="hostfakesplit">
+                        Split around a fake hostname
+                      </option>
+                    </select>
+                  </td>
+                </tr>
+                <tr>
+                  <th>
+                    <label for="tcp_ports">
+                      TCP ports
+                    </label>
+                  </th>
+                  <td>
+                    <input id="tcp_ports" type="text" />
+                    <p>
+                      Comma-separated port numbers. Up to 15 ports.
+                    </p>
+                  </td>
+                </tr>
+                <tr>
+                  <th>
+                    <label for="split_positions">
+                      Split positions
+                    </label>
+                  </th>
+                  <td>
+                    <input id="split_positions" type="text" maxlength="128" />
+                    <p>
+                      Byte positions or markers, separated by commas: 2, host, midsld+1. Interleaving strategies accept one position.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+              <h2>
+                UDP connections
+              </h2>
+              <table class="FormTable ocf-config-table">
+                <tr>
+                  <th>
+                    <label for="udp_strategy">
+                      Strategy
+                    </label>
+                  </th>
+                  <td>
+                    <select id="udp_strategy">
+                      <option value="off">
+                        Off
+                      </option>
+                      <option value="fake-quic">
+                        QUIC fake packets
+                      </option>
+                    </select>
+                  </td>
+                </tr>
+                <tr>
+                  <th>
+                    <label for="udp_ports">
+                      UDP ports
+                    </label>
+                  </th>
+                  <td>
+                    <input id="udp_ports" type="text" />
+                  </td>
+                </tr>
+              </table>
+              <h3>
+                Packet settings
+              </h3>
+              <table class="FormTable ocf-config-table">
+                <tr>
+                  <th>
+                    <label for="sequence_overlap">
+                      TCP sequence overlap
+                    </label>
+                  </th>
+                  <td>
+                    <input id="sequence_overlap" type="number" min="0" max="4096" />
+                    <p>
+                      Extra bytes before a split segment. Zero disables overlap.
+                    </p>
+                  </td>
+                </tr>
+                <tr>
+                  <th>
+                    <label for="fake_fooling">
+                      Fake TCP packet protection
+                    </label>
+                  </th>
+                  <td>
+                    <select id="fake_fooling">
+                      <option value="ttl">
+                        TTL only
+                      </option>
+                      <option value="badseq">
+                        TTL and out-of-window sequence
+                      </option>
+                      <option value="md5">
+                        TTL and TCP MD5 option
+                      </option>
+                      <option value="badsum">
+                        TTL and invalid checksum
+                      </option>
+                    </select>
+                    <p>
+                      Helps the destination reject fake data. Applies only to fake TCP packets.
+                    </p>
+                  </td>
+                </tr>
+                <tr>
+                  <th>
+                    <label for="fake_sni">
+                      Fake hostname
+                    </label>
+                  </th>
+                  <td>
+                    <input id="fake_sni" type="text" maxlength="253" />
+                    <p>
+                      Optional hostname for fake TLS or hostname-splitting strategies. Empty uses the strategy default.
+                    </p>
+                  </td>
+                </tr>
+                <tr>
+                  <th>
+                    <label for="fake_ttl">
+                      Fake packet TTL
+                    </label>
+                  </th>
+                  <td>
+                    <input id="fake_ttl" type="number" min="1" max="255" />
+                    <p>
+                      Also used as fallback when automatic TTL cannot be determined.
+                    </p>
+                  </td>
+                </tr>
+                <tr>
+                  <th>
+                    <label for="auto_ttl">
+                      Automatic TTL
+                    </label>
+                  </th>
+                  <td>
+                    <label>
+                      <input id="auto_ttl" type="checkbox" />
+                      Estimate from server replies
+                    </label>
+                  </td>
+                </tr>
+                <tr>
+                  <th>
+                    <label for="auto_ttl_delta">
+                      TTL distance adjustment
+                    </label>
+                  </th>
+                  <td>
+                    <input id="auto_ttl_delta" type="number" min="-20" max="20" />
+                    <p>
+                      Negative values expire fake packets before the estimated destination.
+                    </p>
+                  </td>
+                </tr>
+                <tr>
+                  <th>
+                    <label for="auto_ttl_min">
+                      Minimum automatic TTL
+                    </label>
+                  </th>
+                  <td>
+                    <input id="auto_ttl_min" type="number" min="1" max="255" />
+                  </td>
+                </tr>
+                <tr>
+                  <th>
+                    <label for="auto_ttl_max">
+                      Maximum automatic TTL
+                    </label>
+                  </th>
+                  <td>
+                    <input id="auto_ttl_max" type="number" min="1" max="255" />
+                  </td>
+                </tr>
+                <tr>
+                  <th>
+                    <label for="fake_repeats">
+                      Fake packet repeats
+                    </label>
+                  </th>
+                  <td>
+                    <input id="fake_repeats" type="number" min="1" max="20" />
+                    <p>
+                      Applies to standalone TCP fakes and QUIC fakes.
+                    </p>
+                  </td>
+                </tr>
+                <tr>
+                  <th>
+                    <label for="packet_limit">
+                      Initial packets inspected
+                    </label>
+                  </th>
+                  <td>
+                    <input id="packet_limit" type="number" min="4" max="64" />
+                    <p>
+                      Per direction, per connection. Increase for larger handshakes; higher values add processing overhead.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </details>
+          </section>
+          <div class="apply_gen ocf-save-bar">
+            <span id="unsaved" role="status" hidden>
+              Unsaved changes
+            </span>
+            <button type="submit">
+              Apply
+            </button>
+            <button id="reload" type="button" class="ext-secondary">
+              Reload
+            </button>
+            <p id="result" role="status">
+            </p>
           </div>
         </fieldset>
       </form>
-      <details id="scanner">
-        <summary>Find a working HTTPS strategy</summary>
-        <p>Compare a connection without processing with TCP presets. Each preset makes two HTTPS requests through WAN. Saved settings and other connections are unchanged.</p>
-        <p>Choose a domain and TCP port covered by your saved destinations. Only public IPv4 destinations are tested. DNS, QUIC and download speed are not evaluated.</p>
-        <table class="FormTable">
-          <tr><th><label for="scan-host">Test domain</label></th><td><input id="scan-host" type="text" maxlength="253" placeholder="example.com" /></td></tr>
-          <tr><th><label for="scan-port">HTTPS port</label></th><td><input id="scan-port" type="number" min="1" max="65535" value="443" /></td></tr>
+      <section id="panel-finder" role="tabpanel" aria-labelledby="tab-finder" hidden>
+        <h2>
+          Find a working HTTPS strategy
+        </h2>
+        <p>
+          Choose a service endpoint or enter a domain to compare TCP presets. Tests do not change your destination lists or settings.
+        </p>
+        <table class="FormTable ocf-config-table">
+          <tr>
+            <th>
+              <label for="scan-target">
+                Suggested targets
+              </label>
+            </th>
+            <td>
+              <select id="scan-target">
+                <option value="">
+                  Custom domain
+                </option>
+              </select>
+            </td>
+          </tr>
+          <tr>
+            <th>
+              <label for="scan-host">
+                Test domain
+              </label>
+            </th>
+            <td>
+              <input id="scan-host" type="text" maxlength="253" placeholder="example.com" />
+            </td>
+          </tr>
+          <tr>
+            <th>
+              <label for="scan-port">
+                HTTPS port
+              </label>
+            </th>
+            <td>
+              <input id="scan-port" type="number" min="1" max="65535" value="443" />
+            </td>
+          </tr>
         </table>
-        <div class="apply_gen"><button id="scan-start" type="button">Start test</button><button id="scan-cancel" type="button" class="ext-secondary" disabled>Cancel</button></div>
-        <p id="scan-state" role="status"></p>
-        <div class="ext-table-scroll"><table class="FormTable"><thead><tr><th>Preset</th><th>Successful attempts</th><th>Response time</th><th>HTTP status</th><th>Settings</th></tr></thead><tbody id="scan-results"></tbody></table></div>
-        <p>A successful response confirms HTTPS connectivity to this server, not access to every resource on the site. Selecting a result fills the form; Apply saves it.</p>
-      </details>
+        <div class="apply_gen">
+          <button id="scan-start" type="button">
+            Start test
+          </button>
+          <button id="scan-cancel" type="button" class="ext-secondary" disabled>
+            Cancel
+          </button>
+        </div>
+        <p id="scan-state" role="status">
+        </p>
+        <div class="ext-table-scroll">
+          <table class="FormTable">
+            <thead>
+              <tr>
+                <th>
+                  Preset
+                </th>
+                <th>
+                  Successful attempts
+                </th>
+                <th>
+                  Response time
+                </th>
+                <th>
+                  HTTP status
+                </th>
+                <th>
+                  Settings
+                </th>
+              </tr>
+            </thead>
+            <tbody id="scan-results">
+            </tbody>
+          </table>
+        </div>
+        <p>
+          Use settings fills the form. Apply saves the selected strategy.
+        </p>
+        <details>
+          <summary>
+            About this test
+          </summary>
+          <p>
+            Suggestions identify individual service endpoints, not complete service lists. Testing a website does not test its apps, calls or video streams.
+          </p>
+          <p>
+            Compare a connection without processing with TCP presets. Each preset makes two HTTPS requests through WAN. Saved settings and other connections are unchanged.
+          </p>
+          <p>
+            Only the selected public IPv4 endpoint and HTTPS port are tested. DNS, QUIC and download speed are not evaluated.
+          </p>
+          <p>
+            A successful response confirms HTTPS connectivity to this server, not access to every resource on the site. Selecting a result fills the form; Apply saves it.
+          </p>
+          <p>
+            Only HTTPS over TCP is tested. A working HTTPS strategy does not confirm DTLS, WireGuard or other UDP protocols.
+          </p>
+        </details>
+      </section>
+      <section id="panel-diagnostics" role="tabpanel" aria-labelledby="tab-diagnostics" hidden>
+        <h2>
+          Diagnostics
+        </h2>
+        <dl class="ocf-diagnostics">
+          <div>
+            <dt>
+              Module version
+            </dt>
+            <dd id="diagnostic-version">
+              -
+            </dd>
+          </div>
+          <div>
+            <dt>
+              Engine version
+            </dt>
+            <dd id="diagnostic-engine">
+              -
+            </dd>
+          </div>
+          <div>
+            <dt>
+              Saved IP addresses and subnets
+            </dt>
+            <dd id="diagnostic-networks">
+              -
+            </dd>
+          </div>
+          <div>
+            <dt>
+              Saved domains
+            </dt>
+            <dd id="diagnostic-domains">
+              -
+            </dd>
+          </div>
+        </dl>
+        <details>
+          <summary>
+            Processing scope
+          </summary>
+          <p>
+            Only selected direct WAN connections are processed. Domain matching requires a visible server name. Traffic inside a VPN tunnel is not inspected.
+          </p>
+        </details>
+      </section>
     </main>
-    <script src="app.js"></script>
-    <script src="translations.js"></script>
-    <script src="/user/ocfusion-i18n.js"></script>
+    <script src="layout.js">
+    </script>
+    <script src="targets.js">
+    </script>
+    <script src="app.js">
+    </script>
+    <script src="translations.js">
+    </script>
+    <script src="/user/ocfusion-i18n.js">
+    </script>
   </body>
 </html>

@@ -3,6 +3,7 @@ package main
 
 import (
 	"encoding/json"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"strings"
@@ -37,14 +38,14 @@ func TestPresetCatalogIsBoundedAndReproducible(t *testing.T) {
 	}
 }
 
-func TestScanSelectionUsesDomainOrAddress(t *testing.T) {
-	c := defaultConfig()
-	c.Domains = []string{"example.com"}
-	if !domainSelected(c, "a.example.com") || !domainSelected(c, "example.com") || domainSelected(c, "badexample.com") || domainSelected(c, "example.com.evil.org") {
-		t.Fatal("domain boundary")
+func TestScanOnlyUsesPublicIPv4(t *testing.T) {
+	for _, value := range []string{"127.0.0.1", "10.1.2.3", "192.168.1.1", "169.254.1.1", "224.0.0.1", "::1", "2001:db8::1"} {
+		if scanAddressAllowed(netip.MustParseAddr(value)) {
+			t.Fatal("non-public destination accepted", value)
+		}
 	}
-	if containsPort([]int{80, 443}, 8443) || !containsPort([]int{80, 443}, 443) {
-		t.Fatal("port boundary")
+	if !scanAddressAllowed(netip.MustParseAddr("8.8.8.8")) {
+		t.Fatal("public IPv4 rejected")
 	}
 }
 
@@ -86,15 +87,15 @@ func TestScanRequestRevisionLockAndCancellation(t *testing.T) {
 	for _, raw := range []string{
 		`{"revision":3,"host":"example.com","port":443}`,
 		`{"revision":4,"host":"https://example.com","port":443}`,
-		`{"revision":4,"host":"example.com","port":8443}`,
+		`{"revision":4,"host":"example.com","port":0}`,
 		`{"revision":4,"host":"example.com","port":443,"argv":"bad"}`,
 	} {
 		if _, err := requestScan([]byte(raw)); err == nil {
 			t.Fatal("invalid scan accepted", raw)
 		}
 	}
-	state, err := requestScan([]byte(`{"revision":4,"host":"Example.com.","port":443}`))
-	if err != nil || state.State != "QUEUED" || state.Host != "example.com" {
+	state, err := requestScan([]byte(`{"revision":4,"host":"Example.net.","port":8443}`))
+	if err != nil || state.State != "QUEUED" || state.Host != "example.net" || state.Port != 8443 {
 		t.Fatal(state, err)
 	}
 	if _, err = requestScan([]byte(`{"revision":4,"host":"example.com","port":443}`)); err == nil {

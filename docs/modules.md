@@ -601,7 +601,9 @@ a projection to the form does not save configuration; use normal revision-aware
 configuration updates. Arbitrary command lines and Lua imports are not accepted.
 
 `scan-start` accepts `{"revision":1,"host":"example.com","port":443}` against
-the saved destination selection and TCP ports. It requires a live module
+the current configuration revision. The explicit test host/port need not be in
+the saved processing selection. They authorize only isolated temporary test
+sockets and never update the persistent selection. It requires a live module
 service, allows one scan at a time and returns an unpredictable scan `id`.
 `scan-cancel` accepts `{"id":"..."}` and rejects stale IDs. The live daemon owns
 the asynchronous scan and its child process; no detached service is started.

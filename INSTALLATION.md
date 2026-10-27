@@ -230,6 +230,11 @@ The optional zapret2 module processes selected direct WAN connections without a
 VPN or a third-party relay. It is excluded from the default build and disabled
 initially. Install its standalone module package or build with `-Dmodules=all`.
 
+The module has four sections: **Management** for enable/disable and destination
+lists, **Strategies** for presets and optional manual tuning, **Strategy finder**
+for isolated HTTPS tests, and **Diagnostics** for saved-list counts and versions.
+Switching sections retains unsaved changes; only **Apply** saves them.
+
 Enter destination IPv4/IPv6 addresses or CIDR subnets, domain names, or both.
 A match in either list selects the connection (IP/subnet OR domain). Empty
 lists disable interception. IP selection happens in the firewall; domain selection uses
@@ -262,8 +267,12 @@ lists and ports. TCP presets retain the UDP strategy; fake-packet parameters
 are shared between protocols and remain visible in the form.
 
 **Find a working HTTPS strategy** compares an unmodified baseline with the TCP
-presets, twice each. Save destination lists and TCP ports first, then enter a
-covered domain and HTTPS port. The test resolves one public IPv4 address and
+presets, twice each. Choose a suggested service endpoint or enter a domain and
+HTTPS port. Suggestions include individual website/API/CDN hosts, with endpoint
+names referenced from [zapret-gui's target profiles](https://github.com/avatarDD/zapret-gui/blob/9d1c39abf6ec7fa80dcceed5ab9c28e329b5889c/core/scan_targets.py).
+They are not complete service hostlists and are not added to persistent
+processing lists. An explicit test target can be outside the saved selection;
+only that test socket is intercepted. The test resolves one public IPv4 address and
 uses that same address for every attempt. It binds sockets to WAN and verifies
 TLS certificates, without redirects or proxy environment variables. Timing
 starts after temporary packet-processing setup and excludes DNS lookup.

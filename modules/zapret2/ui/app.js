@@ -55,6 +55,11 @@ function updateStrategyFields() {
   document.getElementById("fake_fooling").closest("tr").hidden = !tcpFakes;
   document.getElementById("fake_sni").closest("tr").hidden = !standaloneFakes && tcp !== "hostfakesplit";
   document.getElementById("fake_repeats").closest("tr").hidden = !standaloneFakes && udp === "off";
+
+  for (const protocol of ["tcp", "udp"]) {
+    const select = document.getElementById(protocol + "_strategy");
+    document.getElementById("summary-" + protocol).textContent = select.selectedOptions[0].dataset.label;
+  }
 }
 
 async function load() {
@@ -121,6 +126,9 @@ async function load() {
 
     renderedScan = "";
     renderScan(scan);
+    setDirty(false);
+    document.getElementById("diagnostic-networks").textContent = String((config.networks || []).length);
+    document.getElementById("diagnostic-domains").textContent = String((config.domains || []).length);
     result.textContent = "";
   } catch (error) {
     result.textContent = error.message;
@@ -186,6 +194,8 @@ async function updateStatus() {
     };
     document.getElementById("state").textContent = labels[snapshot.data?.state] || "Unavailable";
     renderScan(snapshot.data?.scan);
+    document.getElementById("diagnostic-version").textContent = snapshot.data?.version || "-";
+    document.getElementById("diagnostic-engine").textContent = snapshot.data?.upstream || "-";
   } catch (error) {
     document.getElementById("state").textContent = "Unavailable";
   }
@@ -195,7 +205,11 @@ for (const id of ["tcp_strategy", "udp_strategy", "auto_ttl"]) {
   document.getElementById(id).addEventListener("change", updateStrategyFields);
 }
 
-document.getElementById("reload").addEventListener("click", load);
+document.getElementById("reload").addEventListener("click", () => {
+  if (confirmDiscard()) {
+    load();
+  }
+});
 load().then(updateStatus);
 setInterval(updateStatus, 3000);
 
@@ -218,6 +232,7 @@ function selectPreset(id) {
     }
   }
 
+  setDirty(true);
   document.getElementById("preset").value = id;
   document.getElementById("preset-description").textContent = preset.description;
   updateStrategyFields();
@@ -241,6 +256,7 @@ function renderScan(state) {
   document.getElementById("scan-start").disabled = running || scanBusy || !config;
   document.getElementById("scan-cancel").disabled = !running || scanBusy;
   document.getElementById("scan-host").disabled = running || scanBusy;
+  document.getElementById("scan-target").disabled = running || scanBusy;
   document.getElementById("scan-port").disabled = running || scanBusy;
   const signature = JSON.stringify([state, config?.revision, pending, catalog.length]);
 
@@ -284,6 +300,7 @@ function renderScan(state) {
       button.textContent = "Use settings";
       button.disabled = pending || state.revision !== config?.revision;
       button.addEventListener("click", () => {
+        selectTab("strategies");
         selectPreset(entry.preset);
         document.getElementById("preset").scrollIntoView({block: "center", behavior: "smooth"});
       });

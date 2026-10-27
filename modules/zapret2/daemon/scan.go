@@ -90,8 +90,8 @@ func requestScan(data []byte) (ScanState, error) {
 	}
 	c, err := loadConfig()
 	request.Host = strings.ToLower(strings.TrimSuffix(strings.TrimSpace(request.Host), "."))
-	if err != nil || request.Revision != c.Revision || request.ID != "" || len(request.Host) > 253 || !domainPattern.MatchString(request.Host) || net.ParseIP(request.Host) != nil || !containsPort(c.TCPPorts, request.Port) {
-		return ScanState{}, errors.New("choose a domain and TCP port from the saved destinations")
+	if err != nil || request.Revision != c.Revision || request.ID != "" || len(request.Host) > 253 || !domainPattern.MatchString(request.Host) || net.ParseIP(request.Host) != nil || (request.Port < 1 || request.Port > 65535) {
+		return ScanState{}, errors.New("choose a domain and HTTPS port")
 	}
 	// A live daemon owns the scan and all of its child processes.
 	status, err := os.Stat(scanPath("service.json"))
@@ -121,32 +121,8 @@ func requestScan(data []byte) (ScanState, error) {
 	return state, err
 }
 
-func containsPort(ports []int, wanted int) bool {
-	for _, port := range ports {
-		if port == wanted {
-			return true
-		}
-	}
-	return false
-}
-
-func domainSelected(c Config, host string) bool {
-	for _, domain := range c.Domains {
-		if host == domain || strings.HasSuffix(host, "."+domain) {
-			return true
-		}
-	}
-	return false
-}
-
-func addressSelected(c Config, address netip.Addr) bool {
-	for _, value := range c.Networks {
-		prefix, err := netip.ParsePrefix(value)
-		if err == nil && prefix.Contains(address) {
-			return true
-		}
-	}
-	return false
+func scanAddressAllowed(address netip.Addr) bool {
+	return address.Is4() && address.IsGlobalUnicast() && !address.IsPrivate()
 }
 
 func pendingScan() (ScanRequest, bool) {
@@ -236,7 +212,7 @@ func performScan(ctx context.Context, request ScanRequest, c Config, bypass stri
 		os.Remove(scanPath("lock"))
 	}()
 	writeJSON(scanPath("status.json"), state)
-	if request.Revision != c.Revision || !containsPort(c.TCPPorts, request.Port) {
+	if request.Revision != c.Revision || request.Port < 1 || request.Port > 65535 {
 		return errors.New("settings changed")
 	}
 	resolveCtx, cancel := context.WithTimeout(ctx, 8*time.Second)
@@ -250,14 +226,14 @@ func performScan(ctx context.Context, request ScanRequest, c Config, bypass stri
 	for _, value := range addresses {
 		value = value.Unmap()
 		// Never use a hostname test to access LAN, loopback or link-local services.
-		if value.Is4() && value.IsGlobalUnicast() && !value.IsPrivate() && (domainSelected(c, request.Host) || addressSelected(c, value)) {
+		if scanAddressAllowed(value) {
 			address = value.String()
 			break
 		}
 	}
 	if address == "" {
-		state.Error = "No allowed public IPv4 address"
-		return errors.New("no public IPv4 destination in the saved selection")
+		state.Error = "No public IPv4 address"
+		return errors.New("no public IPv4 destination")
 	}
 	iface, err := wan("-4")
 	if err != nil {

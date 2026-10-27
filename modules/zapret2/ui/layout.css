@@ -1,0 +1,109 @@
+.ocf-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 20px 0;
+  border-bottom: 1px solid var(--ext-line);
+}
+.ocf-tabs button {
+  float: none;
+  margin: 0;
+  border-radius: 5px 5px 0 0;
+}
+.ocf-tabs [aria-selected="true"] {
+  border-bottom: 3px solid var(--ext-accent);
+}
+.ext-module [hidden] {
+  display: none !important;
+}
+.ext-module .ocf-strategy-summary,
+.ext-module .ocf-diagnostics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin: 20px 0;
+}
+.ocf-strategy-summary > div,
+.ocf-diagnostics > div {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--ext-line);
+}
+.ocf-strategy-summary dt,
+.ocf-diagnostics dt {
+  color: var(--ext-muted, #aaa);
+  margin-bottom: 8px;
+}
+.ocf-strategy-summary dd,
+.ocf-diagnostics dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+#custom-strategy {
+  margin-top: 20px;
+}
+#custom-strategy h2,
+#custom-strategy h3 {
+  margin-top: 24px;
+}
+.ocf-save-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--ext-line);
+}
+.ocf-save-bar button {
+  margin: 0;
+}
+#unsaved {
+  color: var(--ext-accent);
+  flex-basis: 100%;
+}
+.ext-table-scroll {
+  overflow-x: auto;
+}
+.ext-module button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+@media (max-width: 520px) {
+  .ocf-tabs button {
+    flex: 1 1 40%;
+  }
+}
+
+.ocf-tabs [aria-selected="false"] {
+  background: var(--ext-panel);
+  color: #bbb;
+  border-color: var(--ext-line);
+}
+.ocf-config-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.ocf-config-table th,
+.ocf-config-table td {
+  padding: 10px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+.ocf-config-table th {
+  width: 28%;
+}
+.ocf-config-table input:not([type="checkbox"]),
+.ocf-config-table select,
+.ocf-config-table textarea {
+  width: 100%;
+  box-sizing: border-box;
+}
+@media (max-width: 520px) {
+  .ocf-config-table th,
+  .ocf-config-table td {
+    display: block;
+    width: auto;
+    padding-left: 0;
+    padding-right: 0;
+  }
+}

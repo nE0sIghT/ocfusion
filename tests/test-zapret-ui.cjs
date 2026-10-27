@@ -12,6 +12,9 @@ async function main() {
   const assets = {
     "/module/index.html": "modules/zapret2/ui/index.html",
     "/module/app.js": "modules/zapret2/ui/app.js",
+    "/module/targets.js": "modules/zapret2/ui/targets.js",
+    "/module/layout.js": "modules/zapret2/ui/layout.js",
+    "/module/layout.css": "modules/zapret2/ui/layout.css",
     "/module/translations.js": "modules/zapret2/ui/translations.js",
     "/user/ocfusion-i18n.js": "web/i18n.js",
     "/user/extensions-panel.css": "web/panel.css",
@@ -75,18 +78,27 @@ async function main() {
       await frame.locator("#fields:not([disabled])").waitFor();
       assert.equal(await frame.locator("#enabled").isChecked(), false);
       assert.equal(await frame.locator("#udp_strategy").inputValue(), "off");
+      assert.equal(await frame.locator("[role=tabpanel]:visible").count(), 1);
+      assert.equal(await frame.locator("#custom-strategy").getAttribute("open"), null);
+      await frame.locator("#tab-management").focus();
+      await frame.locator("#tab-management").press("End");
+      assert.equal(await frame.locator("#panel-diagnostics").isVisible(), true);
+      assert.equal(await frame.locator("#settings").isVisible(), false);
+      await frame.locator("#tab-diagnostics").press("Home");
       await frame.locator("#networks").fill("203.0.113.10\n2001:db8::/32");
       await frame.locator("#domains").fill("example.com");
+      await frame.locator("#enabled").check();
+      await frame.locator("#tab-strategies").click();
+      await frame.locator("#custom-strategy summary").click();
       assert.equal(await frame.locator("#fake_ttl").evaluate((element) => element.closest("tr").hidden), true);
       await frame.locator("#tcp_strategy").selectOption("fake-split");
       assert.equal(await frame.locator("#fake_ttl").evaluate((element) => element.closest("tr").hidden), false);
       await frame.locator("#split_positions").fill("host, midsld+1");
-      await frame.locator("details:not(#scanner) summary").click();
+
       await frame.locator("#auto_ttl").check();
       await frame.locator("#fake_sni").fill("example.net");
       await frame.locator("#fake_fooling").selectOption("badseq");
       await frame.locator("#packet_limit").fill("24");
-      await frame.locator("#enabled").check();
       await frame.locator("#settings button[type=submit]").click();
       assert.equal(await frame.locator("#settings button[type=submit]").isDisabled(), true);
       await frame.locator("#fields:not([disabled])").waitFor();
@@ -103,10 +115,16 @@ async function main() {
       assert.equal(saved.auto_ttl, true);
       assert.equal(saved.auto_ttl_delta, -1);
       assert.equal(saved.packet_limit, 24);
+      assert.equal(await frame.locator("#unsaved").isVisible(), false);
       await frame.locator("#preset").selectOption("hostname");
+      assert.equal(await frame.locator("#unsaved").isVisible(), true);
       assert.equal(await frame.locator("#split_positions").inputValue(), "1,midsld");
       assert.equal((await page.evaluate(() => window.changes)).length, 1);
-      await frame.locator("#scanner summary").click();
+      await frame.locator("#tab-finder").click();
+      await frame.locator("#scan-target").selectOption("youtube.com");
+      assert.equal(await frame.locator("#scan-host").inputValue(), "youtube.com");
+      assert.equal((await page.evaluate(() => window.changes)).length, 1);
+      assert.equal(await frame.locator("#settings").isVisible(), false);
       await frame.locator("#scan-host").fill("example.com");
       await frame.locator("#scan-start").click();
       await frame.locator("#scan-cancel:not([disabled])").waitFor();
@@ -120,6 +138,8 @@ async function main() {
       await frame.locator("#scan-results button").click();
       assert.equal(await frame.locator("#tcp_strategy").inputValue(), "split");
       assert.equal((await page.evaluate(() => window.changes)).length, 1);
+      assert.equal(await frame.locator("#tab-strategies").getAttribute("aria-selected"), "true");
+      await frame.locator("#tab-management").click();
       const body = await frame.locator("body").innerText();
       assert(body.includes(language === "ru" ? "IP-адреса и подсети" : "IP addresses and subnets"));
       assert(body.includes(language === "ru" ? "любым из списков" : "matches either list"));
@@ -134,7 +154,7 @@ async function main() {
     await new Promise((resolve) => server.close(resolve));
   }
 
-  console.log("PASS: zapret2 EN/RU, selective targets, settings revision and pending controls");
+  console.log("PASS: zapret2 EN/RU tabs, keyboard navigation, unsaved settings, target suggestions and scanner results");
 }
 
 main().catch((error) => {

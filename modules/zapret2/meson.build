@@ -36,6 +36,9 @@ module_specs += {
             'packaging/module.json.in',
             'ui/index.html',
             'ui/app.js',
+            'ui/layout.js',
+            'ui/targets.js',
+            'ui/layout.css',
             'ui/translations.js',
         ),
         'generated_data': [
