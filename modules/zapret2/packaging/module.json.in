@@ -7,7 +7,7 @@
   "entrypoint": "bin/ocfusion-zapret2",
   "ui": "ui/index.html",
   "dependencies": [],
-  "actions": ["settings"],
+  "actions": ["settings", "presets", "scan-start", "scan-cancel"],
   "capabilities": ["network.packet-processing"],
   "resources": {"packet-processing.zapret2": "wan"}
 }

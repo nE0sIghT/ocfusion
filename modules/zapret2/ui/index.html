@@ -19,7 +19,7 @@
         <fieldset id="fields" disabled>
           <label><input id="enabled" type="checkbox" /> Enable packet processing</label>
           <h2>Destinations</h2>
-          <p>Specify IP addresses, subnets or domains. With both lists filled, a connection must match both. Empty lists disable processing.</p>
+          <p>Specify IP addresses, subnets or domains. A connection is selected when its IP or domain matches either list. Empty lists disable processing.</p>
           <table class="FormTable">
             <tr>
               <th><label for="networks">IP addresses and subnets</label></th>
@@ -30,22 +30,40 @@
               <td><textarea id="domains" rows="4"></textarea><p>One domain per line, without URLs or wildcards. Includes subdomains. Encrypted or unavailable names cannot be matched.</p></td>
             </tr>
           </table>
+          <h2>Strategy presets</h2>
+          <table class="FormTable">
+            <tr><th><label for="preset">Preset</label></th><td><select id="preset"><option value="">Custom settings</option></select><p id="preset-description">Choose a starting point, then apply or adjust its settings.</p></td></tr>
+          </table>
           <h2>TCP connections</h2>
           <table class="FormTable">
             <tr>
               <th><label for="tcp_strategy">Strategy</label></th>
-              <td><select id="tcp_strategy"><option value="off">Off</option><option value="split">Split packets</option><option value="disorder">Split and reorder packets</option></select></td>
+              <td><select id="tcp_strategy"><option value="off">Off</option><option value="split">Split packets</option><option value="disorder">Split and reorder packets</option><option value="fake">Fake packets</option><option value="fake-split">Fake packets and split</option><option value="fake-disorder">Fake packets and reorder</option><option value="fakedsplit">Interleave fake and real segments</option><option value="fakeddisorder">Interleave and reorder segments</option><option value="hostfakesplit">Split around a fake hostname</option></select></td>
             </tr>
             <tr><th><label for="tcp_ports">TCP ports</label></th><td><input id="tcp_ports" type="text" /><p>Comma-separated port numbers. Up to 15 ports.</p></td></tr>
-            <tr><th><label for="split_position">Split position</label></th><td><input id="split_position" type="number" min="1" max="1500" /><p>Byte position in the initial HTTP request or TLS handshake.</p></td></tr>
+            <tr><th><label for="split_positions">Split positions</label></th><td><input id="split_positions" type="text" maxlength="128" /><p>Byte positions or markers, separated by commas: 2, host, midsld+1. Interleaving strategies accept one position.</p></td></tr>
           </table>
           <h2>UDP connections</h2>
           <table class="FormTable">
             <tr><th><label for="udp_strategy">Strategy</label></th><td><select id="udp_strategy"><option value="off">Off</option><option value="fake-quic">QUIC fake packets</option></select></td></tr>
             <tr><th><label for="udp_ports">UDP ports</label></th><td><input id="udp_ports" type="text" /></td></tr>
-            <tr><th><label for="fake_ttl">Fake packet TTL</label></th><td><input id="fake_ttl" type="number" min="1" max="255" /></td></tr>
-            <tr><th><label for="fake_repeats">Fake packet repeats</label></th><td><input id="fake_repeats" type="number" min="1" max="20" /></td></tr>
+
           </table>
+          <details>
+            <summary>Advanced strategy settings</summary>
+            <table class="FormTable">
+              <tr><th><label for="sequence_overlap">TCP sequence overlap</label></th><td><input id="sequence_overlap" type="number" min="0" max="4096" /><p>Extra bytes before a split segment. Zero disables overlap.</p></td></tr>
+              <tr><th><label for="fake_fooling">Fake TCP packet protection</label></th><td><select id="fake_fooling"><option value="ttl">TTL only</option><option value="badseq">TTL and out-of-window sequence</option><option value="md5">TTL and TCP MD5 option</option><option value="badsum">TTL and invalid checksum</option></select><p>Helps the destination reject fake data. Applies only to fake TCP packets.</p></td></tr>
+              <tr><th><label for="fake_sni">Fake hostname</label></th><td><input id="fake_sni" type="text" maxlength="253" /><p>Optional hostname for fake TLS or hostname-splitting strategies. Empty uses the strategy default.</p></td></tr>
+              <tr><th><label for="fake_ttl">Fake packet TTL</label></th><td><input id="fake_ttl" type="number" min="1" max="255" /><p>Also used as fallback when automatic TTL cannot be determined.</p></td></tr>
+              <tr><th><label for="auto_ttl">Automatic TTL</label></th><td><label><input id="auto_ttl" type="checkbox" /> Estimate from server replies</label></td></tr>
+              <tr><th><label for="auto_ttl_delta">TTL distance adjustment</label></th><td><input id="auto_ttl_delta" type="number" min="-20" max="20" /><p>Negative values expire fake packets before the estimated destination.</p></td></tr>
+              <tr><th><label for="auto_ttl_min">Minimum automatic TTL</label></th><td><input id="auto_ttl_min" type="number" min="1" max="255" /></td></tr>
+              <tr><th><label for="auto_ttl_max">Maximum automatic TTL</label></th><td><input id="auto_ttl_max" type="number" min="1" max="255" /></td></tr>
+              <tr><th><label for="fake_repeats">Fake packet repeats</label></th><td><input id="fake_repeats" type="number" min="1" max="20" /><p>Applies to standalone TCP fakes and QUIC fakes.</p></td></tr>
+              <tr><th><label for="packet_limit">Initial packets inspected</label></th><td><input id="packet_limit" type="number" min="4" max="64" /><p>Per direction, per connection. Increase for larger handshakes; higher values add processing overhead.</p></td></tr>
+            </table>
+          </details>
           <p>Strategy effectiveness depends on the connection and provider. Test new connections after applying changes.</p>
           <div class="apply_gen">
             <button type="submit">Apply</button>
@@ -54,6 +72,19 @@
           </div>
         </fieldset>
       </form>
+      <details id="scanner">
+        <summary>Find a working HTTPS strategy</summary>
+        <p>Compare a connection without processing with TCP presets. Each preset makes two HTTPS requests through WAN. Saved settings and other connections are unchanged.</p>
+        <p>Choose a domain and TCP port covered by your saved destinations. Only public IPv4 destinations are tested. DNS, QUIC and download speed are not evaluated.</p>
+        <table class="FormTable">
+          <tr><th><label for="scan-host">Test domain</label></th><td><input id="scan-host" type="text" maxlength="253" placeholder="example.com" /></td></tr>
+          <tr><th><label for="scan-port">HTTPS port</label></th><td><input id="scan-port" type="number" min="1" max="65535" value="443" /></td></tr>
+        </table>
+        <div class="apply_gen"><button id="scan-start" type="button">Start test</button><button id="scan-cancel" type="button" class="ext-secondary" disabled>Cancel</button></div>
+        <p id="scan-state" role="status"></p>
+        <div class="ext-table-scroll"><table class="FormTable"><thead><tr><th>Preset</th><th>Successful attempts</th><th>Response time</th><th>HTTP status</th><th>Settings</th></tr></thead><tbody id="scan-results"></tbody></table></div>
+        <p>A successful response confirms HTTPS connectivity to this server, not access to every resource on the site. Selecting a result fills the form; Apply saves it.</p>
+      </details>
     </main>
     <script src="app.js"></script>
     <script src="translations.js"></script>

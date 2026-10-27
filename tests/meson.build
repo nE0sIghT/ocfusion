@@ -122,15 +122,6 @@ foreach suite : ['unit', 'example']
 endforeach
 
 if get_option('browser_tests')
-    test(
-        'browser-zapret2',
-        node,
-        args: [files('test-zapret-ui.cjs')],
-        suite: 'browser',
-        timeout: 60,
-    )
-
-
     run_target(
         'test-browser',
         command: [

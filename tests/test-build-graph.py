@@ -86,6 +86,18 @@ def main():
     changes = [
         (
             "zapret2",
+            "modules/zapret2/daemon/strategy.go",
+            ["ocfusion-zapret2"],
+            [*C_TARGETS, "AdGuardHome", "extd", "ocfusion-vpn"],
+        ),
+        (
+            "zapret2",
+            "modules/zapret2/daemon/scan_worker.go",
+            ["ocfusion-zapret2"],
+            [*C_TARGETS, "AdGuardHome", "extd", "ocfusion-vpn"],
+        ),
+        (
+            "zapret2",
             "modules/zapret2/daemon/config.go",
             ["ocfusion-zapret2"],
             [*C_TARGETS, "AdGuardHome", "extd", "ocfusion-vpn"],

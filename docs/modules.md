@@ -591,3 +591,28 @@ run without network assignments while an egress lease needs them. Their clients
 read `egress_demand` in `dns-state` for their own module/profile pair; this does
 not select or change global DNS policy. Native Fusion connections must be
 activated in ASUS. The provider does not start them on the consumer's behalf.
+
+## zapret2 strategy actions
+
+The optional `zapret2` module declares `presets`, `scan-start` and `scan-cancel`
+in addition to `settings`. `presets` returns bounded, built-in strategy objects
+with `id`, `name`, `description`, `protocol` and a `settings` projection. Applying
+a projection to the form does not save configuration; use normal revision-aware
+configuration updates. Arbitrary command lines and Lua imports are not accepted.
+
+`scan-start` accepts `{"revision":1,"host":"example.com","port":443}` against
+the saved destination selection and TCP ports. It requires a live module
+service, allows one scan at a time and returns an unpredictable scan `id`.
+`scan-cancel` accepts `{"id":"..."}` and rejects stale IDs. The live daemon owns
+the asynchronous scan and its child process; no detached service is started.
+Public status includes `scan` with state, current preset and bounded results.
+Each result records a preset ID, attempt/success counts, mean successful
+response time in milliseconds and HTTP status. Results expire with RAM; changing
+the configuration cancels the scan and invalidates result-selection controls.
+
+Tests use a fixed public IPv4 destination, WAN-bound TCP sockets, verified TLS
+and no redirects. Only the test socket tuple is intercepted. Separate worker
+marks prevent double processing, while ordinary configured processing remains
+active. Temporary rules are journaled separately, removed before killing the
+test consumer and recovered after interrupted execution. QUIC and IPv6 are not
+covered by the HTTPS test.

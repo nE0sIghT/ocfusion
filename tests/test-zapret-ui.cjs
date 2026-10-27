@@ -27,13 +27,30 @@ async function main() {
         window.changes = [];
         window.moduleState = "DISABLED";
         window.EXTENSIONS = {
-          action: async () => ({...window.saved}),
+          action: async (id, operation) => {
+            if (operation === "presets") {
+              return [{id: "hostname", name: "Hostname split", description: "Split within the server name.", protocol: "tcp", settings: {tcp_strategy: "split", split_positions: "1,midsld", sequence_overlap: 0, auto_ttl: false}}];
+            }
+
+            return {...window.saved};
+          },
+          call: async (id, operation, request) => {
+            window.lastCall = {operation, request};
+
+            if (operation === "scan-start") {
+              window.scan = {id: "test", state: "RUNNING", revision: window.saved.revision, results: []};
+            } else {
+              window.scan.state = "CANCELLED";
+            }
+
+            return window.scan;
+          },
           configure: async (id, settings) => {
             window.changes.push(settings);
             await new Promise((resolve) => setTimeout(resolve, 200));
             window.saved = settings;
           },
-          status: async () => ({data: {state: window.moduleState}})
+          status: async () => ({data: {state: window.moduleState, scan: window.scan || {state: "IDLE"}}})
         };
       </script><iframe src="/module/index.html"></iframe>`);
       return;
@@ -60,6 +77,15 @@ async function main() {
       assert.equal(await frame.locator("#udp_strategy").inputValue(), "off");
       await frame.locator("#networks").fill("203.0.113.10\n2001:db8::/32");
       await frame.locator("#domains").fill("example.com");
+      assert.equal(await frame.locator("#fake_ttl").evaluate((element) => element.closest("tr").hidden), true);
+      await frame.locator("#tcp_strategy").selectOption("fake-split");
+      assert.equal(await frame.locator("#fake_ttl").evaluate((element) => element.closest("tr").hidden), false);
+      await frame.locator("#split_positions").fill("host, midsld+1");
+      await frame.locator("details:not(#scanner) summary").click();
+      await frame.locator("#auto_ttl").check();
+      await frame.locator("#fake_sni").fill("example.net");
+      await frame.locator("#fake_fooling").selectOption("badseq");
+      await frame.locator("#packet_limit").fill("24");
       await frame.locator("#enabled").check();
       await frame.locator("#settings button[type=submit]").click();
       assert.equal(await frame.locator("#settings button[type=submit]").isDisabled(), true);
@@ -70,9 +96,33 @@ async function main() {
       assert.deepEqual(saved.tcp_ports, [80, 443]);
       assert.equal(saved.revision, 1);
       assert.equal(saved.enabled, true);
+      assert.equal(saved.tcp_strategy, "fake-split");
+      assert.equal(saved.split_positions, "host, midsld+1");
+      assert.equal(saved.fake_fooling, "badseq");
+      assert.equal(saved.fake_sni, "example.net");
+      assert.equal(saved.auto_ttl, true);
+      assert.equal(saved.auto_ttl_delta, -1);
+      assert.equal(saved.packet_limit, 24);
+      await frame.locator("#preset").selectOption("hostname");
+      assert.equal(await frame.locator("#split_positions").inputValue(), "1,midsld");
+      assert.equal((await page.evaluate(() => window.changes)).length, 1);
+      await frame.locator("#scanner summary").click();
+      await frame.locator("#scan-host").fill("example.com");
+      await frame.locator("#scan-start").click();
+      await frame.locator("#scan-cancel:not([disabled])").waitFor();
+      assert.deepEqual(await page.evaluate(() => window.lastCall), {operation: "scan-start", request: {revision: 1, host: "example.com", port: 443}});
+      await page.evaluate(() => {
+        window.scan = {id: "test", state: "COMPLETE", revision: 1, results: [{preset: "baseline", success: 0, attempts: 2}, {preset: "hostname", success: 2, attempts: 2, milliseconds: 125}]};
+      });
+      await frame.locator("#scan-results button").waitFor();
+      assert((await frame.locator("#scan-results").innerText()).includes("2/2"));
+      assert((await frame.locator("#scan-results").innerText()).includes("125 ms"));
+      await frame.locator("#scan-results button").click();
+      assert.equal(await frame.locator("#tcp_strategy").inputValue(), "split");
+      assert.equal((await page.evaluate(() => window.changes)).length, 1);
       const body = await frame.locator("body").innerText();
       assert(body.includes(language === "ru" ? "IP-адреса и подсети" : "IP addresses and subnets"));
-      assert(body.includes(language === "ru" ? "соответствовать обоим" : "match both"));
+      assert(body.includes(language === "ru" ? "любым из списков" : "matches either list"));
       assert.deepEqual(errors, []);
       await page.close();
     }

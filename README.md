@@ -25,8 +25,9 @@ OCFusion is running.
   uses custom upstreams including DoT and DoH. It also works without
   OpenConnect.
 - **zapret2** (optional) - applies DPI processing to explicit destination IP/subnet
-  and domain lists on direct WAN connections. Includes TCP split/reorder and
-  QUIC fake-packet strategies. Disabled by default; effectiveness depends on the
+  and domain lists on direct WAN connections. Includes TCP splitting,
+  reordering, fake-packet combinations, QUIC fakes and an isolated HTTPS
+  strategy finder. Disabled by default; effectiveness depends on the
   provider and strategy. Build with `-Dmodules=all` or install its standalone
   module package.
 - **Wi-Fi radio settings** (optional, source builds only) - selects a native ASUS regional profile and shows

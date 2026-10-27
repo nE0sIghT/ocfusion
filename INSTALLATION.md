@@ -231,20 +231,57 @@ VPN or a third-party relay. It is excluded from the default build and disabled
 initially. Install its standalone module package or build with `-Dmodules=all`.
 
 Enter destination IPv4/IPv6 addresses or CIDR subnets, domain names, or both.
-When both lists are populated, both conditions must match. Empty lists disable
-interception. IP selection happens in the firewall; domain selection uses
+A match in either list selects the connection (IP/subnet OR domain). Empty
+lists disable interception. IP selection happens in the firewall; domain selection uses
 HTTP Host or a visible TLS/QUIC server name. Domain entries include subdomains.
 Encrypted names such as ECH cannot reliably identify the intended domain.
 
-Choose TCP ports and split or split/reorder processing. QUIC processing is
-optional and uses fake initial packets with configurable TTL and repetition.
+Choose TCP ports and a strategy: split, split/reorder, standalone fake packets,
+fake packets followed by splitting/reordering, interleaved fake/real segments,
+or hostname-based fake splitting. Split positions accept byte offsets and
+upstream markers such as `host`, `midsld+1` and `sniext`; interleaving modes
+accept one position. Sequence overlap is optional.
+
+Advanced settings control fake-packet TTL/Hop Limit, automatic TTL estimation
+with a fixed fallback, optional fake TLS hostname and additional TCP protection
+(out-of-window sequence, TCP MD5 or invalid checksum). Negative automatic-TTL
+adjustments expire packets before the estimated destination. QUIC fake packets
+share the TTL and repetition settings; TCP-only protection does not apply to
+QUIC. Repetitions apply to standalone TCP fakes and QUIC fakes, not interleaved
+real segments.
 There is no universal strategy: verify the selected destinations after applying
 settings. Connections outside the selection are not modified. Domain-only
 selection inspects initial packets on the selected ports to discover the name.
+With both lists populated, independent upstream profiles implement OR matching:
+IP-selected connections do not require a matching or visible hostname.
 VPN interfaces are excluded from interception.
 
+Ready-made TCP and QUIC presets provide reproducible starting points. Choosing
+one fills the form; **Apply** saves the settings. Presets retain destination
+lists and ports. TCP presets retain the UDP strategy; fake-packet parameters
+are shared between protocols and remain visible in the form.
+
+**Find a working HTTPS strategy** compares an unmodified baseline with the TCP
+presets, twice each. Save destination lists and TCP ports first, then enter a
+covered domain and HTTPS port. The test resolves one public IPv4 address and
+uses that same address for every attempt. It binds sockets to WAN and verifies
+TLS certificates, without redirects or proxy environment variables. Timing
+starts after temporary packet-processing setup and excludes DNS lookup.
+The result measures HTTPS response headers, not download speed or QUIC.
+A valid HTTP response, including a redirect or access-denied response, is a
+connectivity result; it does not establish that every site resource works.
+
+The scanner isolates each socket by its destination and ephemeral source port.
+Normal processing continues with the saved settings. Results never apply
+automatically; select **Use settings**, review the form, then **Apply**.
+Cancel stops enumeration. Saving a changed configuration or stopping the module
+also cancels it. Temporary interception is removed between attempts and on
+exit; interrupted scans recover their recorded rules at the next startup.
+Results are kept in RAM and must be rechecked after connection changes.
+
 The module enables connection accounting when needed to limit inspection to the
-first 12 packets in each direction. Existing connections without accounting may
+first configured number of packets in each direction (12 by default, 4-64
+allowed). Existing connections without accounting may
 need to reconnect. Accounting remains enabled after removal because it is shared
 kernel state; module interception rules are removed. Hardware acceleration can
 bypass packet hooks on some firmware, so successful processing must be verified

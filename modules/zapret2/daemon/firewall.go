@@ -76,6 +76,9 @@ func applyRule(rule Rule, add bool) error {
 	op := "-D"
 	if add {
 		op = "-A"
+		if strings.Contains(strings.Join(rule.Args, " "), "ocfusion:zapret2-scan") {
+			op = "-I"
+		}
 	}
 
 	_, err = execute(rule.Tool, append([]string{"-t", "mangle", op, rule.Chain}, rule.Args...)...)
@@ -83,7 +86,11 @@ func applyRule(rule Rule, add bool) error {
 }
 
 func cleanup() error {
-	data, err := os.ReadFile(filepath.Join(runDir, "resources.json"))
+	return cleanupAt(filepath.Join(runDir, "resources.json"), "ocfusion:zapret2")
+}
+
+func cleanupAt(path, owner string) error {
+	data, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
 		return nil
 	}
@@ -95,13 +102,13 @@ func cleanup() error {
 
 	var failures error
 	for _, rule := range r.Rules {
-		if (rule.Tool != "iptables" && rule.Tool != "ip6tables") || (rule.Chain != "POSTROUTING" && rule.Chain != "PREROUTING") {
+		if (rule.Tool != "iptables" && rule.Tool != "ip6tables") || (rule.Chain != "POSTROUTING" && rule.Chain != "PREROUTING" && !(owner == "ocfusion:zapret2-scan" && rule.Chain == "OUTPUT")) {
 			return errors.New("invalid packet-processing recovery rule")
 		}
 
 		comment := false
 		for i, arg := range rule.Args {
-			if arg == "--comment" && i+1 < len(rule.Args) && rule.Args[i+1] == "ocfusion:zapret2" {
+			if arg == "--comment" && i+1 < len(rule.Args) && rule.Args[i+1] == owner {
 				comment = true
 			}
 		}
@@ -119,7 +126,7 @@ func cleanup() error {
 
 	// Accounting is shared kernel state. Leave it enabled rather than undoing
 	// another service's subsequent dependency on it. No traffic rule remains.
-	return os.Remove(filepath.Join(runDir, "resources.json"))
+	return os.Remove(path)
 }
 
 func wan(family string) (string, error) {
@@ -233,12 +240,16 @@ func allocate(c Config) (Resources, error) {
 
 	for _, family := range []string{"-4", "-6"} {
 		networks := []string{}
-		for _, prefix := range c.Networks {
-			if strings.Contains(prefix, ":") == (family == "-6") {
-				networks = append(networks, prefix)
+		// Domain selection must inspect candidate destinations independently of
+		// the IP list. The engine applies separate IP OR domain profiles.
+		if len(c.Domains) == 0 {
+			for _, prefix := range c.Networks {
+				if strings.Contains(prefix, ":") == (family == "-6") {
+					networks = append(networks, prefix)
+				}
 			}
 		}
-		if len(c.Networks) > 0 && len(networks) == 0 {
+		if len(c.Domains) == 0 && len(c.Networks) > 0 && len(networks) == 0 {
 			continue
 		}
 		if len(networks) == 0 {
@@ -277,7 +288,7 @@ func allocate(c Config) (Resources, error) {
 						args = append(args, addressFlag, prefix)
 					}
 					args = append(args, "-m", "multiport", portsFlag, portList(ports), "-m", "mark", "!", "--mark", r.Mark+"/"+r.Mark,
-						"-m", "connbytes", "--connbytes", "1:12", "--connbytes-dir", direction, "--connbytes-mode", "packets",
+						"-m", "connbytes", "--connbytes", "1:"+strconv.Itoa(c.PacketLimit), "--connbytes-dir", direction, "--connbytes-mode", "packets",
 						"-m", "comment", "--comment", "ocfusion:zapret2", "-j", "NFQUEUE", "--queue-num", strconv.Itoa(r.Queue), "--queue-bypass")
 					r.Rules = append(r.Rules, Rule{Tool: tool, Chain: chain, Args: args})
 				}

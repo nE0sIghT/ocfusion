@@ -21,21 +21,43 @@ var domainPattern = regexp.MustCompile(`^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?
 var interfacePattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,14}$`)
 
 type Config struct {
-	Revision uint64   `json:"revision"`
-	Enabled  bool     `json:"enabled"`
-	Networks []string `json:"networks"`
-	Domains  []string `json:"domains"`
-	TCPPorts []int    `json:"tcp_ports"`
-	UDPPorts []int    `json:"udp_ports"`
-	TCP      string   `json:"tcp_strategy"`
-	UDP      string   `json:"udp_strategy"`
-	Split    int      `json:"split_position"`
-	TTL      int      `json:"fake_ttl"`
-	Repeats  int      `json:"fake_repeats"`
+	Revision    uint64   `json:"revision"`
+	Enabled     bool     `json:"enabled"`
+	Networks    []string `json:"networks"`
+	Domains     []string `json:"domains"`
+	TCPPorts    []int    `json:"tcp_ports"`
+	UDPPorts    []int    `json:"udp_ports"`
+	TCP         string   `json:"tcp_strategy"`
+	UDP         string   `json:"udp_strategy"`
+	Split       int      `json:"split_position"`
+	Positions   string   `json:"split_positions"`
+	Overlap     int      `json:"sequence_overlap"`
+	TTL         int      `json:"fake_ttl"`
+	Repeats     int      `json:"fake_repeats"`
+	Fooling     string   `json:"fake_fooling"`
+	FakeSNI     string   `json:"fake_sni"`
+	AutoTTL     bool     `json:"auto_ttl"`
+	AutoDelta   int      `json:"auto_ttl_delta"`
+	AutoMin     int      `json:"auto_ttl_min"`
+	AutoMax     int      `json:"auto_ttl_max"`
+	PacketLimit int      `json:"packet_limit"`
 }
 
 func defaultConfig() Config {
-	return Config{TCPPorts: []int{80, 443}, UDPPorts: []int{443}, TCP: "split", UDP: "off", Split: 2, TTL: 3, Repeats: 3}
+	return Config{
+		TCPPorts:    []int{80, 443},
+		UDPPorts:    []int{443},
+		TCP:         "split",
+		UDP:         "off",
+		Split:       2,
+		TTL:         3,
+		Repeats:     3,
+		Fooling:     "ttl",
+		AutoDelta:   -1,
+		AutoMin:     3,
+		AutoMax:     20,
+		PacketLimit: 12,
+	}
 }
 
 func parseConfig(data []byte) (Config, error) {
@@ -69,8 +91,17 @@ func parseConfig(data []byte) (Config, error) {
 		}
 	}
 
-	if (c.TCP != "off" && c.TCP != "split" && c.TCP != "disorder") || (c.UDP != "off" && c.UDP != "fake-quic") {
-		return c, errors.New("invalid strategy")
+	c.FakeSNI = strings.ToLower(strings.TrimSuffix(c.FakeSNI, "."))
+	if c.Positions != "" {
+		markers := strings.Split(c.Positions, ",")
+		for i := range markers {
+			markers[i] = strings.TrimSpace(markers[i])
+		}
+		c.Positions = strings.Join(markers, ",")
+	}
+
+	if err := validateStrategy(c); err != nil {
+		return c, err
 	}
 
 	for i, value := range c.Networks {

@@ -2,6 +2,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,46 +17,6 @@ import (
 	"syscall"
 	"time"
 )
-
-func workerArgs(c Config, r Resources, directory string, uid int) []string {
-	args := []string{
-		"--qnum=" + strconv.Itoa(r.Queue),
-		"--fwmark=" + r.Mark,
-		"--uid=" + strconv.Itoa(uid) + ":" + strconv.Itoa(uid),
-		"--bind-fix4", "--bind-fix6",
-		"--lua-init=@" + filepath.Join(directory, "zapret-lib.lua"),
-		"--lua-init=@" + filepath.Join(directory, "zapret-antidpi.lua"),
-	}
-	profiles := 0
-	for _, protocol := range []string{"tcp", "udp"} {
-		ports, strategy := c.TCPPorts, c.TCP
-		if protocol == "udp" {
-			ports, strategy = c.UDPPorts, c.UDP
-		}
-		if len(ports) == 0 || strategy == "off" {
-			continue
-		}
-		if profiles > 0 {
-			args = append(args, "--new")
-		}
-		profiles++
-		args = append(args, "--filter-"+protocol+"="+portList(ports))
-		if len(c.Domains) > 0 {
-			args = append(args, "--hostlist="+filepath.Join(directory, "domains.txt"))
-		}
-		if protocol == "tcp" {
-			function := "multisplit"
-			if strategy == "disorder" {
-				function = "multidisorder"
-			}
-			args = append(args, "--payload=http_req,tls_client_hello", "--lua-desync="+function+":pos="+strconv.Itoa(c.Split))
-		} else {
-			args = append(args, "--payload=quic_initial", "--lua-desync=fake:blob=fake_default_quic:ip_ttl="+strconv.Itoa(c.TTL)+":ip6_ttl="+strconv.Itoa(c.TTL)+":repeats="+strconv.Itoa(c.Repeats))
-		}
-	}
-
-	return args
-}
 
 func privateUID() (int, error) {
 	used := map[int]bool{}
@@ -95,14 +56,16 @@ func privateUID() (int, error) {
 }
 
 func prepareWorker(c Config, uid int) error {
-	directory := filepath.Join(runDir, "worker")
+	return prepareWorkerAt(c, uid, filepath.Join(runDir, "worker"))
+}
+
+func prepareWorkerAt(c Config, uid int, directory string) error {
 	if err := os.MkdirAll(directory, 0750); err != nil {
 		return err
 	}
-	if err := os.Chown(runDir, 0, uid); err != nil {
-		return err
-	}
-	if err := os.Chmod(runDir, 0750); err != nil {
+	// Separate normal/test identities can traverse only to their own protected
+	// worker directory; status, journals and requests remain root-only.
+	if err := os.Chmod(runDir, 0711); err != nil {
 		return err
 	}
 	if err := os.Chown(directory, 0, uid); err != nil {
@@ -122,16 +85,23 @@ func prepareWorker(c Config, uid int) error {
 			return err
 		}
 	}
-	path := filepath.Join(directory, "domains.txt")
-	if err := os.WriteFile(path, []byte(strings.Join(c.Domains, "\n")+"\n"), 0640); err != nil {
-		return err
+	for name, entries := range map[string][]string{"domains.txt": c.Domains, "networks.txt": c.Networks} {
+		path := filepath.Join(directory, name)
+		if err := os.WriteFile(path, []byte(strings.Join(entries, "\n")+"\n"), 0640); err != nil {
+			return err
+		}
+		if err := os.Chown(path, 0, uid); err != nil {
+			return err
+		}
 	}
-	return os.Chown(path, 0, uid)
+
+	return nil
 }
 
 func publish(state string) {
+	writeJSON(scanPath("service.json"), map[string]string{"state": state})
 	if path := os.Getenv("EXT_PUBLIC_STATUS_PATH"); path != "" {
-		writeJSON(path, map[string]any{"version": version, "state": state, "upstream": "1.0.6"})
+		writeJSON(path, map[string]any{"version": version, "state": state, "upstream": "1.0.6", "scan": scanStatus()})
 	}
 }
 
@@ -150,9 +120,11 @@ func run() error {
 	if err := os.MkdirAll(runDir, 0700); err != nil {
 		return err
 	}
-	if err := cleanup(); err != nil {
+	if err := errors.Join(cleanup(), cleanupAt(scanResources(), "ocfusion:zapret2-scan")); err != nil {
 		return err
 	}
+	resetScan()
+	defer os.Remove(scanPath("service.json"))
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
@@ -164,6 +136,9 @@ func run() error {
 	var active Config
 	var resources Resources
 	lastRepair := time.Time{}
+	var scanning <-chan error
+	var cancelScan context.CancelFunc
+
 	terminate := func() error {
 		err := cleanup()
 		if worker != nil {
@@ -173,10 +148,61 @@ func run() error {
 		}
 		return err
 	}
-	defer terminate()
+	defer func() {
+		if cancelScan != nil {
+			cancelScan()
+			<-scanning
+		}
+		terminate()
+	}()
 
 	for {
 		c, err := loadConfig()
+		if scanning != nil {
+			if worker != nil {
+				select {
+				case <-done:
+					worker = nil
+					cancelScan()
+				default:
+				}
+			}
+			if err != nil || scanCancelled(c) {
+				cancelScan()
+			}
+			select {
+			case <-scanning:
+				scanning = nil
+				cancelScan = nil
+			default:
+				state := "DISABLED"
+				if worker != nil {
+					state = "RUNNING"
+				}
+				publish(state)
+				select {
+				case <-stop:
+					return nil
+				case <-tick.C:
+				}
+				continue
+			}
+		}
+		if request, ok := pendingScan(); ok && err == nil {
+			ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
+			cancelScan = cancel
+			finished := make(chan error, 1)
+			scanning = finished
+			bypass := ""
+			if worker != nil {
+				bypass = resources.Mark
+			}
+			go func() {
+				defer cancel()
+				finished <- performScan(ctx, request, c, bypass)
+			}()
+			continue
+		}
 		state := "DISABLED"
 		if err != nil || !c.Enabled || !hasSelection(c) {
 			cleanupErr := terminate()
@@ -343,8 +369,14 @@ func main() {
 		err = run()
 	case "settings":
 		result, err = loadConfig()
+	case "presets":
+		result = presetCatalog()
+	case "scan-start":
+		result, err = requestScan(envelope.Config)
+	case "scan-cancel":
+		err = cancelRequestedScan(envelope.Config)
 	case "remove":
-		err = cleanup()
+		err = errors.Join(cleanup(), cleanupAt(scanResources(), "ocfusion:zapret2-scan"))
 	case "diagnose":
 		result = map[string]string{"version": version, "state": "UNAVAILABLE"}
 		data, readErr := os.ReadFile(os.Getenv("EXT_PUBLIC_STATUS_PATH"))

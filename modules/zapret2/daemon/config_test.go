@@ -77,7 +77,7 @@ func TestFirewallScopesBothDirectionsAndReservesForeignMarks(t *testing.T) {
 	}
 }
 
-func TestDomainAndIPRestrictionsAreCombinedWithoutLuaInjection(t *testing.T) {
+func TestDomainProfileHasNoImplicitIPRequirement(t *testing.T) {
 	c := defaultConfig()
 	c.Domains = []string{"example.com"}
 	c.UDP = "fake-quic"
@@ -154,5 +154,103 @@ func TestConnectionMarkRestoreCannotEraseLoopProtection(t *testing.T) {
 	c.Networks = []string{"203.0.113.0/24"}
 	if _, err := allocate(c); err == nil || !strings.Contains(err.Error(), "mark") {
 		t.Fatal("unprotected loop-prevention mark accepted", err)
+	}
+}
+
+func TestIPOrDomainProfilesAndFirewallCandidates(t *testing.T) {
+	c := defaultConfig()
+	c.Networks = []string{"203.0.113.0/24"}
+	c.Domains = []string{"example.com"}
+	c.UDP = "fake-quic"
+	args := workerArgs(c, Resources{Queue: 200, Mark: "0x40000000"}, "/worker", 62000)
+	profiles := [][]string{{}}
+	for _, arg := range args {
+		if arg == "--new" {
+			profiles = append(profiles, []string{})
+		} else {
+			profiles[len(profiles)-1] = append(profiles[len(profiles)-1], arg)
+		}
+	}
+	if len(profiles) != 4 {
+		t.Fatal("expected independent TCP/UDP IP and domain profiles", profiles)
+	}
+	for i, profile := range profiles {
+		joined := strings.Join(profile, " ")
+		hasIP := strings.Contains(joined, "--ipset=/worker/networks.txt")
+		hasHost := strings.Contains(joined, "--hostlist=/worker/domains.txt")
+		if hasIP == hasHost || (i < 2) != hasIP {
+			t.Fatal("IP and host selectors became an intersection", profile)
+		}
+	}
+
+	old := execute
+	t.Cleanup(func() {
+		execute = old
+	})
+	execute = func(tool string, args ...string) (string, error) {
+		if strings.Contains(strings.Join(args, " "), "route show") {
+			return "default dev ppp0", nil
+		}
+		return "", nil
+	}
+	r, err := allocate(c)
+	if err != nil || len(r.Rules) != 8 {
+		t.Fatal(r, err)
+	}
+	for _, rule := range r.Rules {
+		joined := " " + strings.Join(rule.Args, " ") + " "
+		if strings.Contains(joined, " -d ") || strings.Contains(joined, " -s ") {
+			t.Fatal("domain candidates outside the IP list were excluded", rule)
+		}
+	}
+}
+
+func TestAdvancedStrategiesAreBoundedAndMatchUpstreamNames(t *testing.T) {
+	for strategy, function := range map[string]string{
+		"split": "multisplit", "disorder": "multidisorder",
+		"fake": "fake", "fake-split": "multisplit",
+		"fake-disorder": "multidisorder", "fakedsplit": "fakedsplit",
+		"fakeddisorder": "fakeddisorder", "hostfakesplit": "hostfakesplit",
+	} {
+		c := defaultConfig()
+		c.TCP = strategy
+		c.Positions = "host"
+		c.Fooling = "badseq"
+		c.FakeSNI = "example.net"
+		c.AutoTTL = true
+		c.Overlap = 32
+		if err := validateStrategy(c); err != nil {
+			t.Fatal(strategy, err)
+		}
+		joined := strings.Join(tcpStrategy(c), " ")
+		if !strings.Contains(joined, "--lua-desync="+function+":") {
+			t.Fatal(strategy, joined)
+		}
+		if strings.HasPrefix(strategy, "fake") && strategy != "fakedsplit" && strategy != "fakeddisorder" {
+			if !strings.Contains(joined, "blob=fake_default_http") || !strings.Contains(joined, "blob=fake_default_tls") || !strings.Contains(joined, ":tcp_seq=-10000") {
+				t.Fatal("fake protection or protocol-specific blob missing", joined)
+			}
+		}
+	}
+	c, err := parseConfig([]byte(`{"split_positions":"host, midsld+1,-10","fake_sni":"Example.NET."}`))
+	if err != nil || c.Positions != "host,midsld+1,-10" || c.FakeSNI != "example.net" {
+		t.Fatal(c, err)
+	}
+	for _, data := range []string{
+		`{"split_positions":"host:code=evil"}`,
+		`{"split_positions":"2;evil"}`,
+		`{"tcp_strategy":"fakedsplit","split_positions":"host,midsld"}`,
+		`{"fake_sni":"example.com:luaexec"}`,
+		`{"fake_fooling":"fool=luaexec"}`,
+		`{"auto_ttl_min":30,"auto_ttl_max":20}`,
+		`{"packet_limit":65535}`,
+	} {
+		if _, err := parseConfig([]byte(data)); err == nil {
+			t.Fatal("unbounded strategy accepted", data)
+		}
+	}
+	opts := fakeOptions(c, false)
+	if strings.Contains(opts, "tcp_") || strings.Contains(opts, "badsum") {
+		t.Fatal("TCP-only fooling leaked to UDP", opts)
 	}
 }

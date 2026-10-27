@@ -3,6 +3,10 @@ zapret_adapter = custom_target(
     input: files(
         'daemon/go.mod',
         'daemon/config.go',
+        'daemon/strategy.go',
+        'daemon/presets.go',
+        'daemon/scan.go',
+        'daemon/scan_worker.go',
         'daemon/firewall.go',
         'daemon/main.go',
         'daemon/log.go',

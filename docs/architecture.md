@@ -152,12 +152,24 @@ queue allocation and worker lifecycle. It does not allocate VPN resources or
 change routing, DNS configuration, native startup scripts or global hardware
 acceleration. The VPN provider continues to own VPN routing/firewall resources.
 IP/subnet selection occurs before queueing; domain filters are evaluated by the
-pinned upstream engine. Both selectors combine as an intersection. Empty
+pinned upstream engine. Separate ordered IP and domain profiles combine
+selectors as a union (OR).
+IP profiles do not require a hostname match. When domains are configured, the
+firewall queues candidate initial packets independently of the IP list, while
+the engine applies strategies only to matching profiles. Empty
 selection never creates interception rules. Worker arguments are generated from
 a bounded schema and a fixed strategy allowlist, without shell evaluation or
 arbitrary Lua. The worker drops to a free dedicated UID and keeps upstream's
 network capability restrictions and seccomp hardening. Rules are journaled before
 installation for recovery and use queue bypass when the worker is absent.
+
+Strategy enumeration belongs to the module daemon. It holds normal module
+configuration steady while a cancellable test runs, with a separate private
+worker, queue and recovery journal. WAN-bound test sockets use exact destination
+and ephemeral source-port rules; their packets bypass the normal engine without
+bypassing foreign firewall rules. Generated packets retain both loop-protection
+bits. Configuration changes cancel the test before normal reconciliation.
+Results are informational and do not alter persistent configuration.
 
 ## Global DNS and filtering
 
