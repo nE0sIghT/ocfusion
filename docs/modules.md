@@ -648,3 +648,26 @@ engine's IP-set selector; firewall rule count does not grow per subnet. With no
 usable selected/manual destinations, enabled processing waits without creating
 interception rules. Cache updates change effective worker selection and trigger
 normal reconciliation after any active strategy test completes.
+
+### Application traffic profiles
+
+`catalog` returns `presets`, `lists` and `applications` metadata in one action.
+`application-catalog` returns the application metadata separately. Configuration
+`applications` contains enabled profiles with `id`, `method`, `ports`, `packets`,
+`position`, `repeats`, `fragment` and `padding`. Ports accept numbers,
+comma-separated ranges or `*`. Profiles match selected destination IPs/subnets,
+including managed service subnets; domains alone cannot identify MTProto or
+voice packets without a hostname. No IP selection means no application profile.
+
+Profiles cover MTProto TCP, DTLS (including Cisco DTLS), WireGuard, STUN,
+Discord discovery, unknown UDP and optionally unknown TCP. HTTP/TLS and QUIC
+have separate protocol filters so they do not consume application traffic on
+shared ports. Composite presets replace application profiles; application-only
+presets merge by protocol. Web presets preserve application settings.
+
+Methods include TCP splitting/reordering, protocol-shaped fakes, IP fragmentation
+and advanced UDP padding. Padding changes application data length and can break
+protocols. Fragmentation retains the original packet if fragment transmission
+fails. Only initial outgoing data packets are processed. HTTPS discovery tests
+web TCP presets only; it does not establish MTProto, DTLS, QUIC or call success.
+Verify these with the actual client and selected destinations.

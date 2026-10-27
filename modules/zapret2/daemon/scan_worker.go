@@ -65,6 +65,7 @@ func installScanRules(resources Resources) error {
 func startProbeWorker(ctx context.Context, request ScanRequest, base Config, preset Preset, address, iface string, port int, bypass string) (*exec.Cmd, chan error, error) {
 	c := presetConfig(base, preset)
 	c.Networks, c.Domains = []string{address + "/32"}, nil
+	c.Applications = nil
 	c.TCPPorts, c.UDP = []int{request.Port}, "off"
 	resources, err := allocate(c)
 	if err != nil {

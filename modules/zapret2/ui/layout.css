@@ -125,3 +125,19 @@
 #manual-destinations {
   margin-top: 24px;
 }
+
+.ocf-application-profile {
+  margin: 12px 0;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--ext-line);
+}
+.ocf-application-profile > label {
+  display: block;
+  margin-bottom: 12px;
+}
+.ocf-application-profile > div > select {
+  margin-bottom: 12px;
+}
+.ocf-application-profile .ext-fields {
+  margin-top: 16px;
+}

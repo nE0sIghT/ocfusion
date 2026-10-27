@@ -137,10 +137,12 @@
                   -
                 </dd>
               </div>
+              <div><dt>Applications</dt><dd id="summary-applications">Off</dd></div>
             </dl>
             <p>
               Presets fill the form. Review the settings and select Apply to save changes.
             </p>
+            <p id="application-ip-notice" class="ext-managed-notice" hidden>Application profiles need destination IPs. Add server IPs or select service lists containing subnets.</p>
             <details id="custom-strategy">
               <summary>
                 Customize strategy
@@ -246,6 +248,9 @@
                   </td>
                 </tr>
               </table>
+              <h3>Application profiles</h3>
+              <p>Application profiles use destination IPs and subnets. Ports may be individual numbers, ranges such as 50000-65535, or * for all ports.</p>
+              <div id="application-profiles"></div>
               <h3>
                 Packet settings
               </h3>
@@ -503,7 +508,7 @@
             A successful response confirms HTTPS connectivity to this server, not access to every resource on the site. Selecting a result fills the form; Apply saves it.
           </p>
           <p>
-            Only HTTPS over TCP is tested. A working HTTPS strategy does not confirm DTLS, WireGuard or other UDP protocols.
+            The strategy finder tests HTTP/TLS presets only. Application profiles remain configured independently; verify them with their actual clients.
           </p>
         </details>
       </section>
@@ -560,6 +565,7 @@
     <script src="targets.js">
     </script>
     <script src="lists.js"></script>
+    <script src="applications.js"></script>
     <script src="app.js">
     </script>
     <script src="translations.js">

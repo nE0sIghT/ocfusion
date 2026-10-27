@@ -34,7 +34,7 @@ ROOT_FILES = (
 )
 LICENSE_HEADER = "SPDX-License-Identifier: GPL-3.0-or-later"
 # Only programming-language source and executable shell scripts carry our header.
-CODE_SUFFIXES = {".go", ".py", ".js", ".cjs", ".sh"}
+CODE_SUFFIXES = {".go", ".py", ".js", ".cjs", ".sh", ".lua"}
 FORBIDDEN_TRACKED_PREFIXES = ("contrib/", "build/", "dist/", "downloads/")
 
 

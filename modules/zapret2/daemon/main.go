@@ -72,7 +72,11 @@ func prepareWorkerAt(c Config, uid int, directory string) error {
 		return err
 	}
 
-	for _, name := range []string{"zapret-lib.lua", "zapret-antidpi.lua"} {
+	files := []string{"zapret-lib.lua", "zapret-antidpi.lua", "ocfusion-strategies.lua"}
+	for _, blob := range applicationBlobs() {
+		files = append(files, blob.File)
+	}
+	for _, name := range files {
 		data, err := os.ReadFile(filepath.Join(os.Getenv("EXT_PAYLOAD_PATH"), "lua", name))
 		if err != nil {
 			return err
@@ -383,6 +387,10 @@ func main() {
 		err = run()
 	case "settings":
 		result, err = loadConfig()
+	case "catalog":
+		result = map[string]any{"presets": presetCatalog(), "lists": serviceCatalog(), "applications": applicationCatalog()}
+	case "application-catalog":
+		result = applicationCatalog()
 	case "list-catalog":
 		result = serviceCatalog()
 	case "refresh-lists":

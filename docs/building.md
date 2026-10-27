@@ -254,6 +254,13 @@ zapret2 1.0.6 is pinned to an immutable commit and built without upstream
 installation scripts, list downloaders or bundled executables. Meson separately
 builds Lua 5.4.8, libmnl, libnfnetlink and libnetfilter_queue with the static musl
 sysroot. Compatibility headers come from pinned glibc and libcap sources.
-The payload includes only nfqws2, the adapter and two matching upstream Lua
-libraries. Arbitrary Lua and upstream argument injection are not exposed by
-the module API.
+The payload includes nfqws2, the adapter, two matching upstream Lua libraries,
+a fixed OCFusion fragmentation helper and four protocol packet samples from
+the locked upstream archive. Arbitrary Lua and upstream argument injection are
+not exposed by the module API.
+
+Application argument validation can additionally run against a native build of
+the pinned engine: set `OCF_NFQWS2_TEST_BINARY` to nfqws2 and
+`OCF_NFQWS2_TEST_LUA` to a directory containing the packaged Lua files and
+packet samples, then run `go test ./...` in `modules/zapret2/daemon`. This checks
+engine parsing, not physical network effectiveness.

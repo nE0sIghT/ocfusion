@@ -26,7 +26,8 @@ OCFusion is running.
   OpenConnect.
 - **zapret2** (optional) - applies DPI processing to explicit destination IP/subnet
   and domain lists on direct WAN connections. Includes TCP splitting,
-  reordering, fake-packet combinations, QUIC fakes and an isolated HTTPS
+  reordering, fake-packet combinations, QUIC fakes, application profiles for
+  MTProto, DTLS, WireGuard and voice/game UDP, and an isolated HTTPS
   strategy finder. Optional service domain/subnet lists update from their
   publisher and remain separate from custom addresses. Disabled by default;
   effectiveness depends on the

@@ -6,9 +6,9 @@ let selectedServiceLists = [];
 let currentServiceStatuses = [];
 let serviceRefreshBusy = false;
 
-async function loadServiceLists(saved) {
+async function loadServiceLists(saved, catalogEntries) {
   if (serviceCatalogEntries.length === 0) {
-    serviceCatalogEntries = await parent.EXTENSIONS.action("zapret2", "list-catalog");
+    serviceCatalogEntries = catalogEntries;
     const select = document.getElementById("service-picker");
 
     for (const service of serviceCatalogEntries) {
@@ -36,6 +36,10 @@ function appendServiceText(parentNode, text) {
 function renderServiceLists(statuses) {
   if (statuses) {
     currentServiceStatuses = statuses;
+  }
+
+  if (applicationKinds.length > 0) {
+    updateApplicationSummary();
   }
 
   const root = document.getElementById("service-lists");

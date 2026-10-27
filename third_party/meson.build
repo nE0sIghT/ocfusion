@@ -129,7 +129,9 @@ foreach component : components
             ],
         )
         dependencies += compatibility_headers
-        output = ['nfqws2', 'zapret-lib.lua', 'zapret-antidpi.lua']
+        output = ['nfqws2', 'zapret-lib.lua', 'zapret-antidpi.lua',
+            'dtls_clienthello_w3_org.bin', 'wireguard_initiation.bin',
+            'stun.bin', 'discord-ip-discovery-with-port.bin']
     endif
 
     if name == '3proxy'

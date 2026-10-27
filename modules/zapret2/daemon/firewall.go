@@ -242,14 +242,14 @@ func allocate(c Config) (Resources, error) {
 		networks := []string{}
 		// Domain selection must inspect candidate destinations independently of
 		// the IP list. The engine applies separate IP OR domain profiles.
-		if len(c.Domains) == 0 && !c.ManagedSets {
+		if len(c.Domains) == 0 && !usesEngineSets(c) {
 			for _, prefix := range c.Networks {
 				if strings.Contains(prefix, ":") == (family == "-6") {
 					networks = append(networks, prefix)
 				}
 			}
 		}
-		if len(c.Domains) == 0 && !c.ManagedSets && len(c.Networks) > 0 && len(networks) == 0 {
+		if len(c.Domains) == 0 && !usesEngineSets(c) && len(c.Networks) > 0 && len(networks) == 0 {
 			continue
 		}
 		if len(networks) == 0 {
@@ -270,27 +270,25 @@ func allocate(c Config) (Resources, error) {
 
 		for _, prefix := range networks {
 			for _, protocol := range []string{"tcp", "udp"} {
-				ports, strategy := c.TCPPorts, c.TCP
-				if protocol == "udp" {
-					ports, strategy = c.UDPPorts, c.UDP
-				}
-				if len(ports) == 0 || strategy == "off" {
-					continue
-				}
+				for _, ports := range firewallPortGroups(c, protocol) {
 
-				for _, incoming := range []bool{false, true} {
-					chain, ifaceFlag, addressFlag, portsFlag, direction := "POSTROUTING", "-o", "-d", "--dports", "original"
-					if incoming {
-						chain, ifaceFlag, addressFlag, portsFlag, direction = "PREROUTING", "-i", "-s", "--sports", "reply"
+					for _, incoming := range []bool{false, true} {
+						chain, ifaceFlag, addressFlag, portsFlag, direction := "POSTROUTING", "-o", "-d", "--dports", "original"
+						if incoming {
+							chain, ifaceFlag, addressFlag, portsFlag, direction = "PREROUTING", "-i", "-s", "--sports", "reply"
+						}
+						args := []string{ifaceFlag, iface, "-p", protocol}
+						if prefix != "" {
+							args = append(args, addressFlag, prefix)
+						}
+						if ports != "*" {
+							args = append(args, "-m", "multiport", portsFlag, ports)
+						}
+						args = append(args, "-m", "mark", "!", "--mark", r.Mark+"/"+r.Mark,
+							"-m", "connbytes", "--connbytes", "1:"+strconv.Itoa(processingPacketLimit(c)), "--connbytes-dir", direction, "--connbytes-mode", "packets",
+							"-m", "comment", "--comment", "ocfusion:zapret2", "-j", "NFQUEUE", "--queue-num", strconv.Itoa(r.Queue), "--queue-bypass")
+						r.Rules = append(r.Rules, Rule{Tool: tool, Chain: chain, Args: args})
 					}
-					args := []string{ifaceFlag, iface, "-p", protocol}
-					if prefix != "" {
-						args = append(args, addressFlag, prefix)
-					}
-					args = append(args, "-m", "multiport", portsFlag, portList(ports), "-m", "mark", "!", "--mark", r.Mark+"/"+r.Mark,
-						"-m", "connbytes", "--connbytes", "1:"+strconv.Itoa(c.PacketLimit), "--connbytes-dir", direction, "--connbytes-mode", "packets",
-						"-m", "comment", "--comment", "ocfusion:zapret2", "-j", "NFQUEUE", "--queue-num", strconv.Itoa(r.Queue), "--queue-bypass")
-					r.Rules = append(r.Rules, Rule{Tool: tool, Chain: chain, Args: args})
 				}
 			}
 		}

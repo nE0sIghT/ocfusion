@@ -127,6 +127,10 @@ func workerArgs(c Config, r Resources, directory string, uid int) []string {
 		"--bind-fix4", "--bind-fix6",
 		"--lua-init=@" + filepath.Join(directory, "zapret-lib.lua"),
 		"--lua-init=@" + filepath.Join(directory, "zapret-antidpi.lua"),
+		"--lua-init=@" + filepath.Join(directory, "ocfusion-strategies.lua"),
+	}
+	for _, blob := range applicationBlobs() {
+		args = append(args, "--blob="+blob.Name+":@"+filepath.Join(directory, blob.File))
 	}
 	profiles := 0
 	for _, selector := range []string{"networks", "domains"} {
@@ -146,6 +150,11 @@ func workerArgs(c Config, r Resources, directory string, uid int) []string {
 			}
 			profiles++
 			args = append(args, "--filter-"+protocol+"="+portList(ports))
+			if protocol == "tcp" {
+				args = append(args, "--filter-l7=http,tls")
+			} else {
+				args = append(args, "--filter-l7=quic")
+			}
 			if selector == "networks" {
 				args = append(args, "--ipset="+filepath.Join(directory, "networks.txt"))
 			} else {
@@ -156,6 +165,18 @@ func workerArgs(c Config, r Resources, directory string, uid int) []string {
 			} else {
 				args = append(args, "--payload=quic_initial", "--lua-desync=fake:blob=fake_default_quic"+fakeOptions(c, false)+":repeats="+strconv.Itoa(c.Repeats))
 			}
+		}
+	}
+
+	if len(c.Networks) > 0 {
+		for _, profile := range c.Applications {
+			kind, _ := applicationKind(profile.ID)
+			if profiles > 0 {
+				args = append(args, "--new")
+			}
+			profiles++
+			args = append(args, "--filter-"+kind.Transport+"="+profile.Ports, "--filter-l7="+kind.L7, "--ipset="+filepath.Join(directory, "networks.txt"))
+			args = append(args, applicationStrategy(c, profile, kind)...)
 		}
 	}
 

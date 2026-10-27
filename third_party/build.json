@@ -231,7 +231,11 @@
       "executable": "nfq2/nfqws2",
       "runtime_files": [
         "lua/zapret-lib.lua",
-        "lua/zapret-antidpi.lua"
+        "lua/zapret-antidpi.lua",
+        "files/fake/dtls_clienthello_w3_org.bin",
+        "files/fake/wireguard_initiation.bin",
+        "files/fake/stun.bin",
+        "files/fake/discord-ip-discovery-with-port.bin"
       ],
       "extra_license_files": [
         "nfq2/uthash.h",

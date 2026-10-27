@@ -3,6 +3,8 @@ zapret_adapter = custom_target(
     input: files(
         'daemon/go.mod',
         'daemon/config.go',
+        'daemon/traffic.go',
+        'daemon/application_strategy.go',
         'daemon/service_catalog.go',
         'daemon/service_fetch.go',
         'daemon/service_store.go',
@@ -39,6 +41,8 @@ module_specs += {
             'packaging/module.json.in',
             'ui/index.html',
             'ui/app.js',
+            'ui/applications.js',
+            'lua/ocfusion-strategies.lua',
             'ui/lists.js',
             'ui/layout.js',
             'ui/targets.js',
@@ -53,6 +57,22 @@ module_specs += {
             {
                 'source': external_targets['zapret2'][2],
                 'name': 'lua/zapret-antidpi.lua',
+            },
+            {
+                'source': external_targets['zapret2'][3],
+                'name': 'lua/dtls_clienthello_w3_org.bin',
+            },
+            {
+                'source': external_targets['zapret2'][4],
+                'name': 'lua/wireguard_initiation.bin',
+            },
+            {
+                'source': external_targets['zapret2'][5],
+                'name': 'lua/stun.bin',
+            },
+            {
+                'source': external_targets['zapret2'][6],
+                'name': 'lua/discord-ip-discovery-with-port.bin',
             },
         ],
         'notices': [

@@ -11,6 +11,7 @@ const root = path.resolve(__dirname, "..");
 async function main() {
   const assets = {
     "/module/index.html": "modules/zapret2/ui/index.html",
+    "/module/applications.js": "modules/zapret2/ui/applications.js",
     "/module/lists.js": "modules/zapret2/ui/lists.js",
     "/module/app.js": "modules/zapret2/ui/app.js",
     "/module/targets.js": "modules/zapret2/ui/targets.js",
@@ -35,6 +36,10 @@ async function main() {
           action: async (id, operation) => {
             if (operation === "list-catalog") {
               return [{id: "telegram", name: "Telegram", paths: ["Services/telegram.lst", "Subnets/IPv4/telegram.lst"]}, {id: "youtube", name: "YouTube", paths: ["Services/youtube.lst"]}];
+            }
+
+            if (operation === "catalog") {
+              return {presets: await window.EXTENSIONS.action(id, "presets"), lists: await window.EXTENSIONS.action(id, "list-catalog"), applications: [{id: "mtproto", name: "Telegram MTProto", transport: "tcp", methods: ["split", "fake"], defaults: {method:"split", ports:"*", packets:3, position:2, repeats:3, fragment:8, padding:2}}]};
             }
 
             if (operation === "presets") {
@@ -106,12 +111,14 @@ async function main() {
       await frame.locator("#domains").fill("example.com");
       await frame.locator("#enabled").check();
       await frame.locator("#tab-strategies").click();
-      await frame.locator("#custom-strategy summary").click();
+      await frame.locator("#custom-strategy > summary").click();
       assert.equal(await frame.locator("#fake_ttl").evaluate((element) => element.closest("tr").hidden), true);
       await frame.locator("#tcp_strategy").selectOption("fake-split");
       assert.equal(await frame.locator("#fake_ttl").evaluate((element) => element.closest("tr").hidden), false);
       await frame.locator("#split_positions").fill("host, midsld+1");
 
+      await frame.locator("#application-mtproto-enabled").check();
+      await frame.locator("#application-mtproto-ports").evaluate((element) => { element.value = "80,443,5222,50000-65535"; });
       await frame.locator("#auto_ttl").check();
       await frame.locator("#fake_sni").fill("example.net");
       await frame.locator("#fake_fooling").selectOption("badseq");
@@ -124,6 +131,8 @@ async function main() {
       assert.deepEqual(saved.domains, ["example.com"]);
       assert.deepEqual(saved.tcp_ports, [80, 443]);
       assert.deepEqual(saved.lists, ["telegram"]);
+      assert.equal(saved.applications[0].id, "mtproto");
+      assert.equal(saved.applications[0].ports, "80,443,5222,50000-65535");
       assert.equal(saved.revision, 1);
       assert.equal(saved.enabled, true);
       assert.equal(saved.tcp_strategy, "fake-split");
@@ -137,6 +146,7 @@ async function main() {
       await frame.locator("#preset").selectOption("hostname");
       assert.equal(await frame.locator("#unsaved").isVisible(), true);
       assert.equal(await frame.locator("#split_positions").inputValue(), "1,midsld");
+      assert.equal(await frame.locator("#application-mtproto-enabled").isChecked(), true);
       assert.equal((await page.evaluate(() => window.changes)).length, 1);
       await frame.locator("#tab-finder").click();
       await frame.locator("#scan-target").selectOption("youtube.com");
