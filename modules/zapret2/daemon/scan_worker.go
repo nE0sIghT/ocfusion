@@ -62,16 +62,37 @@ func installScanRules(resources Resources) error {
 	return nil
 }
 
-func startProbeWorker(ctx context.Context, request ScanRequest, base Config, preset Preset, address, iface string, port int, bypass string) (*exec.Cmd, chan error, error) {
-	c := presetConfig(base, preset)
+func probeWorkerConfig(base Config, preset Preset, target ScanTarget, address string) Config {
+	resolved := presetConfig(base, preset)
+	c := resolved
 	c.Networks, c.Domains = []string{address + "/32"}, nil
-	c.Applications = nil
-	c.TCPPorts, c.UDP = []int{request.Port}, "off"
+	c.TCP, c.UDP, c.Applications = "off", "off", nil
+	if scanProtocol(target) == "tcp" {
+		c.TCP = resolved.TCP
+		c.TCPPorts = []int{target.Port}
+	} else if target.Protocol == "http3" {
+		c.UDP = "fake-quic"
+		c.UDPPorts = []int{target.Port}
+	} else {
+		c.Applications = resolved.Applications
+		for i := range c.Applications {
+			c.Applications[i].Ports = strconv.Itoa(target.Port)
+		}
+	}
+	return c
+}
+
+func startProbeWorker(ctx context.Context, target ScanTarget, base Config, preset Preset, address, iface string, port int, bypass string) (*exec.Cmd, chan error, error) {
+	c := probeWorkerConfig(base, preset, target, address)
 	resources, err := allocate(c)
 	if err != nil {
 		return nil, nil, err
 	}
-	rules := scanRules(resources, iface, address, request.Port, port, bypass)
+	protocol := "udp"
+	if scanProtocol(target) == "tcp" {
+		protocol = "tcp"
+	}
+	rules := scanRulesForProtocol(resources, iface, address, target.Port, port, bypass, protocol)
 	resources.Rules = rules
 	if preset.ID == "baseline" {
 		resources.Rules = nil

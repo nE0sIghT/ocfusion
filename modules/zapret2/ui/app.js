@@ -235,6 +235,11 @@ function selectPreset(id) {
     return;
   }
 
+  fillStrategySettings(preset);
+  document.getElementById("preset").value = id;
+}
+
+function fillStrategySettings(preset) {
   for (const [key, value] of Object.entries(preset.settings)) {
     const element = document.getElementById(key);
 
@@ -248,12 +253,12 @@ function selectPreset(id) {
   }
 
   if (preset.settings.applications) {
-    writeApplications(preset.settings.applications, preset.protocol === "application");
+    writeApplications(preset.settings.applications, ["application", "stun"].includes(preset.protocol));
   }
 
   setDirty(true);
-  document.getElementById("preset").value = id;
-  document.getElementById("preset-description").textContent = preset.description;
+  document.getElementById("preset").value = "";
+  document.getElementById("preset-description").textContent = preset.description || preset.name;
   updateStrategyFields();
 }
 
@@ -263,72 +268,6 @@ function presetName(id) {
   }
 
   return catalog.find((item) => item.id === id)?.name || id;
-}
-
-function renderScan(state) {
-  if (!state) {
-    return;
-  }
-
-  scan = state;
-  const running = ["QUEUED", "RUNNING"].includes(state.state);
-  document.getElementById("scan-start").disabled = running || scanBusy || !config;
-  document.getElementById("scan-cancel").disabled = !running || scanBusy;
-  document.getElementById("scan-host").disabled = running || scanBusy;
-  document.getElementById("scan-target").disabled = running || scanBusy;
-  document.getElementById("scan-port").disabled = running || scanBusy;
-  const signature = JSON.stringify([state, config?.revision, pending, catalog.length]);
-
-  if (signature === renderedScan) {
-    return;
-  }
-
-  renderedScan = signature;
-  const text = document.getElementById("scan-state");
-  const labels = {QUEUED: "Waiting to start", RUNNING: "Testing", COMPLETE: "Test complete", CANCELLED: "Test cancelled", ERROR: "Test failed", IDLE: ""};
-  text.replaceChildren();
-  const label = document.createElement("span");
-  label.textContent = labels[state.state] || "";
-  text.appendChild(label);
-
-  if (state.current || state.error) {
-    text.appendChild(document.createTextNode(" - "));
-    const detail = document.createElement("span");
-    detail.textContent = state.error || presetName(state.current);
-    text.appendChild(detail);
-  }
-
-  const table = document.getElementById("scan-results");
-  table.replaceChildren();
-
-  for (const entry of state.results || []) {
-    const row = document.createElement("tr");
-
-    for (const value of [presetName(entry.preset), entry.success + "/" + entry.attempts, entry.success ? entry.milliseconds + " ms" : "-", entry.http_status || "-"]) {
-      const cell = document.createElement("td");
-      cell.textContent = value;
-      row.appendChild(cell);
-    }
-
-    const action = document.createElement("td");
-
-    if (entry.preset !== "baseline" && entry.success > 0) {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "ext-secondary";
-      button.textContent = "Use settings";
-      button.disabled = pending || state.revision !== config?.revision;
-      button.addEventListener("click", () => {
-        selectTab("strategies");
-        selectPreset(entry.preset);
-        document.getElementById("preset").scrollIntoView({block: "center", behavior: "smooth"});
-      });
-      action.appendChild(button);
-    }
-
-    row.appendChild(action);
-    table.appendChild(row);
-  }
 }
 
 document.getElementById("preset").addEventListener("change", (event) => {
@@ -352,45 +291,3 @@ for (const id of ["tcp_strategy", "udp_strategy", "split_positions", "sequence_o
     document.getElementById("preset-description").textContent = "Custom strategy settings";
   });
 }
-
-
-document.getElementById("scan-start").addEventListener("click", async () => {
-  if (!config || scanBusy || pending) {
-    return;
-  }
-
-  scanBusy = true;
-  renderScan(scan || {state: "IDLE"});
-
-  try {
-    const state = await parent.EXTENSIONS.call(moduleID, "scan-start", {
-      revision: config.revision,
-      host: document.getElementById("scan-host").value.trim(),
-      port: Number(document.getElementById("scan-port").value),
-    });
-    renderScan(state);
-  } catch (error) {
-    document.getElementById("scan-state").textContent = error.message;
-  } finally {
-    scanBusy = false;
-    renderScan(scan || {state: "IDLE"});
-  }
-});
-
-document.getElementById("scan-cancel").addEventListener("click", async () => {
-  if (!scan?.id || scanBusy) {
-    return;
-  }
-
-  scanBusy = true;
-  renderScan(scan);
-
-  try {
-    await parent.EXTENSIONS.call(moduleID, "scan-cancel", {id: scan.id});
-  } catch (error) {
-    document.getElementById("scan-state").textContent = error.message;
-  } finally {
-    scanBusy = false;
-    renderScan(scan);
-  }
-});

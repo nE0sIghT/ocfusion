@@ -30,6 +30,10 @@ for (const [service, hosts] of Object.entries(targetSuggestions)) {
     const option = document.createElement("option");
     option.value = host;
     option.textContent = host;
+
+    if (host === "i.ytimg.com") {
+      option.dataset.path = "/vi/dQw4w9WgXcQ/maxresdefault.jpg";
+    }
     group.appendChild(option);
   }
 
@@ -39,7 +43,8 @@ for (const [service, hosts] of Object.entries(targetSuggestions)) {
 targetSelect.addEventListener("change", () => {
   if (targetSelect.value) {
     document.getElementById("scan-host").value = targetSelect.value;
-    document.getElementById("scan-port").value = "443";
+    document.getElementById("scan-path").value = targetSelect.selectedOptions[0].dataset.path || "/";
+    document.getElementById("scan-port").value = document.getElementById("scan-protocol").value === "http" ? "80" : "443";
   }
 });
 

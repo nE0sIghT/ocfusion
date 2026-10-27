@@ -105,7 +105,7 @@ func prepareWorkerAt(c Config, uid int, directory string) error {
 func publish(state string) {
 	writeJSON(scanPath("service.json"), map[string]string{"state": state})
 	if path := os.Getenv("EXT_PUBLIC_STATUS_PATH"); path != "" {
-		writeJSON(path, map[string]any{"version": version, "state": state, "upstream": "1.0.6", "scan": scanStatus(), "lists": serviceStatuses()})
+		writeCompactJSON(path, map[string]any{"version": version, "state": state, "upstream": "1.0.6", "scan": publicScanStatus(), "lists": serviceStatuses()})
 	}
 }
 
@@ -204,7 +204,7 @@ func run() error {
 			}
 		}
 		if request, ok := pendingScan(); ok && err == nil {
-			ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
+			ctx, cancel := context.WithTimeout(context.Background(), 12*time.Minute)
 			cancelScan = cancel
 			finished := make(chan error, 1)
 			scanning = finished
@@ -399,6 +399,23 @@ func main() {
 		result = presetCatalog()
 	case "scan-start":
 		result, err = requestScan(envelope.Config)
+	case "scan-settings":
+		var selection struct {
+			ID     string `json:"id"`
+			Parent string `json:"parent"`
+		}
+		if err = decodeScan(envelope.Config, &selection); err == nil {
+			state := scanStatus()
+			valid := false
+			for _, row := range state.Results {
+				valid = valid || row.Preset == selection.ID
+			}
+			if selection.Parent != state.ID || !valid {
+				err = errors.New("test results changed; refresh before selecting")
+			} else {
+				result, err = scanCandidateSettings(selection.ID)
+			}
+		}
 	case "scan-cancel":
 		err = cancelRequestedScan(envelope.Config)
 	case "remove":
@@ -406,7 +423,7 @@ func main() {
 	case "diagnose":
 		result = map[string]string{"version": version, "state": "UNAVAILABLE"}
 		data, readErr := os.ReadFile(os.Getenv("EXT_PUBLIC_STATUS_PATH"))
-		if readErr == nil && len(data) < 8192 {
+		if readErr == nil && len(data) < 16384 {
 			var status map[string]any
 			if json.Unmarshal(data, &status) == nil {
 				result = status

@@ -13,6 +13,7 @@ async function main() {
     "/module/index.html": "modules/zapret2/ui/index.html",
     "/module/applications.js": "modules/zapret2/ui/applications.js",
     "/module/lists.js": "modules/zapret2/ui/lists.js",
+    "/module/discovery.js": "modules/zapret2/ui/discovery.js",
     "/module/app.js": "modules/zapret2/ui/app.js",
     "/module/targets.js": "modules/zapret2/ui/targets.js",
     "/module/layout.js": "modules/zapret2/ui/layout.js",
@@ -54,6 +55,10 @@ async function main() {
             if (operation === "refresh-lists") {
               window.listStatuses = [{id: "telegram", state: "ERROR", updated: 1793000000, domains: 3, networks: 2}];
               return {ok: true};
+            }
+
+            if (operation === "scan-settings") {
+              return {name:"Hostname split", protocol:"tcp", settings:{tcp_strategy:"split",split_positions:"1,midsld"}};
             }
 
             if (operation === "scan-start") {
@@ -156,17 +161,40 @@ async function main() {
       await frame.locator("#scan-host").fill("example.com");
       await frame.locator("#scan-start").click();
       await frame.locator("#scan-cancel:not([disabled])").waitFor();
-      assert.deepEqual(await page.evaluate(() => window.lastCall), {operation: "scan-start", request: {revision: 1, host: "example.com", port: 443}});
+      assert.deepEqual(await page.evaluate(() => window.lastCall), {operation: "scan-start", request: {revision: 1, mode:"search", targets:[{host:"example.com", port:443, protocol:"https", path:"/"}]}});
       await page.evaluate(() => {
         window.scan = {id: "test", state: "COMPLETE", revision: 1, results: [{preset: "baseline", success: 0, attempts: 2}, {preset: "hostname", success: 2, attempts: 2, milliseconds: 125}]};
       });
-      await frame.locator("#scan-results button").waitFor();
+      await frame.locator("#scan-results button").first().waitFor();
       assert((await frame.locator("#scan-results").innerText()).includes("2/2"));
       assert((await frame.locator("#scan-results").innerText()).includes("125 ms"));
-      await frame.locator("#scan-results button").click();
+      await frame.locator("#scan-results button").first().click();
       assert.equal(await frame.locator("#tcp_strategy").inputValue(), "split");
       assert.equal((await page.evaluate(() => window.changes)).length, 1);
       assert.equal(await frame.locator("#tab-strategies").getAttribute("aria-selected"), "true");
+      await frame.locator("#tab-finder").click();
+      await frame.locator("#scan-results button").nth(1).click();
+      await frame.locator("#scan-cancel:not([disabled])").waitFor();
+      assert.equal((await page.evaluate(() => window.lastCall)).request.mode, "refine");
+      assert.equal((await page.evaluate(() => window.lastCall)).request.parent, "test");
+      await frame.locator("#scan-cancel").click();
+      await page.waitForTimeout(3200);
+      await frame.locator("#scan-protocol:not([disabled])").waitFor();
+      await frame.locator("#scan-protocol").selectOption("http3");
+      await frame.locator("#scan-add-target").click();
+      await frame.locator("#scan-protocol").selectOption("stun");
+      await frame.locator("#scan-host").fill("stun.example.net");
+      await frame.locator("#scan-add-target").click();
+      assert.equal(await frame.locator("#scan-targets > div").count(), 2);
+      assert.equal(await frame.locator("#scan-path-row").isVisible(), false);
+      await frame.locator("#scan-start").click();
+      await frame.locator("#scan-cancel:not([disabled])").waitFor();
+      const multiRequest = (await page.evaluate(() => window.lastCall)).request;
+      assert.equal(multiRequest.targets.length, 2);
+      assert.equal(multiRequest.targets[0].protocol, "http3");
+      assert.equal(multiRequest.targets[1].protocol, "stun");
+      assert.equal(multiRequest.targets[1].port, 19302);
+      assert.equal((await page.evaluate(() => window.changes)).length, 1);
       await frame.locator("#tab-management").click();
       const body = await frame.locator("body").innerText();
       assert(body.includes(language === "ru" ? "IP-адреса и подсети" : "IP addresses and subnets"));

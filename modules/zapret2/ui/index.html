@@ -445,14 +445,39 @@
           <tr>
             <th>
               <label for="scan-port">
-                HTTPS port
+                Service port
               </label>
             </th>
             <td>
               <input id="scan-port" type="number" min="1" max="65535" value="443" />
             </td>
           </tr>
+          <tr>
+            <th>
+              <label for="scan-protocol">Test protocol</label>
+            </th>
+            <td>
+              <select id="scan-protocol">
+                <option value="https">HTTPS / TCP</option>
+                <option value="https12">HTTPS / TLS 1.2</option>
+                <option value="http">HTTP / TCP</option>
+                <option value="http3">HTTP/3 / QUIC</option>
+                <option value="stun">STUN / calls</option>
+              </select>
+            </td>
+          </tr>
+          <tr id="scan-path-row">
+            <th>
+              <label for="scan-path">Download path</label>
+            </th>
+            <td>
+              <input id="scan-path" type="text" maxlength="512" value="/" />
+            </td>
+          </tr>
         </table>
+        <button id="scan-add-target" type="button" class="ext-secondary">Add target</button>
+        <div id="scan-targets"></div>
+        <p>Up to four targets. Web tests read up to 64 KiB; choose a large file to check longer transfers. STUN tests a binding response, not a complete call.</p>
         <div class="apply_gen">
           <button id="scan-start" type="button">
             Start test
@@ -471,13 +496,13 @@
                   Preset
                 </th>
                 <th>
-                  Successful attempts
+                  Successful targets
                 </th>
                 <th>
-                  Response time
+                  Test duration
                 </th>
                 <th>
-                  HTTP status
+                  Transfer and details
                 </th>
                 <th>
                   Settings
@@ -492,24 +517,10 @@
           Use settings fills the form. Apply saves the selected strategy.
         </p>
         <details>
-          <summary>
-            About this test
-          </summary>
-          <p>
-            Suggestions identify individual service endpoints, not complete service lists. Testing a website does not test its apps, calls or video streams.
-          </p>
-          <p>
-            Compare a connection without processing with TCP presets. Each preset makes two HTTPS requests through WAN. Saved settings and other connections are unchanged.
-          </p>
-          <p>
-            Only the selected public IPv4 endpoint and HTTPS port are tested. DNS, QUIC and download speed are not evaluated.
-          </p>
-          <p>
-            A successful response confirms HTTPS connectivity to this server, not access to every resource on the site. Selecting a result fills the form; Apply saves it.
-          </p>
-          <p>
-            The strategy finder tests HTTP/TLS presets only. Application profiles remain configured independently; verify them with their actual clients.
-          </p>
+          <summary>About this test</summary>
+          <p>Each target is resolved once. Tests compare the same public IPv4 endpoint through WAN, with and without processing. Saved settings and other connections are unchanged.</p>
+          <p>HTTPS and HTTP/3 validate the server certificate and read up to 64 KiB without following redirects. A short response checks connectivity but cannot establish that larger downloads work.</p>
+          <p>Refine varies strategy parameters. Simplify tries less processing. Neither action applies settings automatically. Results describe these endpoints, not every function of a service.</p>
         </details>
       </section>
       <section id="panel-diagnostics" role="tabpanel" aria-labelledby="tab-diagnostics" hidden>
@@ -566,6 +577,7 @@
     </script>
     <script src="lists.js"></script>
     <script src="applications.js"></script>
+    <script src="discovery.js"></script>
     <script src="app.js">
     </script>
     <script src="translations.js">

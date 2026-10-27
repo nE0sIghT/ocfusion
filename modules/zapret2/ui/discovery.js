@@ -1,0 +1,266 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+"use strict";
+
+let discoveryTargets = [];
+
+const discoveryStages = {
+  dns: "DNS lookup failed",
+  address: "No public IPv4 address",
+  route: "Direct WAN route unavailable",
+  connect: "TCP connection failed",
+  tls: "TLS handshake failed",
+  headers: "HTTP response failed",
+  body: "Transfer interrupted",
+  "http-status": "Server rejected the test",
+  "short-body": "Short response; larger transfer untested",
+  quic: "QUIC or HTTP/3 failed",
+  stun: "No valid STUN response",
+  complete: "Complete",
+};
+
+function currentDiscoveryTarget() {
+  return {
+    host: document.getElementById("scan-host").value.trim(),
+    port: Number(document.getElementById("scan-port").value),
+    protocol: document.getElementById("scan-protocol").value,
+    path: document.getElementById("scan-protocol").value === "stun" ? "" : document.getElementById("scan-path").value.trim(),
+  };
+}
+
+function renderDiscoveryTargets() {
+  const root = document.getElementById("scan-targets");
+  root.replaceChildren();
+
+  for (const [index, target] of discoveryTargets.entries()) {
+    const row = document.createElement("div");
+    row.className = "ocf-discovery-target";
+    const name = document.createElement("span");
+    name.textContent = target.protocol.toUpperCase() + " · " + target.host + ":" + target.port + (target.path || "");
+    row.appendChild(name);
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "ext-secondary";
+    remove.textContent = "Remove";
+    remove.addEventListener("click", () => {
+      discoveryTargets.splice(index, 1);
+      renderDiscoveryTargets();
+    });
+    row.appendChild(remove);
+    root.appendChild(row);
+  }
+}
+
+function scanTargetDescription(state, index) {
+  const target = state.targets?.[index];
+  return target ? (index + 1) + ". " + target.host + ":" + target.port : state.host || "";
+}
+
+function appendProbeDetails(cell, entry, state) {
+  const details = document.createElement("details");
+  const summary = document.createElement("summary");
+  summary.textContent = entry.protocol === "stun" ? "STUN response" : (entry.bytes || 0) + " B / 65536 B";
+  details.appendChild(summary);
+
+  for (const detail of entry.details || []) {
+    const row = document.createElement("p");
+    const name = document.createElement("span");
+    name.textContent = scanTargetDescription(state, detail.target) + " · ";
+    row.appendChild(name);
+    const stage = document.createElement("span");
+    stage.textContent = discoveryStages[detail.stage] || detail.stage;
+    row.appendChild(stage);
+
+    if (detail.bytes) {
+      row.appendChild(document.createTextNode(" · " + detail.bytes + " B"));
+    }
+
+    details.appendChild(row);
+  }
+
+  cell.appendChild(details);
+}
+
+async function startDiscovery(extra) {
+  if (!config || scanBusy || pending) {
+    return;
+  }
+
+  scanBusy = true;
+  renderScan(scan || {state: "IDLE"});
+
+  try {
+    const state = await parent.EXTENSIONS.call(moduleID, "scan-start", {
+      revision: config.revision,
+      targets: discoveryTargets.length ? discoveryTargets : [currentDiscoveryTarget()],
+      ...extra,
+    });
+    renderScan(state);
+  } catch (error) {
+    document.getElementById("scan-state").textContent = error.message;
+  } finally {
+    scanBusy = false;
+    renderScan(scan || {state: "IDLE"});
+  }
+}
+
+function appendDiscoveryActions(cell, entry, state, running) {
+  if (entry.preset === "baseline" || entry.preset.endsWith(":baseline")) {
+    return;
+  }
+
+  const actions = [
+    {label: "Use settings", mode: "use"},
+    {label: "Refine", mode: "refine"},
+    {label: "Simplify", mode: "lighten"},
+  ];
+
+  for (const action of actions) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "ext-secondary";
+    button.textContent = action.label;
+    button.disabled = pending || running || scanBusy || state.state !== "COMPLETE" || state.revision !== config?.revision;
+    button.addEventListener("click", async () => {
+      if (action.mode !== "use") {
+        await startDiscovery({mode: action.mode, from: entry.preset, parent: state.id});
+        return;
+      }
+
+      button.disabled = true;
+
+      try {
+        const candidate = await parent.EXTENSIONS.call(moduleID, "scan-settings", {id: entry.preset, parent: state.id});
+        fillStrategySettings(candidate);
+        selectTab("strategies");
+        document.getElementById("preset").scrollIntoView({block: "center", behavior: "smooth"});
+      } catch (error) {
+        document.getElementById("scan-state").textContent = error.message;
+      } finally {
+        button.disabled = false;
+      }
+    });
+    cell.appendChild(button);
+  }
+}
+
+function renderScan(state) {
+  if (!state) {
+    return;
+  }
+
+  scan = state;
+  const running = ["QUEUED", "RUNNING"].includes(state.state);
+
+  for (const id of ["scan-start", "scan-host", "scan-target", "scan-port", "scan-protocol", "scan-path", "scan-add-target"]) {
+    document.getElementById(id).disabled = running || scanBusy || !config;
+  }
+
+  for (const button of document.querySelectorAll("#scan-targets button")) {
+    button.disabled = running || scanBusy;
+  }
+
+  document.getElementById("scan-cancel").disabled = !running || scanBusy;
+  const signature = JSON.stringify([state, config?.revision, pending, scanBusy]);
+
+  if (signature === renderedScan) {
+    return;
+  }
+
+  renderedScan = signature;
+  const text = document.getElementById("scan-state");
+  const labels = {QUEUED: "Waiting to start", RUNNING: "Testing", COMPLETE: "Test complete", CANCELLED: "Test cancelled", ERROR: "Test failed", IDLE: ""};
+  text.replaceChildren();
+  const label = document.createElement("span");
+  label.textContent = labels[state.state] || "";
+  text.appendChild(label);
+
+  if (state.current || state.error) {
+    text.appendChild(document.createTextNode(" · "));
+    const detail = document.createElement("span");
+    detail.textContent = state.error || scanTargetDescription(state, state.current_target);
+    text.appendChild(detail);
+  }
+
+  const table = document.getElementById("scan-results");
+  table.replaceChildren();
+
+  for (const entry of state.results || []) {
+    const row = document.createElement("tr");
+    const name = document.createElement("td");
+    const title = document.createElement("span");
+    const titleParts = (entry.name || presetName(entry.preset)).split(" - ");
+    title.textContent = titleParts[0];
+    name.appendChild(title);
+
+    if (titleParts.length > 1) {
+      name.appendChild(document.createTextNode(" - "));
+      const suffixParts = titleParts.slice(1).join(" - ").split(" / ");
+      const suffix = document.createElement("span");
+      suffix.textContent = suffixParts[0];
+      name.appendChild(suffix);
+
+      if (suffixParts.length > 1) {
+        name.appendChild(document.createTextNode(" / " + suffixParts.slice(1).join(" / ")));
+      }
+    }
+
+    name.appendChild(document.createTextNode(" · " + (entry.protocol || "tcp").toUpperCase()));
+    row.appendChild(name);
+
+    for (const value of [entry.success + "/" + entry.attempts, entry.success ? entry.milliseconds + " ms" : "-"]) {
+      const cell = document.createElement("td");
+      cell.textContent = value;
+      row.appendChild(cell);
+    }
+
+    const details = document.createElement("td");
+    appendProbeDetails(details, entry, state);
+    row.appendChild(details);
+    const actions = document.createElement("td");
+    appendDiscoveryActions(actions, entry, state, running);
+    row.appendChild(actions);
+    table.appendChild(row);
+  }
+}
+
+document.getElementById("scan-add-target").addEventListener("click", () => {
+  const target = currentDiscoveryTarget();
+
+  if (!target.host || discoveryTargets.length >= 4) {
+    document.getElementById("scan-state").textContent = "Choose up to four test targets";
+    return;
+  }
+
+  discoveryTargets.push(target);
+  renderDiscoveryTargets();
+});
+
+document.getElementById("scan-protocol").addEventListener("change", () => {
+  const stun = document.getElementById("scan-protocol").value === "stun";
+  document.getElementById("scan-path-row").hidden = stun;
+  document.getElementById("scan-port").value = stun ? "19302" : document.getElementById("scan-protocol").value === "http" ? "80" : "443";
+
+  if (stun && !document.getElementById("scan-host").value) {
+    document.getElementById("scan-host").value = "stun.l.google.com";
+  }
+});
+
+document.getElementById("scan-start").addEventListener("click", () => startDiscovery({mode: "search"}));
+
+document.getElementById("scan-cancel").addEventListener("click", async () => {
+  if (!scan?.id || scanBusy) {
+    return;
+  }
+
+  scanBusy = true;
+  renderScan(scan);
+
+  try {
+    await parent.EXTENSIONS.call(moduleID, "scan-cancel", {id: scan.id});
+  } catch (error) {
+    document.getElementById("scan-state").textContent = error.message;
+  } finally {
+    scanBusy = false;
+    renderScan(scan);
+  }
+});

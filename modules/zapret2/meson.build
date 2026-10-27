@@ -2,6 +2,7 @@ zapret_adapter = custom_target(
     'ocfusion-zapret2',
     input: files(
         'daemon/go.mod',
+        'daemon/go.sum',
         'daemon/config.go',
         'daemon/traffic.go',
         'daemon/application_strategy.go',
@@ -11,12 +12,17 @@ zapret_adapter = custom_target(
         'daemon/strategy.go',
         'daemon/presets.go',
         'daemon/scan.go',
+        'daemon/scan_targets.go',
+        'daemon/scan_refine.go',
+        'daemon/scan_runner.go',
+        'daemon/scan_probe.go',
+        'daemon/scan_udp.go',
         'daemon/scan_worker.go',
         'daemon/firewall.go',
         'daemon/main.go',
         'daemon/log.go',
     ),
-    output: 'ocfusion-zapret2',
+    output: ['ocfusion-zapret2', 'zapret2-Go-dependencies.txt'],
     depend_files: go_builder,
     command: [
         python,
@@ -26,7 +32,9 @@ zapret_adapter = custom_target(
         '--module',
         source_root / 'modules/zapret2/daemon',
         '--output',
-        '@OUTPUT@',
+        '@OUTPUT0@',
+        '--notices',
+        '@OUTPUT1@',
         '--version',
         version,
         '--revision',
@@ -36,11 +44,12 @@ zapret_adapter = custom_target(
 
 module_specs += {
     'zapret2': {
-        'binaries': [external_targets['zapret2'][0], zapret_adapter],
+        'binaries': [external_targets['zapret2'][0], zapret_adapter[0]],
         'assets': files(
             'packaging/module.json.in',
             'ui/index.html',
             'ui/app.js',
+            'ui/discovery.js',
             'ui/applications.js',
             'lua/ocfusion-strategies.lua',
             'ui/lists.js',
@@ -76,6 +85,7 @@ module_specs += {
             },
         ],
         'notices': [
+            zapret_adapter[1].full_path(),
             build_root / 'licenses/zapret2-license.txt',
             build_root / 'licenses/zapret2-compatibility-headers.txt',
             build_root / 'licenses/libmnl-COPYING.txt',

@@ -3,47 +3,61 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"crypto/rand"
-	"crypto/tls"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"io"
 	"net"
-	"net/http"
 	"net/netip"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 )
 
 type ScanRequest struct {
-	ID       string `json:"id"`
-	Revision uint64 `json:"revision"`
-	Host     string `json:"host"`
-	Port     int    `json:"port"`
+	ID       string       `json:"id"`
+	Revision uint64       `json:"revision"`
+	Host     string       `json:"host,omitempty"`
+	Port     int          `json:"port,omitempty"`
+	Targets  []ScanTarget `json:"targets,omitempty"`
+	Mode     string       `json:"mode,omitempty"`
+	From     string       `json:"from,omitempty"`
+	Parent   string       `json:"parent,omitempty"`
+	seed     *Preset
+}
+
+type TargetProbe struct {
+	Target       int    `json:"target"`
+	Success      bool   `json:"success"`
+	Stage        string `json:"stage"`
+	Bytes        int64  `json:"bytes,omitempty"`
+	Milliseconds int64  `json:"milliseconds,omitempty"`
+	Status       int    `json:"http_status,omitempty"`
 }
 
 type ProbeResult struct {
-	Preset       string `json:"preset"`
-	Success      int    `json:"success"`
-	Attempts     int    `json:"attempts"`
-	Milliseconds int64  `json:"milliseconds"`
-	Error        string `json:"error,omitempty"`
-	Status       int    `json:"http_status,omitempty"`
+	Preset       string        `json:"preset"`
+	Name         string        `json:"name,omitempty"`
+	Protocol     string        `json:"protocol,omitempty"`
+	Success      int           `json:"success"`
+	Attempts     int           `json:"attempts"`
+	Milliseconds int64         `json:"milliseconds"`
+	Error        string        `json:"error,omitempty"`
+	Status       int           `json:"http_status,omitempty"`
+	Bytes        int64         `json:"bytes,omitempty"`
+	Details      []TargetProbe `json:"details,omitempty"`
 }
 
 type ScanState struct {
 	ScanRequest
-	State   string        `json:"state"`
-	Results []ProbeResult `json:"results"`
-	Current string        `json:"current,omitempty"`
-	Error   string        `json:"error,omitempty"`
+	State         string        `json:"state"`
+	Results       []ProbeResult `json:"results"`
+	Current       string        `json:"current,omitempty"`
+	CurrentTarget int           `json:"current_target"`
+	Error         string        `json:"error,omitempty"`
 }
 
 func scanPath(name string) string {
@@ -57,7 +71,7 @@ func scanResources() string {
 func scanStatus() ScanState {
 	var state ScanState
 	data, err := os.ReadFile(scanPath("status.json"))
-	if err != nil || len(data) > 8192 || json.Unmarshal(data, &state) != nil {
+	if err != nil || len(data) > 32768 || json.Unmarshal(data, &state) != nil {
 		state.State = "IDLE"
 	}
 	return state
@@ -77,7 +91,7 @@ func resetScan() {
 func decodeScan(data []byte, result any) error {
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.DisallowUnknownFields()
-	if len(data) > 1024 || decoder.Decode(result) != nil || decoder.Decode(new(any)) != io.EOF {
+	if len(data) > 4096 || decoder.Decode(result) != nil || decoder.Decode(new(any)) != io.EOF {
 		return errors.New("invalid scan request")
 	}
 	return nil
@@ -89,9 +103,47 @@ func requestScan(data []byte) (ScanState, error) {
 		return ScanState{}, err
 	}
 	c, err := loadConfig()
-	request.Host = strings.ToLower(strings.TrimSuffix(strings.TrimSpace(request.Host), "."))
-	if err != nil || request.Revision != c.Revision || request.ID != "" || len(request.Host) > 253 || !domainPattern.MatchString(request.Host) || net.ParseIP(request.Host) != nil || (request.Port < 1 || request.Port > 65535) {
-		return ScanState{}, errors.New("choose a domain and HTTPS port")
+	if err != nil || request.Revision != c.Revision || request.ID != "" {
+		return ScanState{}, errors.New("settings changed; refresh before testing")
+	}
+	if request.Mode == "" {
+		request.Mode = "search"
+	}
+	if request.Mode != "search" && request.Mode != "refine" && request.Mode != "lighten" {
+		return ScanState{}, errors.New("invalid discovery mode")
+	}
+	if request.Mode == "search" && (request.From != "" || request.Parent != "") {
+		return ScanState{}, errors.New("invalid discovery mode")
+	}
+	if request.Mode != "search" {
+		previous := scanStatus()
+		if previous.ID != request.Parent || previous.Revision != c.Revision || previous.State != "COMPLETE" {
+			return ScanState{}, errors.New("test results changed; refresh before refining")
+		}
+		valid := false
+		for _, result := range previous.Results {
+			valid = valid || result.Preset == request.From
+		}
+		if !valid {
+			return ScanState{}, errors.New("choose a strategy result")
+		}
+		preset, seedErr := scanCandidateSettings(request.From)
+		if seedErr != nil {
+			return ScanState{}, seedErr
+		}
+		request.seed = &preset
+		request.Targets = nil
+		for _, target := range previous.Targets {
+			if scanProtocol(target) == preset.Protocol {
+				request.Targets = append(request.Targets, target)
+			}
+		}
+		if len(request.Targets) == 0 {
+			return ScanState{}, errors.New("no matching test targets")
+		}
+	}
+	if err := normalizeScanTargets(&request); err != nil {
+		return ScanState{}, err
 	}
 	// A live daemon owns the scan and all of its child processes.
 	status, err := os.Stat(scanPath("service.json"))
@@ -110,6 +162,14 @@ func requestScan(data []byte) (ScanState, error) {
 		return ScanState{}, err
 	}
 	request.ID = hex.EncodeToString(token)
+	if request.seed != nil {
+		if err = writeJSON(scanPath("seed.json"), request.seed); err != nil {
+			os.Remove(scanPath("lock"))
+			return ScanState{}, err
+		}
+	} else {
+		os.Remove(scanPath("seed.json"))
+	}
 	state := ScanState{ScanRequest: request, State: "QUEUED", Results: []ProbeResult{}}
 	os.Remove(scanPath("cancel"))
 	if err = writeJSON(scanPath("status.json"), state); err == nil {
@@ -132,6 +192,14 @@ func pendingScan() (ScanRequest, bool) {
 		return request, false
 	}
 	os.Remove(scanPath("request.json"))
+	if request.Mode != "search" {
+		data, _ := os.ReadFile(scanPath("seed.json"))
+		var preset Preset
+		if json.Unmarshal(data, &preset) != nil {
+			return request, false
+		}
+		request.seed = &preset
+	}
 	return request, true
 }
 
@@ -152,10 +220,14 @@ func scanCancelled(c Config) bool {
 }
 
 func scanRules(r Resources, iface, address string, port, source int, bypass string) []Rule {
+	return scanRulesForProtocol(r, iface, address, port, source, bypass, "tcp")
+}
+
+func scanRulesForProtocol(r Resources, iface, address string, port, source int, bypass, protocol string) []Rule {
 	mark := []string{"-m", "mark", "!", "--mark", r.Mark + "/" + r.Mark}
 	queue := append(mark, "-m", "comment", "--comment", "ocfusion:zapret2-scan", "-j", "NFQUEUE", "--queue-num", strconv.Itoa(r.Queue), "--queue-bypass")
-	outgoing := []string{"-o", iface, "-p", "tcp", "-d", address, "--dport", strconv.Itoa(port), "--sport", strconv.Itoa(source)}
-	incoming := []string{"-i", iface, "-p", "tcp", "-s", address, "--sport", strconv.Itoa(port), "--dport", strconv.Itoa(source)}
+	outgoing := []string{"-o", iface, "-p", protocol, "-d", address, "--dport", strconv.Itoa(port), "--sport", strconv.Itoa(source)}
+	incoming := []string{"-i", iface, "-p", protocol, "-s", address, "--sport", strconv.Itoa(port), "--dport", strconv.Itoa(source)}
 	rules := []Rule{{Tool: "iptables", Chain: "OUTPUT", Args: append(outgoing, queue...)}}
 	if bypass != "" {
 		// Mark only this reply tuple before the regular module's PREROUTING rules.
@@ -187,163 +259,10 @@ func routeForScan(address, iface string) (string, error) {
 	return source, nil
 }
 
-func performScan(ctx context.Context, request ScanRequest, c Config, bypass string) (failure error) {
-	state := ScanState{ScanRequest: request, State: "RUNNING", Results: []ProbeResult{}}
-	defer func() {
-		cleanupErr := cleanupAt(scanResources(), "ocfusion:zapret2-scan")
-		if cleanupErr != nil {
-			failure = errors.Join(failure, cleanupErr)
-		}
-		state.Current = ""
-		state.State = "COMPLETE"
-		if failure != nil {
-			state.State = "ERROR"
-			if state.Error == "" {
-				state.Error = "Test could not be completed"
-			}
-		}
-		if ctx.Err() != nil {
-			state.State, state.Error = "CANCELLED", ""
-		}
-		if cleanupErr != nil {
-			state.State, state.Error = "ERROR", "Temporary rule cleanup failed"
-		}
-		writeJSON(scanPath("status.json"), state)
-		os.Remove(scanPath("lock"))
-	}()
-	writeJSON(scanPath("status.json"), state)
-	if request.Revision != c.Revision || request.Port < 1 || request.Port > 65535 {
-		return errors.New("settings changed")
+func publicScanStatus() ScanState {
+	state := scanStatus()
+	for i := range state.Targets {
+		state.Targets[i].Path = ""
 	}
-	resolveCtx, cancel := context.WithTimeout(ctx, 8*time.Second)
-	addresses, err := net.DefaultResolver.LookupNetIP(resolveCtx, "ip4", request.Host)
-	cancel()
-	if err != nil {
-		state.Error = "DNS lookup failed"
-		return err
-	}
-	address := ""
-	for _, value := range addresses {
-		value = value.Unmap()
-		// Never use a hostname test to access LAN, loopback or link-local services.
-		if scanAddressAllowed(value) {
-			address = value.String()
-			break
-		}
-	}
-	if address == "" {
-		state.Error = "No public IPv4 address"
-		return errors.New("no public IPv4 destination")
-	}
-	iface, err := wan("-4")
-	if err != nil {
-		state.Error = "Direct WAN route unavailable"
-		return err
-	}
-	source, err := routeForScan(address, iface)
-	if err != nil {
-		state.Error = "Direct WAN route unavailable"
-		return err
-	}
-	candidates := append([]Preset{{ID: "baseline", Name: "Without processing", Protocol: "tcp"}}, presets()...)
-	for _, preset := range candidates {
-		if preset.Protocol != "tcp" {
-			continue
-		}
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
-		state.Current = preset.ID
-		writeJSON(scanPath("status.json"), state)
-		result := ProbeResult{Preset: preset.ID}
-		for attempt := 0; attempt < 2; attempt++ {
-			if ctx.Err() != nil {
-				return ctx.Err()
-			}
-			trialCtx, trialCancel := context.WithTimeout(ctx, 7*time.Second)
-			elapsed, status, probeErr := probeHTTPS(trialCtx, request, c, preset, address, iface, source, bypass)
-			trialCancel()
-			if errors.Is(probeErr, errScanSetup) {
-				state.Error = "Test packet processing unavailable"
-				return probeErr
-			}
-			result.Attempts++
-			if probeErr == nil {
-				result.Success++
-				result.Milliseconds += elapsed.Milliseconds()
-				result.Status = status
-			} else {
-				result.Error = "Connection or HTTPS response failed"
-			}
-			// A failed cleanup must stop enumeration, not carry stale rules forward.
-			if _, statErr := os.Stat(scanResources()); statErr == nil {
-				return errors.New("temporary resources remain")
-			}
-		}
-		if result.Success > 0 {
-			result.Milliseconds /= int64(result.Success)
-		}
-		state.Results = append(state.Results, result)
-		writeJSON(scanPath("status.json"), state)
-	}
-	return nil
-}
-
-func probeHTTPS(ctx context.Context, request ScanRequest, base Config, preset Preset, address, iface, source, bypass string) (time.Duration, int, error) {
-	var worker *exec.Cmd
-	var workerDone chan error
-	defer func() {
-		// Remove packet interception before terminating the queue consumer.
-		cleanupAt(scanResources(), "ocfusion:zapret2-scan")
-		if worker != nil {
-			worker.Process.Kill()
-			<-workerDone
-		}
-	}()
-	started := time.Now()
-	transport := &http.Transport{Proxy: nil, DisableKeepAlives: true, TLSClientConfig: &tls.Config{ServerName: request.Host, MinVersion: tls.VersionTLS12}}
-	defer transport.CloseIdleConnections()
-	transport.DialContext = func(dialCtx context.Context, network, ignored string) (net.Conn, error) {
-		dialer := net.Dialer{Control: func(network, destination string, raw syscall.RawConn) error {
-			var setupErr error
-			controlErr := raw.Control(func(fd uintptr) {
-				var port int
-				port, setupErr = bindProbeSocket(int(fd), iface, source, bypass)
-				if setupErr == nil {
-					worker, workerDone, setupErr = startProbeWorker(ctx, request, base, preset, address, iface, port, bypass)
-				}
-			})
-			started = time.Now()
-			if controlErr != nil || setupErr != nil {
-				return errors.Join(errScanSetup, controlErr, setupErr)
-			}
-			return nil
-		}}
-		return dialer.DialContext(dialCtx, "tcp4", net.JoinHostPort(address, strconv.Itoa(request.Port)))
-	}
-	client := &http.Client{Transport: transport, CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
-		return http.ErrUseLastResponse
-	}}
-	url := "https://" + net.JoinHostPort(request.Host, strconv.Itoa(request.Port)) + "/"
-	query, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return 0, 0, err
-	}
-	query.Header.Set("User-Agent", "OCFusion-connectivity-test")
-	response, err := client.Do(query)
-	if err != nil {
-		return 0, 0, err
-	}
-	defer response.Body.Close()
-	if worker != nil {
-		select {
-		case workerErr := <-workerDone:
-			workerDone <- workerErr
-			return 0, 0, errScanSetup
-		default:
-		}
-	}
-	// No response body is downloaded; a verified TLS handshake plus HTTP headers is the
-	// result, not a claim about video throughput, HTTP/3 or all site resources.
-	return time.Since(started), response.StatusCode, nil
+	return state
 }

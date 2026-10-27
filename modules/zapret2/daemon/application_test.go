@@ -109,3 +109,53 @@ func TestApplicationPresetCatalog(t *testing.T) {
 		t.Fatalf("catalog size %d: %v", len(data), err)
 	}
 }
+
+func TestPinnedDiscoveryEngineCandidates(t *testing.T) {
+	binary := os.Getenv("OCF_NFQWS2_TEST_BINARY")
+	directory := os.Getenv("OCF_NFQWS2_TEST_LUA")
+	if binary == "" || directory == "" {
+		t.Skip("requires pinned native nfqws2")
+	}
+	worker := t.TempDir()
+	entries, err := os.ReadDir(directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		data, err := os.ReadFile(filepath.Join(directory, entry.Name()))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(worker, entry.Name()), data, 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(worker, "networks.txt"), []byte("203.0.113.1/32\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	for _, protocol := range []string{"tcp", "udp", "stun"} {
+		target := ScanTarget{Host: "example.com", Port: 443, Protocol: "https"}
+		if protocol == "udp" {
+			target.Protocol = "http3"
+		}
+		if protocol == "stun" {
+			target.Protocol = "stun"
+			target.Port = 3478
+		}
+		for _, seed := range scanCandidates(protocol)[1:] {
+			candidates := append(refinedCandidates(seed, "refine"), refinedCandidates(seed, "lighten")...)
+			for _, candidate := range candidates {
+				if candidate.ID == "baseline" {
+					continue
+				}
+				c := probeWorkerConfig(defaultConfig(), candidate, target, "203.0.113.1")
+				args := workerArgs(c, Resources{Queue: 200, Mark: "0x40000000"}, worker, 62000)
+				args = append(args[:2], args[3:]...)
+				args = append(args, "--dry-run")
+				if output, err := exec.Command(binary, args...).CombinedOutput(); err != nil {
+					t.Fatalf("%s %s: %v\n%s", protocol, candidate.ID, err, output)
+				}
+			}
+		}
+	}
+}

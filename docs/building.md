@@ -264,3 +264,10 @@ the pinned engine: set `OCF_NFQWS2_TEST_BINARY` to nfqws2 and
 `OCF_NFQWS2_TEST_LUA` to a directory containing the packaged Lua files and
 packet samples, then run `go test ./...` in `modules/zapret2/daemon`. This checks
 engine parsing, not physical network effectiveness.
+
+The zapret2 adapter links quic-go 0.60.0 for isolated HTTP/3 probes. Its Go
+module versions and content digests are pinned in the adapter's `go.mod` and
+`go.sum`; builds use read-only module resolution. The adapter build collects
+licenses and notices for its actual linked Go dependencies into both runtime
+and standalone module distributions. These MIT/BSD libraries retain their own
+licenses; the adapter remains GPL-3.0-or-later.

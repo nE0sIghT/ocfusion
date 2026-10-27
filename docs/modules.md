@@ -594,30 +594,52 @@ activated in ASUS. The provider does not start them on the consumer's behalf.
 
 ## zapret2 strategy actions
 
-The optional `zapret2` module declares `presets`, `scan-start` and `scan-cancel`
-in addition to `settings`. `presets` returns bounded, built-in strategy objects
-with `id`, `name`, `description`, `protocol` and a `settings` projection. Applying
-a projection to the form does not save configuration; use normal revision-aware
-configuration updates. Arbitrary command lines and Lua imports are not accepted.
+The optional `zapret2` module declares strategy discovery actions in addition
+to `settings`. `presets` returns bounded built-in strategy objects with `id`,
+`name`, `description`, `protocol` and a `settings` projection. Selecting a result
+fills the form; use normal revision-aware configuration updates to save it.
+Arbitrary command lines and Lua imports are not accepted.
 
-`scan-start` accepts `{"revision":1,"host":"example.com","port":443}` against
-the current configuration revision. The explicit test host/port need not be in
-the saved processing selection. They authorize only isolated temporary test
-sockets and never update the persistent selection. It requires a live module
-service, allows one scan at a time and returns an unpredictable scan `id`.
-`scan-cancel` accepts `{"id":"..."}` and rejects stale IDs. The live daemon owns
-the asynchronous scan and its child process; no detached service is started.
-Public status includes `scan` with state, current preset and bounded results.
-Each result records a preset ID, attempt/success counts, mean successful
-response time in milliseconds and HTTP status. Results expire with RAM; changing
-the configuration cancels the scan and invalidates result-selection controls.
+`scan-start` accepts a current `revision`, `mode: "search"` and up to four
+`targets`. Each target contains a domain `host`, `port`, `protocol` and an
+optional HTTP `path` (including a query string). Protocols are `http`, `https`,
+`https12` (TLS 1.2 only), `http3` and `stun`. HTTP paths cannot change the server.
+Targets need not be in the processing selection. They authorize only temporary
+probe sockets and never change persistent settings.
 
-Tests use a fixed public IPv4 destination, WAN-bound TCP sockets, verified TLS
-and no redirects. Only the test socket tuple is intercepted. Separate worker
-marks prevent double processing, while ordinary configured processing remains
-active. Temporary rules are journaled separately, removed before killing the
-test consumer and recovered after interrupted execution. QUIC and IPv6 are not
-covered by the HTTPS test.
+The live daemon owns one asynchronous scan at a time. Public `scan` status
+contains its unpredictable `id`, targets, current target and bounded results.
+Each result has a `preset` ID, name, protocol family, success/attempt counts,
+mean successful duration and per-target phase, bytes, status and outcome.
+Public status omits HTTP paths; original paths remain in private RAM state for
+refinement. Results are not persistent across reboot. DNS/route/connect/TLS/
+headers/body/QUIC/STUN failures describe the failed test phase, not a definitive
+classification of a provider's blocking mechanism.
+
+Tests resolve each target once to a public IPv4 endpoint and use that same
+address for baseline and candidates. HTTP tests read up to 64 KiB; short valid
+responses establish connectivity without proving large transfers. Truncated
+bodies fail. HTTPS and HTTP/3 validate certificates, do not follow redirects and
+use no proxy or credentials. HTTP/3 uses real QUIC v1 and HTTP/3 requests. STUN
+requires a matching transaction ID, successful binding response and a mapped
+address; it does not establish that a complete voice call works.
+
+`scan-start` with `mode: "refine"` or `"lighten"` additionally takes `parent`
+(the completed scan ID) and `from` (a result's preset ID). The daemon retrieves
+the tested settings from private RAM state and reuses only targets of that
+protocol family. Refinement varies split positions, fake protection, repeats,
+automatic TTL and fake SNI, or application methods. Simplification tries fewer
+fakes/processing steps. Equivalent effective engine arguments are deduplicated;
+a run is limited to 18 candidates and 12 minutes. Neither mode applies settings.
+
+`scan-settings` takes `{"parent":"...","id":"..."}` and returns the bounded
+settings projection of a published result. Stale scan IDs are rejected.
+`scan-cancel` takes `{"id":"..."}`. Configuration changes cancel the scan.
+Normal traffic keeps its configured strategy: the test has its own worker,
+queue, UID and exact WAN socket tuple rules for TCP or UDP. Rules are journaled
+before insertion and removed before terminating the queue consumer. Recovery
+after interruption removes only scanner-owned rules. IPv6 discovery is not
+implemented.
 
 ### Managed service lists
 
@@ -668,6 +690,6 @@ presets merge by protocol. Web presets preserve application settings.
 Methods include TCP splitting/reordering, protocol-shaped fakes, IP fragmentation
 and advanced UDP padding. Padding changes application data length and can break
 protocols. Fragmentation retains the original packet if fragment transmission
-fails. Only initial outgoing data packets are processed. HTTPS discovery tests
-web TCP presets only; it does not establish MTProto, DTLS, QUIC or call success.
-Verify these with the actual client and selected destinations.
+fails. Only initial outgoing data packets are processed. Discovery tests
+HTTP/TLS, HTTP/3 and STUN. It does not establish native MTProto, DTLS or complete
+call success. Verify these with the actual client and selected destinations.

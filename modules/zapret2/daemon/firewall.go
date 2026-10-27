@@ -52,10 +52,21 @@ func writeJSON(path string, data any) error {
 		return err
 	}
 
-	if err = os.WriteFile(path+".new", raw, 0600); err != nil {
+	return writeJSONBytes(path, raw)
+}
+
+func writeCompactJSON(path string, data any) error {
+	raw, err := json.Marshal(data)
+	if err != nil {
 		return err
 	}
+	return writeJSONBytes(path, raw)
+}
 
+func writeJSONBytes(path string, raw []byte) error {
+	if err := os.WriteFile(path+".new", raw, 0600); err != nil {
+		return err
+	}
 	return os.Rename(path+".new", path)
 }
 

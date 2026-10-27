@@ -141,3 +141,15 @@
 .ocf-application-profile .ext-fields {
   margin-top: 16px;
 }
+
+.ocf-discovery-target {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+}
+
+#scan-results button {
+  margin: 3px;
+}
