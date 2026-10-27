@@ -31,6 +31,7 @@ func presetConfig(base Config, preset Preset) Config {
 	next := defaultConfig()
 	next.Revision, next.Enabled = base.Revision, base.Enabled
 	next.Networks, next.Domains = base.Networks, base.Domains
+	next.Lists = base.Lists
 	next.TCPPorts, next.UDPPorts = base.TCPPorts, base.UDPPorts
 	data, _ := json.Marshal(preset.Settings)
 	_ = json.Unmarshal(data, &next)
@@ -44,7 +45,7 @@ func presetCatalog() []Preset {
 		data, _ := json.Marshal(c)
 		settings := map[string]any{}
 		_ = json.Unmarshal(data, &settings)
-		for _, key := range []string{"revision", "enabled", "networks", "domains", "tcp_ports", "udp_ports"} {
+		for _, key := range []string{"revision", "enabled", "networks", "domains", "lists", "tcp_ports", "udp_ports"} {
 			delete(settings, key)
 		}
 		if catalog[i].Protocol == "tcp" {

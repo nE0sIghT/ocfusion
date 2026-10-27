@@ -618,3 +618,33 @@ marks prevent double processing, while ordinary configured processing remains
 active. Temporary rules are journaled separately, removed before killing the
 test consumer and recovered after interrupted execution. QUIC and IPv6 are not
 covered by the HTTPS test.
+
+### Managed service lists
+
+`settings` includes `lists`, an array of known service IDs. Manual `domains`
+and `networks` remain unchanged and retain their normal request-size limits.
+`list-catalog` returns fixed IDs, names and source paths. `refresh-lists` takes
+`{"revision":1}` and queues a refresh of saved selections; it rejects stale
+revisions, empty selections and an unavailable service. The action performs no
+network download in the command process.
+
+The daemon owns asynchronous downloads and the private persistent
+`data/lists/<id>.json` snapshots. Source URLs are fixed; arbitrary URL, code or
+shell input is not accepted. Each refresh resolves the publisher's commit and
+fetches all files from that same commit over verified HTTPS without redirects.
+Responses are limited to 1 MiB and 50,000 entries per file. Only validated,
+nonempty domain/IP lists are accepted. Explicit `.tld` entries from general
+feeds retain domain-zone matching semantics in the engine. Complete snapshots
+replace atomically;
+failed downloads retain prior data. Private cache checksums detect accidental
+corruption, not publisher authenticity. Successful lists refresh after 24 hours;
+failures retry after 15 minutes. Selection and manual entries stay in platform
+configuration, independently of downloaded data.
+
+Public status `lists` contains bounded per-ID state (`NOT_LOADED`, `UPDATING`,
+`READY`, `ERROR`), successful update time and domain/subnet counts. It contains
+no full list payload or raw download error. Large managed IP lists use the
+engine's IP-set selector; firewall rule count does not grow per subnet. With no
+usable selected/manual destinations, enabled processing waits without creating
+interception rules. Cache updates change effective worker selection and trigger
+normal reconciliation after any active strategy test completes.

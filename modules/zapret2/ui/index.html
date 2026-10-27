@@ -49,8 +49,22 @@
               Destinations
             </h2>
             <p>
-              Specify IP addresses, subnets or domains. A connection is selected when its IP or domain matches either list. Empty lists disable processing.
+              Service lists and custom addresses are combined. Empty selections disable processing.
             </p>
+
+            <h3>Service lists</h3>
+            <p>Choose services to include their domains and subnets. Saved lists update automatically every 24 hours.</p>
+            <div class="ocf-service-toolbar">
+              <label for="service-picker">Service</label>
+              <select id="service-picker"><option value="">Select a service</option></select>
+              <button id="service-add" type="button">Add</button>
+              <button id="service-refresh" type="button" class="ext-secondary" disabled>Update saved lists</button>
+            </div>
+            <p id="service-result" role="status"></p>
+            <div id="service-lists"></div>
+            <p>Lists select destinations only. Strategies and ports determine which traffic is processed.</p>
+            <details id="manual-destinations">
+              <summary>Custom addresses</summary>
             <table class="FormTable ocf-config-table">
               <tr>
                 <th>
@@ -81,6 +95,7 @@
                 </td>
               </tr>
             </table>
+            </details>
           </section>
           <section id="panel-strategies" role="tabpanel" aria-labelledby="tab-strategies" hidden>
             <h2>
@@ -544,6 +559,7 @@
     </script>
     <script src="targets.js">
     </script>
+    <script src="lists.js"></script>
     <script src="app.js">
     </script>
     <script src="translations.js">

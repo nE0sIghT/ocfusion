@@ -27,7 +27,9 @@ OCFusion is running.
 - **zapret2** (optional) - applies DPI processing to explicit destination IP/subnet
   and domain lists on direct WAN connections. Includes TCP splitting,
   reordering, fake-packet combinations, QUIC fakes and an isolated HTTPS
-  strategy finder. Disabled by default; effectiveness depends on the
+  strategy finder. Optional service domain/subnet lists update from their
+  publisher and remain separate from custom addresses. Disabled by default;
+  effectiveness depends on the
   provider and strategy. Build with `-Dmodules=all` or install its standalone
   module package.
 - **Wi-Fi radio settings** (optional, source builds only) - selects a native ASUS regional profile and shows

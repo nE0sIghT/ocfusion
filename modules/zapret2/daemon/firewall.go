@@ -242,14 +242,14 @@ func allocate(c Config) (Resources, error) {
 		networks := []string{}
 		// Domain selection must inspect candidate destinations independently of
 		// the IP list. The engine applies separate IP OR domain profiles.
-		if len(c.Domains) == 0 {
+		if len(c.Domains) == 0 && !c.ManagedSets {
 			for _, prefix := range c.Networks {
 				if strings.Contains(prefix, ":") == (family == "-6") {
 					networks = append(networks, prefix)
 				}
 			}
 		}
-		if len(c.Domains) == 0 && len(c.Networks) > 0 && len(networks) == 0 {
+		if len(c.Domains) == 0 && !c.ManagedSets && len(c.Networks) > 0 && len(networks) == 0 {
 			continue
 		}
 		if len(networks) == 0 {

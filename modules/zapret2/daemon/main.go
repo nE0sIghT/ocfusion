@@ -87,7 +87,7 @@ func prepareWorkerAt(c Config, uid int, directory string) error {
 	}
 	for name, entries := range map[string][]string{"domains.txt": c.Domains, "networks.txt": c.Networks} {
 		path := filepath.Join(directory, name)
-		if err := os.WriteFile(path, []byte(strings.Join(entries, "\n")+"\n"), 0640); err != nil {
+		if err := os.WriteFile(path, workerListData(entries, name == "domains.txt"), 0640); err != nil {
 			return err
 		}
 		if err := os.Chown(path, 0, uid); err != nil {
@@ -101,7 +101,7 @@ func prepareWorkerAt(c Config, uid int, directory string) error {
 func publish(state string) {
 	writeJSON(scanPath("service.json"), map[string]string{"state": state})
 	if path := os.Getenv("EXT_PUBLIC_STATUS_PATH"); path != "" {
-		writeJSON(path, map[string]any{"version": version, "state": state, "upstream": "1.0.6", "scan": scanStatus()})
+		writeJSON(path, map[string]any{"version": version, "state": state, "upstream": "1.0.6", "scan": scanStatus(), "lists": serviceStatuses()})
 	}
 }
 
@@ -124,6 +124,12 @@ func run() error {
 		return err
 	}
 	resetScan()
+	listContext, cancelLists := context.WithCancel(context.Background())
+	lists := newServiceStore()
+	defer func() {
+		cancelLists()
+		lists.wait()
+	}()
 	defer os.Remove(scanPath("service.json"))
 
 	stop := make(chan os.Signal, 1)
@@ -158,6 +164,11 @@ func run() error {
 
 	for {
 		c, err := loadConfig()
+		if err == nil {
+			lists.refresh(listContext, c.Lists, serviceRefreshRequested(c))
+			writeJSON(filepath.Join(runDir, "list-status.json"), lists.statuses())
+			c = lists.effective(c)
+		}
 		if scanning != nil {
 			if worker != nil {
 				select {
@@ -210,6 +221,9 @@ func run() error {
 				state = "ERROR"
 			} else if c.Enabled {
 				state = "EMPTY"
+				if len(c.Lists) > 0 {
+					state = "WAIT_LISTS"
+				}
 			}
 		} else {
 			if worker != nil {
@@ -369,6 +383,10 @@ func main() {
 		err = run()
 	case "settings":
 		result, err = loadConfig()
+	case "list-catalog":
+		result = serviceCatalog()
+	case "refresh-lists":
+		err = requestServiceRefresh(envelope.Config)
 	case "presets":
 		result = presetCatalog()
 	case "scan-start":

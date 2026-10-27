@@ -11,6 +11,7 @@ const root = path.resolve(__dirname, "..");
 async function main() {
   const assets = {
     "/module/index.html": "modules/zapret2/ui/index.html",
+    "/module/lists.js": "modules/zapret2/ui/lists.js",
     "/module/app.js": "modules/zapret2/ui/app.js",
     "/module/targets.js": "modules/zapret2/ui/targets.js",
     "/module/layout.js": "modules/zapret2/ui/layout.js",
@@ -26,11 +27,16 @@ async function main() {
       const language = url.searchParams.get("language") === "ru" ? "ru" : "en";
       response.end(`<!doctype html><script>
         window.OCF_I18N = {language: "${language}"};
-        window.saved = {revision: 0, enabled: false, networks: [], domains: [], tcp_ports: [80,443], udp_ports: [443], tcp_strategy: "split", udp_strategy: "off", split_position: 2, fake_ttl: 3, fake_repeats: 3};
+        window.saved = {revision: 0, enabled: false, lists: [], networks: [], domains: [], tcp_ports: [80,443], udp_ports: [443], tcp_strategy: "split", udp_strategy: "off", split_position: 2, fake_ttl: 3, fake_repeats: 3};
         window.changes = [];
         window.moduleState = "DISABLED";
+        window.listStatuses = [];
         window.EXTENSIONS = {
           action: async (id, operation) => {
+            if (operation === "list-catalog") {
+              return [{id: "telegram", name: "Telegram", paths: ["Services/telegram.lst", "Subnets/IPv4/telegram.lst"]}, {id: "youtube", name: "YouTube", paths: ["Services/youtube.lst"]}];
+            }
+
             if (operation === "presets") {
               return [{id: "hostname", name: "Hostname split", description: "Split within the server name.", protocol: "tcp", settings: {tcp_strategy: "split", split_positions: "1,midsld", sequence_overlap: 0, auto_ttl: false}}];
             }
@@ -39,6 +45,11 @@ async function main() {
           },
           call: async (id, operation, request) => {
             window.lastCall = {operation, request};
+
+            if (operation === "refresh-lists") {
+              window.listStatuses = [{id: "telegram", state: "ERROR", updated: 1793000000, domains: 3, networks: 2}];
+              return {ok: true};
+            }
 
             if (operation === "scan-start") {
               window.scan = {id: "test", state: "RUNNING", revision: window.saved.revision, results: []};
@@ -52,8 +63,9 @@ async function main() {
             window.changes.push(settings);
             await new Promise((resolve) => setTimeout(resolve, 200));
             window.saved = settings;
+            window.listStatuses = settings.lists.map((id) => ({id, state: "READY", updated: 1793000000, domains: 3, networks: 2}));
           },
-          status: async () => ({data: {state: window.moduleState, scan: window.scan || {state: "IDLE"}}})
+          status: async () => ({data: {state: window.moduleState, lists: window.listStatuses, scan: window.scan || {state: "IDLE"}}})
         };
       </script><iframe src="/module/index.html"></iframe>`);
       return;
@@ -85,6 +97,11 @@ async function main() {
       assert.equal(await frame.locator("#panel-diagnostics").isVisible(), true);
       assert.equal(await frame.locator("#settings").isVisible(), false);
       await frame.locator("#tab-diagnostics").press("Home");
+      await frame.locator("#service-picker").selectOption("telegram");
+      await frame.locator("#service-add").click();
+      assert.equal(await frame.locator("#service-lists > div").count(), 1);
+      assert.equal((await page.evaluate(() => window.changes)).length, 0);
+      await frame.locator("#manual-destinations summary").click();
       await frame.locator("#networks").fill("203.0.113.10\n2001:db8::/32");
       await frame.locator("#domains").fill("example.com");
       await frame.locator("#enabled").check();
@@ -106,6 +123,7 @@ async function main() {
       assert.deepEqual(saved.networks, ["203.0.113.10", "2001:db8::/32"]);
       assert.deepEqual(saved.domains, ["example.com"]);
       assert.deepEqual(saved.tcp_ports, [80, 443]);
+      assert.deepEqual(saved.lists, ["telegram"]);
       assert.equal(saved.revision, 1);
       assert.equal(saved.enabled, true);
       assert.equal(saved.tcp_strategy, "fake-split");
@@ -142,7 +160,18 @@ async function main() {
       await frame.locator("#tab-management").click();
       const body = await frame.locator("body").innerText();
       assert(body.includes(language === "ru" ? "IP-адреса и подсети" : "IP addresses and subnets"));
-      assert(body.includes(language === "ru" ? "любым из списков" : "matches either list"));
+      assert(body.includes(language === "ru" ? "объединяются" : "are combined"));
+      await frame.locator("#service-lists summary").click();
+      await frame.locator("#service-refresh").click();
+      await frame.locator("#service-refresh:not([disabled])").waitFor();
+      await page.waitForTimeout(3200);
+      assert.equal(await frame.locator("#service-lists details").getAttribute("open"), "");
+      const serviceText = await frame.locator("#service-lists").innerText();
+      assert(serviceText.includes(language === "ru" ? "Используется сохранённая копия" : "Using the saved copy"));
+      await frame.locator("#service-lists button").click();
+      assert.equal(await frame.locator("#service-lists > div").count(), 0);
+      assert.deepEqual(await page.evaluate(() => window.saved.lists), ["telegram"]);
+      assert.equal(await frame.locator("#domains").inputValue(), "example.com");
       assert.deepEqual(errors, []);
       await page.close();
     }

@@ -97,6 +97,8 @@ async function load() {
     document.getElementById("preset").value = "";
     document.getElementById("preset-description").textContent = "Choose a starting point, then apply or adjust its settings.";
     document.getElementById("enabled").checked = config.enabled;
+    await loadServiceLists(config.lists);
+    document.getElementById("manual-destinations").open = Boolean(config.domains?.length || config.networks?.length);
 
     for (const key of ["networks", "domains"]) {
       document.getElementById(key).value = (config[key] || []).join("\n");
@@ -135,6 +137,7 @@ async function load() {
   } finally {
     pending = false;
     fields.disabled = !config;
+    renderServiceLists();
   }
 }
 
@@ -153,6 +156,7 @@ document.getElementById("settings").addEventListener("submit", async (event) => 
     const next = {
       revision: config.revision + 1,
       enabled: document.getElementById("enabled").checked,
+      lists: serviceListsConfig(),
       networks: lines("networks"),
       domains: lines("domains"),
       tcp_ports: ports("tcp_ports"),
@@ -180,6 +184,7 @@ document.getElementById("settings").addEventListener("submit", async (event) => 
   } finally {
     pending = false;
     fields.disabled = false;
+    renderServiceLists();
   }
 });
 
@@ -189,11 +194,13 @@ async function updateStatus() {
     const labels = {
       DISABLED: "Disabled",
       EMPTY: "Add destinations to start processing",
+      WAIT_LISTS: "Waiting for service lists",
       RUNNING: "Running",
       ERROR: "Packet processing unavailable",
     };
     document.getElementById("state").textContent = labels[snapshot.data?.state] || "Unavailable";
     renderScan(snapshot.data?.scan);
+    renderServiceLists(snapshot.data?.lists);
     document.getElementById("diagnostic-version").textContent = snapshot.data?.version || "-";
     document.getElementById("diagnostic-engine").textContent = snapshot.data?.upstream || "-";
   } catch (error) {

@@ -21,6 +21,8 @@ var domainPattern = regexp.MustCompile(`^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?
 var interfacePattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,14}$`)
 
 type Config struct {
+	Lists       []string `json:"lists"`
+	ManagedSets bool     `json:"-"`
 	Revision    uint64   `json:"revision"`
 	Enabled     bool     `json:"enabled"`
 	Networks    []string `json:"networks"`
@@ -74,6 +76,17 @@ func parseConfig(data []byte) (Config, error) {
 
 	if len(c.Networks) > 64 || len(c.Domains) > 128 || c.Split < 1 || c.Split > 1500 || c.TTL < 1 || c.TTL > 255 || c.Repeats < 1 || c.Repeats > 20 {
 		return c, errors.New("settings exceed limits")
+	}
+
+	seenLists := map[string]bool{}
+	if len(c.Lists) > len(serviceCatalog()) {
+		return c, errors.New("too many service lists")
+	}
+	for _, id := range c.Lists {
+		if _, known := knownService(id); !known || seenLists[id] {
+			return c, errors.New("unknown or duplicate service list")
+		}
+		seenLists[id] = true
 	}
 
 	for _, ports := range [][]int{c.TCPPorts, c.UDPPorts} {

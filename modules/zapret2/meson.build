@@ -3,6 +3,9 @@ zapret_adapter = custom_target(
     input: files(
         'daemon/go.mod',
         'daemon/config.go',
+        'daemon/service_catalog.go',
+        'daemon/service_fetch.go',
+        'daemon/service_store.go',
         'daemon/strategy.go',
         'daemon/presets.go',
         'daemon/scan.go',
@@ -36,6 +39,7 @@ module_specs += {
             'packaging/module.json.in',
             'ui/index.html',
             'ui/app.js',
+            'ui/lists.js',
             'ui/layout.js',
             'ui/targets.js',
             'ui/layout.css',

@@ -235,9 +235,33 @@ lists, **Strategies** for presets and optional manual tuning, **Strategy finder*
 for isolated HTTPS tests, and **Diagnostics** for saved-list counts and versions.
 Switching sections retains unsaved changes; only **Apply** saves them.
 
+In **Management**, choose a service and select **Add**, then **Apply**. The
+selected service lists remain separate from **Custom addresses**. They include
+publisher-provided domains and, where available, IPv4/IPv6 subnets. Open a
+list's details for counts, last successful update and source links. The catalog
+uses [itdoginfo/allow-domains](https://github.com/itdoginfo/allow-domains), also
+used by zapret-gui. It does not bundle downloaded lists or fetch them until
+selected.
+
+Selected lists download after saving and update every 24 hours while the module
+service runs. **Update saved lists** requests an immediate background refresh.
+Each update resolves one immutable source commit and validates every component
+before atomically replacing that service's snapshot. Failed, empty or malformed
+responses keep the previous copy; automatic retries wait 15 minutes. Cache files
+are retained in the module's private `data/lists/` directory across reboots and
+updates. Removing a service from the selection stops using it without deleting
+custom addresses. Generic uninstall with `--prune` removes retained module data.
+
+Lists select destinations, not protocols or ports. For example, Telegram's
+subnets include native app servers, but selecting them does not turn an HTTPS
+strategy into MTProto handling. Current TCP methods match HTTP/TLS handshakes
+and the UDP method matches QUIC Initial packets. The HTTPS finder does not test
+app transports or calls.
+
 Enter destination IPv4/IPv6 addresses or CIDR subnets, domain names, or both.
 A match in either list selects the connection (IP/subnet OR domain). Empty
-lists disable interception. IP selection happens in the firewall; domain selection uses
+lists disable interception. Manual IP-only selection happens in the firewall; managed lists use engine
+IP sets to avoid one firewall rule per subnet. Domain selection uses
 HTTP Host or a visible TLS/QUIC server name. Domain entries include subdomains.
 Encrypted names such as ECH cannot reliably identify the intended domain.
 

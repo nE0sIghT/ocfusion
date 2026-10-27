@@ -98,6 +98,12 @@ def main():
         ),
         (
             "zapret2",
+            "modules/zapret2/daemon/service_fetch.go",
+            ["ocfusion-zapret2"],
+            [*C_TARGETS, "AdGuardHome", "extd", "ocfusion-vpn"],
+        ),
+        (
+            "zapret2",
             "modules/zapret2/daemon/config.go",
             ["ocfusion-zapret2"],
             [*C_TARGETS, "AdGuardHome", "extd", "ocfusion-vpn"],

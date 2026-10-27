@@ -151,7 +151,8 @@ The optional zapret2 module owns only its narrowly scoped WAN NFQUEUE rules,
 queue allocation and worker lifecycle. It does not allocate VPN resources or
 change routing, DNS configuration, native startup scripts or global hardware
 acceleration. The VPN provider continues to own VPN routing/firewall resources.
-IP/subnet selection occurs before queueing; domain filters are evaluated by the
+Manual IP-only selection occurs before queueing; managed service lists use
+engine IP sets to keep firewall rule count bounded. Domain filters are evaluated by the
 pinned upstream engine. Separate ordered IP and domain profiles combine
 selectors as a union (OR).
 IP profiles do not require a hostname match. When domains are configured, the
@@ -162,6 +163,13 @@ a bounded schema and a fixed strategy allowlist, without shell evaluation or
 arbitrary Lua. The worker drops to a free dedicated UID and keeps upstream's
 network capability restrictions and seccomp hardening. Rules are journaled before
 installation for recovery and use queue bypass when the worker is absent.
+
+The module also owns optional publisher-updated service data under its private
+module `data/lists/` directory. Validated snapshots are versioned by upstream
+commit and replaced per service, independently of manual configuration. Fetching
+runs asynchronously with bounded data, cancellation and retained last-good
+copies. No list manager, scheduler or list-specific dispatch is added to the
+platform.
 
 Strategy enumeration belongs to the module daemon. It holds normal module
 configuration steady while a cancellable test runs, with a separate private
