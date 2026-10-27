@@ -224,6 +224,35 @@ outbound connections are IPv4 only. Disabling the proxy stops its connections
 and removes its network rules without disconnecting the VPN or changing global
 router DNS policy.
 
+## zapret2
+
+The optional zapret2 module processes selected direct WAN connections without a
+VPN or a third-party relay. It is excluded from the default build and disabled
+initially. Install its standalone module package or build with `-Dmodules=all`.
+
+Enter destination IPv4/IPv6 addresses or CIDR subnets, domain names, or both.
+When both lists are populated, both conditions must match. Empty lists disable
+interception. IP selection happens in the firewall; domain selection uses
+HTTP Host or a visible TLS/QUIC server name. Domain entries include subdomains.
+Encrypted names such as ECH cannot reliably identify the intended domain.
+
+Choose TCP ports and split or split/reorder processing. QUIC processing is
+optional and uses fake initial packets with configurable TTL and repetition.
+There is no universal strategy: verify the selected destinations after applying
+settings. Connections outside the selection are not modified. Domain-only
+selection inspects initial packets on the selected ports to discover the name.
+VPN interfaces are excluded from interception.
+
+The module enables connection accounting when needed to limit inspection to the
+first 12 packets in each direction. Existing connections without accounting may
+need to reconnect. Accounting remains enabled after removal because it is shared
+kernel state; module interception rules are removed. Hardware acceleration can
+bypass packet hooks on some firmware, so successful processing must be verified
+on the router. The module does not disable acceleration globally.
+
+Stopping the module removes its firewall rules. Without a listening packet
+processor, its NFQUEUE rules use bypass mode and ordinary connectivity remains.
+
 ## One-time codes
 
 OpenConnect's **OTP mode** supports AnyConnect/ocserv. Choose manual input or

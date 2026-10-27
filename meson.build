@@ -81,6 +81,7 @@ if get_option('runtime')
     subdir('modules/openconnect')
     subdir('modules/adguard-home')
     subdir('modules/radio-settings')
+    subdir('modules/zapret2')
     subdir('packaging')
 endif
 

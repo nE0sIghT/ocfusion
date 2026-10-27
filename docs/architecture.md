@@ -145,6 +145,20 @@ tunnel-advertised DNS. Requests to external DNS addresses follow the network's
 normal VPN routes and kill switch; requests to the router use its DNS service
 and the global DNS policy below.
 
+## Selective packet processing
+
+The optional zapret2 module owns only its narrowly scoped WAN NFQUEUE rules,
+queue allocation and worker lifecycle. It does not allocate VPN resources or
+change routing, DNS configuration, native startup scripts or global hardware
+acceleration. The VPN provider continues to own VPN routing/firewall resources.
+IP/subnet selection occurs before queueing; domain filters are evaluated by the
+pinned upstream engine. Both selectors combine as an intersection. Empty
+selection never creates interception rules. Worker arguments are generated from
+a bounded schema and a fixed strategy allowlist, without shell evaluation or
+arbitrary Lua. The worker drops to a free dedicated UID and keeps upstream's
+network capability restrictions and seccomp hardening. Rules are journaled before
+installation for recovery and use queue bypass when the worker is absent.
+
 ## Global DNS and filtering
 
 The VPN provider owns a persistent global DNS preference keyed by

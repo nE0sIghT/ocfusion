@@ -40,6 +40,41 @@
       "name": "3proxy-0.9.9.1.tar.gz",
       "url": "https://github.com/3proxy/3proxy/releases/download/0.9.9.1/3proxy-0.9.9.1.tar.gz",
       "sha256": "13711040af096f09d5202b0cb516ec08db7c08130ed21719063d2e570215fb34"
+    },
+    {
+      "name": "libmnl-1.0.5.tar.bz2",
+      "url": "https://www.netfilter.org/projects/libmnl/files/libmnl-1.0.5.tar.bz2",
+      "sha256": "274b9b919ef3152bfb3da3a13c950dd60d6e2bcd54230ffeca298d03b40d0525"
+    },
+    {
+      "name": "libnfnetlink-1.0.2.tar.bz2",
+      "url": "https://www.netfilter.org/projects/libnfnetlink/files/libnfnetlink-1.0.2.tar.bz2",
+      "sha256": "b064c7c3d426efb4786e60a8e6859b82ee2f2c5e49ffeea640cfe4fe33cbc376"
+    },
+    {
+      "name": "libnetfilter_queue-1.0.5.tar.bz2",
+      "url": "https://www.netfilter.org/projects/libnetfilter_queue/files/libnetfilter_queue-1.0.5.tar.bz2",
+      "sha256": "f9ff3c11305d6e03d81405957bdc11aea18e0d315c3e3f48da53a24ba251b9f5"
+    },
+    {
+      "name": "lua-5.4.8.tar.gz",
+      "url": "https://www.lua.org/ftp/lua-5.4.8.tar.gz",
+      "sha256": "4f18ddae154e793e46eeab727c59ef1c0c0c2b744e7b94219710d76f530629ae"
+    },
+    {
+      "name": "zapret2-1.0.6.tar.gz",
+      "url": "https://codeload.github.com/bol-van/zapret2/tar.gz/221d7dff24bfec0cd5ac0a5070b8acef2008af3d",
+      "sha256": "c9925bb194eea8c19feb05ea6b24a848e8b50af8c64643b9e394ffe653327d87"
+    },
+    {
+      "name": "libcap-2.75.tar.xz",
+      "url": "https://www.kernel.org/pub/linux/libs/security/linux-privs/libcap2/libcap-2.75.tar.xz",
+      "sha256": "de4e7e064c9ba451d5234dd46e897d7c71c96a9ebf9a0c445bc04f4742d83632"
+    },
+    {
+      "name": "glibc-2.41-queue.h",
+      "url": "https://raw.githubusercontent.com/bminor/glibc/glibc-2.41/misc/sys/queue.h",
+      "sha256": "8b284031772b1ba2035d9b05b24f2cb9b23e7bd324bcccb5e3fcc57d34aafa48"
     }
   ]
 }

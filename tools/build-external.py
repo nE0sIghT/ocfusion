@@ -89,7 +89,13 @@ def build_component(arguments, config):
     if source_directory.exists():
         shutil.rmtree(source_directory)
     with tarfile.open(arguments.archive) as archive:
+        members = archive.getmembers()
+        archive_root = members[0].name.split("/")[0]
         archive.extractall(source_root, filter="data")
+
+    extracted = source_root / archive_root
+    if extracted != source_directory:
+        extracted.rename(source_directory)
 
     parameters = {
         "prefix": str(prefix),
@@ -123,7 +129,7 @@ def build_component(arguments, config):
 
         if recipe["install_target"]:
             run(
-                ["make", recipe["install_target"]],
+                ["make", *make_arguments, recipe["install_target"]],
                 source_directory,
                 environment,
                 make_log,
@@ -148,7 +154,16 @@ def build_component(arguments, config):
         license_root / recipe["notice_file"],
     )
 
+    notice = license_root / recipe["notice_file"]
+    for name in recipe.get("extra_license_files", []):
+        with notice.open("a") as destination:
+            destination.write("\n" + name + "\n")
+            destination.write((source_directory / name).read_text())
+
     output = arguments.output.resolve()
+    for name in recipe.get("runtime_files", []):
+        shutil.copy(source_directory / name, output.parent / Path(name).name)
+
     if recipe.get("executable"):
         shutil.copy(source_directory / recipe["executable"], output)
         subprocess.run(["aarch64-linux-gnu-strip", str(output)], check=True)

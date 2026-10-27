@@ -152,6 +152,94 @@
         "EXTRA_CFLAGS={c_flags}"
       ],
       "executable": "bin/3proxy"
+    },
+    "libmnl": {
+      "configure": [
+        "./configure",
+        "--host=aarch64-linux-musl",
+        "--prefix={prefix}",
+        "--disable-shared",
+        "--enable-static",
+        "--disable-doxygen"
+      ],
+      "uses_musl": true,
+      "license_file": "COPYING",
+      "notice_file": "libmnl-COPYING.txt",
+      "install_target": "install"
+    },
+    "libnfnetlink": {
+      "configure": [
+        "./configure",
+        "--host=aarch64-linux-musl",
+        "--prefix={prefix}",
+        "--disable-shared",
+        "--enable-static",
+        "--disable-doxygen"
+      ],
+      "uses_musl": true,
+      "license_file": "COPYING",
+      "notice_file": "libnfnetlink-COPYING.txt",
+      "install_target": "install"
+    },
+    "libnetfilter_queue": {
+      "configure": [
+        "./configure",
+        "--host=aarch64-linux-musl",
+        "--prefix={prefix}",
+        "--disable-shared",
+        "--enable-static",
+        "--disable-doxygen"
+      ],
+      "uses_musl": true,
+      "license_file": "COPYING",
+      "notice_file": "libnetfilter_queue-COPYING.txt",
+      "install_target": "install"
+    },
+    "lua": {
+      "configure": null,
+      "uses_musl": true,
+      "license_file": "doc/readme.html",
+      "notice_file": "Lua-license.html",
+      "install_target": "install",
+      "make_arguments": [
+        "PLAT=linux",
+        "CC={prefix}/bin/musl-gcc",
+        "AR=aarch64-linux-gnu-ar rcu",
+        "RANLIB=aarch64-linux-gnu-ranlib",
+        "MYCFLAGS={c_flags}",
+        "MYLDFLAGS=-static",
+        "INSTALL_TOP={prefix}"
+      ]
+    },
+    "zapret2": {
+      "configure": null,
+      "uses_musl": true,
+      "license_file": "docs/LICENSE.txt",
+      "notice_file": "zapret2-license.txt",
+      "install_target": null,
+      "make_arguments": [
+        "-C",
+        "nfq2",
+        "CC={prefix}/bin/musl-gcc",
+        "LUA_JIT=0",
+        "LUA_CFLAGS=-I{prefix}/include",
+        "LUA_LIB={prefix}/lib/liblua.a",
+        "CFLAGS={c_flags} -std=gnu99 -I{prefix}/include",
+        "LDFLAGS=-L{prefix}/lib -static -Wl,--gc-sections",
+        "LIBS_LINUX=-lnetfilter_queue -lnfnetlink -lmnl -lz -lm -ldl"
+      ],
+      "executable": "nfq2/nfqws2",
+      "runtime_files": [
+        "lua/zapret-lib.lua",
+        "lua/zapret-antidpi.lua"
+      ],
+      "extra_license_files": [
+        "nfq2/uthash.h",
+        "nfq2/kavl.h",
+        "nfq2/crypto/aes.c",
+        "nfq2/crypto/sha.h",
+        "nfq2/crypto/gcm.c"
+      ]
     }
   }
 }

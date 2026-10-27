@@ -24,6 +24,11 @@ OCFusion is running.
   It inherits ASUS DNS settings and follows the selected VPN/WAN DNS path, or
   uses custom upstreams including DoT and DoH. It also works without
   OpenConnect.
+- **zapret2** (optional) - applies DPI processing to explicit destination IP/subnet
+  and domain lists on direct WAN connections. Includes TCP split/reorder and
+  QUIC fake-packet strategies. Disabled by default; effectiveness depends on the
+  provider and strategy. Build with `-Dmodules=all` or install its standalone
+  module package.
 - **Wi-Fi radio settings** (optional, source builds only) - selects a native ASUS regional profile and shows
   live radio state, available channels and their frequencies. The profile
   catalog includes EU, AA, AU, JP, KR and XX; only profiles supported by all

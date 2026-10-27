@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>zapret2 - OCFusion</title>
+    <link rel="stylesheet" href="/index_style.css" />
+    <link rel="stylesheet" href="/form_style.css" />
+    <link rel="stylesheet" href="/user/extensions-panel.css" />
+  </head>
+  <body class="bg">
+    <main class="ext-shell ext-module">
+      <div class="ext-card-heading">
+        <h1>zapret2</h1>
+        <span id="state" class="ext-badge" role="status">Loading...</span>
+      </div>
+      <p>Process selected connections to reduce DPI interference. Applies to direct WAN traffic; VPN traffic is excluded.</p>
+      <form id="settings">
+        <fieldset id="fields" disabled>
+          <label><input id="enabled" type="checkbox" /> Enable packet processing</label>
+          <h2>Destinations</h2>
+          <p>Specify IP addresses, subnets or domains. With both lists filled, a connection must match both. Empty lists disable processing.</p>
+          <table class="FormTable">
+            <tr>
+              <th><label for="networks">IP addresses and subnets</label></th>
+              <td><textarea id="networks" rows="4"></textarea><p>One IPv4/IPv6 address or subnet per line.</p></td>
+            </tr>
+            <tr>
+              <th><label for="domains">Domains</label></th>
+              <td><textarea id="domains" rows="4"></textarea><p>One domain per line, without URLs or wildcards. Includes subdomains. Encrypted or unavailable names cannot be matched.</p></td>
+            </tr>
+          </table>
+          <h2>TCP connections</h2>
+          <table class="FormTable">
+            <tr>
+              <th><label for="tcp_strategy">Strategy</label></th>
+              <td><select id="tcp_strategy"><option value="off">Off</option><option value="split">Split packets</option><option value="disorder">Split and reorder packets</option></select></td>
+            </tr>
+            <tr><th><label for="tcp_ports">TCP ports</label></th><td><input id="tcp_ports" type="text" /><p>Comma-separated port numbers. Up to 15 ports.</p></td></tr>
+            <tr><th><label for="split_position">Split position</label></th><td><input id="split_position" type="number" min="1" max="1500" /><p>Byte position in the initial HTTP request or TLS handshake.</p></td></tr>
+          </table>
+          <h2>UDP connections</h2>
+          <table class="FormTable">
+            <tr><th><label for="udp_strategy">Strategy</label></th><td><select id="udp_strategy"><option value="off">Off</option><option value="fake-quic">QUIC fake packets</option></select></td></tr>
+            <tr><th><label for="udp_ports">UDP ports</label></th><td><input id="udp_ports" type="text" /></td></tr>
+            <tr><th><label for="fake_ttl">Fake packet TTL</label></th><td><input id="fake_ttl" type="number" min="1" max="255" /></td></tr>
+            <tr><th><label for="fake_repeats">Fake packet repeats</label></th><td><input id="fake_repeats" type="number" min="1" max="20" /></td></tr>
+          </table>
+          <p>Strategy effectiveness depends on the connection and provider. Test new connections after applying changes.</p>
+          <div class="apply_gen">
+            <button type="submit">Apply</button>
+            <button id="reload" type="button" class="ext-secondary">Reload</button>
+            <p id="result" role="status"></p>
+          </div>
+        </fieldset>
+      </form>
+    </main>
+    <script src="app.js"></script>
+    <script src="translations.js"></script>
+    <script src="/user/ocfusion-i18n.js"></script>
+  </body>
+</html>

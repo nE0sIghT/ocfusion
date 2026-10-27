@@ -14,6 +14,13 @@ foreach name : [
     'cacert-2026-09-25.pem',
     'AdGuardHome-v0.107.79.tar.gz',
     '3proxy-0.9.9.1.tar.gz',
+    'libmnl-1.0.5.tar.bz2',
+    'libnfnetlink-1.0.2.tar.bz2',
+    'libnetfilter_queue-1.0.5.tar.bz2',
+    'lua-5.4.8.tar.gz',
+    'zapret2-1.0.6.tar.gz',
+    'libcap-2.75.tar.xz',
+    'glibc-2.41-queue.h',
 ]
     downloads += {
         name: custom_target(
@@ -34,7 +41,7 @@ external_command = [
     '--build-root',
     build_root,
     '--output',
-    '@OUTPUT@',
+    '@OUTPUT0@',
     '--c-flags',
     c_flags,
     '--jobs',
@@ -44,7 +51,11 @@ external_command = [
 # Ordered dependencies stay in Meson; upstream build recipes live in build.json.
 components = [
     {'name': 'musl', 'archive': 'musl-1.2.6.tar.gz', 'dependencies': []},
-    {'name': '3proxy', 'archive': '3proxy-0.9.9.1.tar.gz', 'dependencies': ['musl']},
+    {
+        'name': '3proxy',
+        'archive': '3proxy-0.9.9.1.tar.gz',
+        'dependencies': ['musl'],
+    },
     {'name': 'zlib', 'archive': 'zlib-1.3.2.tar.gz', 'dependencies': ['musl']},
     {
         'name': 'openssl',
@@ -61,6 +72,27 @@ components = [
         'archive': 'openconnect-9.21.tar.gz',
         'dependencies': ['musl', 'zlib', 'openssl', 'libxml2'],
     },
+    {
+        'name': 'libmnl',
+        'archive': 'libmnl-1.0.5.tar.bz2',
+        'dependencies': ['musl'],
+    },
+    {
+        'name': 'libnfnetlink',
+        'archive': 'libnfnetlink-1.0.2.tar.bz2',
+        'dependencies': ['musl'],
+    },
+    {
+        'name': 'libnetfilter_queue',
+        'archive': 'libnetfilter_queue-1.0.5.tar.bz2',
+        'dependencies': ['musl', 'libmnl', 'libnfnetlink'],
+    },
+    {'name': 'lua', 'archive': 'lua-5.4.8.tar.gz', 'dependencies': ['musl']},
+    {
+        'name': 'zapret2',
+        'archive': 'zapret2-1.0.6.tar.gz',
+        'dependencies': ['musl', 'zlib', 'lua', 'libnetfilter_queue'],
+    },
 ]
 
 external_targets = {}
@@ -73,6 +105,33 @@ foreach component : components
 
     inputs = [external_builder, external_config]
     output = name + '.stamp'
+    if name == 'zapret2'
+        compatibility_headers = custom_target(
+            'zapret-compatibility-headers',
+            input: [
+                downloads['glibc-2.41-queue.h'],
+                downloads['libcap-2.75.tar.xz'],
+            ],
+            output: 'zapret-headers.stamp',
+            depends: external_targets['musl'],
+            depend_files: files('../tools/prepare-zapret-headers.py'),
+            command: [
+                python,
+                files('../tools/prepare-zapret-headers.py'),
+                '--queue',
+                '@INPUT0@',
+                '--capability',
+                '@INPUT1@',
+                '--build-root',
+                build_root,
+                '--output',
+                '@OUTPUT@',
+            ],
+        )
+        dependencies += compatibility_headers
+        output = ['nfqws2', 'zapret-lib.lua', 'zapret-antidpi.lua']
+    endif
+
     if name == '3proxy'
         output = '3proxy'
     endif

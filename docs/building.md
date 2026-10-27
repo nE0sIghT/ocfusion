@@ -40,6 +40,7 @@ meson test -C build/meson --suite unit --suite example --suite client --print-er
 The root `meson.build` configures the project and includes component build files
 from `third_party/`, `platform/`, `modules/vpn/`, `modules/openconnect/`,
 `modules/adguard-home/`, `modules/http-proxy/`, `modules/radio-settings/`,
+`modules/zapret2/`,
 `packaging/` and `tests/`.
 Upstream configure options, compiler environment and install targets are in
 [third_party/build.json](../third_party/build.json); pinned downloads remain in
@@ -108,7 +109,7 @@ never distributed.
 ## Optional modules and standalone packages
 
 Prebuilt releases and the default runtime build include VPN integration,
-OpenConnect, AdGuard Home and HTTP proxy. Wi-Fi radio settings is excluded by
+OpenConnect, AdGuard Home and HTTP proxy. Wi-Fi radio settings and zapret2 are excluded by
 default.
 To include it in a source build, configure with:
 
@@ -136,6 +137,7 @@ meson compile -C build/meson module-vpn
 meson compile -C build/meson module-openconnect
 meson compile -C build/meson module-http-proxy
 meson compile -C build/meson module-adguard-home
+meson compile -C build/meson module-zapret2
 meson compile -C build/meson module-radio-settings
 ```
 
@@ -245,3 +247,13 @@ separate from Meson's built-in `meson dist` command. Named test targets use
 source and require the dependencies described above. To discard configuration
 and downloaded build inputs entirely, remove the build directory. Release
 archives in `dist/` are separate packaging outputs.
+
+### zapret2 dependencies
+
+zapret2 1.0.6 is pinned to an immutable commit and built without upstream
+installation scripts, list downloaders or bundled executables. Meson separately
+builds Lua 5.4.8, libmnl, libnfnetlink and libnetfilter_queue with the static musl
+sysroot. Compatibility headers come from pinned glibc and libcap sources.
+The payload includes only nfqws2, the adapter and two matching upstream Lua
+libraries. Arbitrary Lua and upstream argument injection are not exposed by
+the module API.

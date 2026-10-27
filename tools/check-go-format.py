@@ -14,6 +14,8 @@ def main():
         for module in (
             "modules/openconnect/daemon",
             "modules/vpn/daemon",
+            "modules/http-proxy/daemon",
+            "modules/zapret2/daemon",
             "modules/adguard-home/daemon",
             "modules/radio-settings/daemon",
             "platform",

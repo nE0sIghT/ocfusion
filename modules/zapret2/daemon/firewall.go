@@ -1,0 +1,293 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"regexp"
+	"strconv"
+	"strings"
+	"time"
+)
+
+var execute = func(tool string, args ...string) (string, error) {
+	paths := map[string][]string{
+		"ip":        {"/usr/sbin/ip", "/sbin/ip"},
+		"iptables":  {"/usr/sbin/iptables", "/sbin/iptables"},
+		"ip6tables": {"/usr/sbin/ip6tables", "/sbin/ip6tables"},
+	}
+	for _, path := range paths[tool] {
+		if _, err := os.Stat(path); err == nil {
+			ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
+			defer cancel()
+			data, err := exec.CommandContext(ctx, path, args...).CombinedOutput()
+			return string(data), err
+		}
+	}
+
+	return "", errors.New("required network tool unavailable")
+}
+
+type Rule struct {
+	Tool  string   `json:"tool"`
+	Chain string   `json:"chain"`
+	Args  []string `json:"args"`
+}
+
+type Resources struct {
+	Queue int    `json:"queue"`
+	Mark  string `json:"mark"`
+	Rules []Rule `json:"rules"`
+	Acct  bool   `json:"enabled_accounting"`
+}
+
+func writeJSON(path string, data any) error {
+	raw, err := json.MarshalIndent(data, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	if err = os.WriteFile(path+".new", raw, 0600); err != nil {
+		return err
+	}
+
+	return os.Rename(path+".new", path)
+}
+
+func applyRule(rule Rule, add bool) error {
+	base := []string{"-t", "mangle", "-C", rule.Chain}
+	_, err := execute(rule.Tool, append(base, rule.Args...)...)
+	if add && err == nil || !add && err != nil {
+		// A failed check is not evidence of absence when the table cannot be read.
+		if !add && err != nil {
+			if _, readErr := execute(rule.Tool, "-t", "mangle", "-S", rule.Chain); readErr != nil {
+				return readErr
+			}
+		}
+
+		return nil
+	}
+
+	op := "-D"
+	if add {
+		op = "-A"
+	}
+
+	_, err = execute(rule.Tool, append([]string{"-t", "mangle", op, rule.Chain}, rule.Args...)...)
+	return err
+}
+
+func cleanup() error {
+	data, err := os.ReadFile(filepath.Join(runDir, "resources.json"))
+	if os.IsNotExist(err) {
+		return nil
+	}
+
+	var r Resources
+	if err != nil || len(data) > 524288 || json.Unmarshal(data, &r) != nil || r.Queue < 200 || r.Queue > 255 || len(r.Rules) > 1024 {
+		return errors.New("invalid packet-processing recovery record")
+	}
+
+	var failures error
+	for _, rule := range r.Rules {
+		if (rule.Tool != "iptables" && rule.Tool != "ip6tables") || (rule.Chain != "POSTROUTING" && rule.Chain != "PREROUTING") {
+			return errors.New("invalid packet-processing recovery rule")
+		}
+
+		comment := false
+		for i, arg := range rule.Args {
+			if arg == "--comment" && i+1 < len(rule.Args) && rule.Args[i+1] == "ocfusion:zapret2" {
+				comment = true
+			}
+		}
+
+		if !comment {
+			return errors.New("unowned packet-processing recovery rule")
+		}
+
+		failures = errors.Join(failures, applyRule(rule, false))
+	}
+
+	if failures != nil {
+		return failures
+	}
+
+	// Accounting is shared kernel state. Leave it enabled rather than undoing
+	// another service's subsequent dependency on it. No traffic rule remains.
+	return os.Remove(filepath.Join(runDir, "resources.json"))
+}
+
+func wan(family string) (string, error) {
+	output, err := execute("ip", family, "route", "show", "table", "main", "default")
+	if err != nil {
+		return "", err
+	}
+
+	for _, line := range strings.Split(output, "\n") {
+		fields := strings.Fields(line)
+		if len(fields) == 0 || fields[0] != "default" {
+			continue
+		}
+
+		for i := 0; i+1 < len(fields); i++ {
+			if fields[i] == "dev" && interfacePattern.MatchString(fields[i+1]) {
+				iface := fields[i+1]
+				if strings.HasPrefix(iface, "br") || strings.HasPrefix(iface, "tun") || strings.HasPrefix(iface, "ocvpn") || strings.HasPrefix(iface, "wg") {
+					continue
+				}
+
+				return iface, nil
+			}
+		}
+	}
+
+	return "", errors.New("WAN route unavailable")
+}
+
+var markRE = regexp.MustCompile(`(?:--mark|--set-xmark|--set-mark|fwmark)\s+(0x[0-9a-fA-F]+|[0-9]+)(?:/(0x[0-9a-fA-F]+|[0-9]+))?`)
+var queueRE = regexp.MustCompile(`--queue-num\s+([0-9]+)`)
+
+func allocate(c Config) (Resources, error) {
+	var r Resources
+	state := ""
+	for _, tool := range []string{"iptables", "ip6tables"} {
+		out, err := execute(tool, "-t", "mangle", "-S")
+		if err != nil && tool == "iptables" {
+			return r, err
+		}
+
+		state += "\n" + out
+	}
+	out, err := execute("ip", "-4", "rule", "show")
+	if err != nil {
+		return r, err
+	}
+
+	state += "\n" + out
+	out, _ = execute("ip", "-6", "rule", "show")
+	state += "\n" + out
+
+	used := uint64(0)
+	for _, match := range markRE.FindAllStringSubmatch(state, -1) {
+		mask := uint64(0xffffffff)
+		if match[2] != "" {
+			mask, _ = strconv.ParseUint(match[2], 0, 32)
+		}
+		used |= mask
+	}
+
+	// A full CONNMARK restore can erase the loop-prevention bit.
+	restoreMask := regexp.MustCompile(`--nfmask\s+(0x[0-9a-fA-F]+|[0-9]+)`)
+	for _, line := range strings.Split(state, "\n") {
+		if !strings.Contains(line, "--restore-mark") {
+			continue
+		}
+
+		mask := uint64(0xffffffff)
+		if match := restoreMask.FindStringSubmatch(line); match != nil {
+			mask, _ = strconv.ParseUint(match[1], 0, 32)
+		}
+		used |= mask
+	}
+
+	for bit := uint64(1 << 30); bit >= 1<<16; bit >>= 1 {
+		if bit&used == 0 {
+			r.Mark = fmt.Sprintf("0x%x", bit)
+			break
+		}
+	}
+	if r.Mark == "" {
+		return r, errors.New("no free packet-processing mark")
+	}
+
+	queues := map[int]bool{}
+	for _, match := range queueRE.FindAllStringSubmatch(state, -1) {
+		q, _ := strconv.Atoi(match[1])
+		queues[q] = true
+	}
+	data, readErr := os.ReadFile("/proc/net/netfilter/nfnetlink_queue")
+	if readErr != nil && !os.IsNotExist(readErr) {
+		return r, readErr
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) > 0 {
+			q, _ := strconv.Atoi(fields[0])
+			queues[q] = true
+		}
+	}
+	for q := 200; q <= 255; q++ {
+		if !queues[q] {
+			r.Queue = q
+			break
+		}
+	}
+	if r.Queue == 0 {
+		return r, errors.New("no free packet-processing queue")
+	}
+
+	for _, family := range []string{"-4", "-6"} {
+		networks := []string{}
+		for _, prefix := range c.Networks {
+			if strings.Contains(prefix, ":") == (family == "-6") {
+				networks = append(networks, prefix)
+			}
+		}
+		if len(c.Networks) > 0 && len(networks) == 0 {
+			continue
+		}
+		if len(networks) == 0 {
+			networks = []string{""}
+		}
+
+		iface, err := wan(family)
+		if err != nil {
+			if family == "-4" {
+				return r, err
+			}
+			continue
+		}
+		tool := "iptables"
+		if family == "-6" {
+			tool = "ip6tables"
+		}
+
+		for _, prefix := range networks {
+			for _, protocol := range []string{"tcp", "udp"} {
+				ports, strategy := c.TCPPorts, c.TCP
+				if protocol == "udp" {
+					ports, strategy = c.UDPPorts, c.UDP
+				}
+				if len(ports) == 0 || strategy == "off" {
+					continue
+				}
+
+				for _, incoming := range []bool{false, true} {
+					chain, ifaceFlag, addressFlag, portsFlag, direction := "POSTROUTING", "-o", "-d", "--dports", "original"
+					if incoming {
+						chain, ifaceFlag, addressFlag, portsFlag, direction = "PREROUTING", "-i", "-s", "--sports", "reply"
+					}
+					args := []string{ifaceFlag, iface, "-p", protocol}
+					if prefix != "" {
+						args = append(args, addressFlag, prefix)
+					}
+					args = append(args, "-m", "multiport", portsFlag, portList(ports), "-m", "mark", "!", "--mark", r.Mark+"/"+r.Mark,
+						"-m", "connbytes", "--connbytes", "1:12", "--connbytes-dir", direction, "--connbytes-mode", "packets",
+						"-m", "comment", "--comment", "ocfusion:zapret2", "-j", "NFQUEUE", "--queue-num", strconv.Itoa(r.Queue), "--queue-bypass")
+					r.Rules = append(r.Rules, Rule{Tool: tool, Chain: chain, Args: args})
+				}
+			}
+		}
+	}
+
+	if len(r.Rules) == 0 {
+		return r, errors.New("no active protocols")
+	}
+
+	return r, nil
+}

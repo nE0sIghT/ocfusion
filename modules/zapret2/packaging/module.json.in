@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "id": "zapret2",
+  "name": "zapret2",
+  "version": "@VERSION@",
+  "module_api": 1,
+  "entrypoint": "bin/ocfusion-zapret2",
+  "ui": "ui/index.html",
+  "dependencies": [],
+  "actions": ["settings"],
+  "capabilities": ["network.packet-processing"],
+  "resources": {"packet-processing.zapret2": "wan"}
+}

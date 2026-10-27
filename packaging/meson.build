@@ -63,6 +63,10 @@ foreach module_id, specification : module_specs
         inputs += data['source']
         description += ['--verified-file', data['source'].full_path(), data['name']]
     endforeach
+    foreach data : specification.get('generated_data', [])
+        inputs += data['source']
+        description += ['--file', data['source'].full_path(), data['name']]
+    endforeach
     foreach notice : specification['notices']
         description += ['--notice', notice]
     endforeach
