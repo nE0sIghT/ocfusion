@@ -55,7 +55,7 @@ func installScanRules(resources Resources) error {
 	// Insert backwards so reply marking precedes both the test queue and the
 	// existing module's rules. No foreign rule or chain is removed or bypassed.
 	for i := len(resources.Rules) - 1; i >= 0; i-- {
-		if err := applyRule(resources.Rules[i], true); err != nil {
+		if err := ensureRule(resources.Rules[i]); err != nil {
 			return err
 		}
 	}

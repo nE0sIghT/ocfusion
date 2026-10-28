@@ -150,10 +150,13 @@ modules. A per-profile producer should also reject stale source snapshots
 instead of refreshing old data indefinitely.
 
 `run` receives `{"api":1,"operation":"run"}` on stdin. `EXT_CONFIG_PATH` points
-to the private configuration. The manager owns the process group; stop sends
-TERM, then KILL after five seconds. Handle TERM and clean up your children. Keep
-the process alive in the foreground. The manager detects early exit during
-startup and restarts unexpected exits with backoff. General status values
+to the private configuration. The manager owns the process group. Stop sends
+TERM to the entrypoint so it can release interception and stop its children in
+order. After five seconds the manager kills the remaining process group. It
+also kills remaining descendants when the entrypoint exits, before reporting
+completion or restarting it. Handle TERM and keep the entrypoint alive until
+child cleanup finishes. Keep the process alive in the foreground. The manager
+detects early exit during startup and restarts unexpected exits with backoff. General status values
 include RUNNING, STOPPED, RESTARTING and WAIT_STORAGE_OR_DEPENDENCY. Stdout is
 bounded; a streaming NDJSON status protocol is not interpreted.
 

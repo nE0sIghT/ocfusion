@@ -85,9 +85,18 @@ func (b *limitedBuffer) Write(p []byte) (int, error) {
 	return n, nil
 }
 
+// Completion includes descendants: an exited entrypoint must never leave a
+// packet consumer or another service running across a restart or update.
+func waitModule(cmd *exec.Cmd, done chan<- error) {
+	err := cmd.Wait()
+	syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+	done <- err
+}
+
 func (m *Manager) stop(id string) {
 	if w := m.workers[id]; w != nil && w.cmd != nil {
-		syscall.Kill(-w.cmd.Process.Pid, syscall.SIGTERM)
+		// Let the module remove interception before terminating its children.
+		w.cmd.Process.Signal(syscall.SIGTERM)
 
 		select {
 		case <-w.done:
@@ -134,6 +143,7 @@ func (m *Manager) start(id string) error {
 
 	cmd := exec.Command(filepath.Join(payload, item.Manifest.Entry), "run")
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd.WaitDelay = time.Second
 	statusPath := filepath.Join(ram, "modules", id, "public-status.json")
 	os.Remove(statusPath)
 
@@ -161,7 +171,7 @@ func (m *Manager) start(id string) error {
 	w := &Worker{cmd: cmd, done: make(chan error, 1), state: "RUNNING"}
 	m.workers[id] = w
 	go func() {
-		w.done <- cmd.Wait()
+		waitModule(cmd, w.done)
 	}()
 
 	select {

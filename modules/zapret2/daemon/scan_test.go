@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/netip"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -157,12 +158,13 @@ func TestScanRuleInstallationAndRecoveryOrder(t *testing.T) {
 	resources := Resources{Queue: 203, Mark: "0x20000000"}
 	resources.Rules = scanRules(resources, "ppp0", "203.0.113.20", 443, 41234, "0x40000000")
 	calls := []string{}
+	absent := exec.Command("/bin/sh", "-c", "exit 1").Run()
 	execute = func(tool string, args ...string) (string, error) {
 		text := strings.Join(args, " ")
 		if strings.Contains(text, " -C ") {
 			// Force installation, then pretend the rule is present during removal.
 			if _, err := os.Stat(scanPath("installed")); err != nil {
-				return "", os.ErrNotExist
+				return "", absent
 			}
 		}
 		calls = append(calls, text)

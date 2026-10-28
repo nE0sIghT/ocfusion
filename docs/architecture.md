@@ -163,6 +163,10 @@ a bounded schema and a fixed strategy allowlist, without shell evaluation or
 arbitrary Lua. The worker drops to a free dedicated UID and keeps upstream's
 network capability restrictions and seccomp hardening. Rules are journaled before
 installation for recovery and use queue bypass when the worker is absent.
+A private runtime lock prevents overlapping adapters from sharing a recovery
+journal. Cleanup reads the current firewall and removes all rules with its
+exact ownership comment, including duplicates; a failed read or removal retains
+the journal for retry.
 
 The module also owns optional publisher-updated service data under its private
 module `data/lists/` directory. Validated snapshots are versioned by upstream

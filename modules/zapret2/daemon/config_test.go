@@ -4,8 +4,10 @@ package main
 import (
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 )
 
@@ -110,7 +112,7 @@ func TestCleanupOnlyOwnedRulesAndPreservesFailedJournal(t *testing.T) {
 			deletions++
 			return "", os.ErrPermission
 		}
-		return "", nil
+		return "-A POSTROUTING -m comment --comment \"ocfusion:zapret2\" -j NFQUEUE --queue-num 200 --queue-bypass", nil
 	}
 	if cleanup() == nil {
 		t.Fatal("failed removal was hidden")
@@ -123,7 +125,7 @@ func TestCleanupOnlyOwnedRulesAndPreservesFailedJournal(t *testing.T) {
 		if strings.Contains(strings.Join(args, " "), " -D ") {
 			deletions++
 		}
-		return "", nil
+		return "-A POSTROUTING -m comment --comment \"ocfusion:zapret2\" -j NFQUEUE --queue-num 200 --queue-bypass", nil
 	}
 	if cleanup() != nil || deletions != 2 {
 		t.Fatal("cleanup retry did not remove owned rule")
@@ -252,5 +254,98 @@ func TestAdvancedStrategiesAreBoundedAndMatchUpstreamNames(t *testing.T) {
 	opts := fakeOptions(c, false)
 	if strings.Contains(opts, "tcp_") || strings.Contains(opts, "badsum") {
 		t.Fatal("TCP-only fooling leaked to UDP", opts)
+	}
+}
+
+func TestCleanupRemovesDuplicatesAndKeepsForeignRules(t *testing.T) {
+	oldDir, oldExecute := runDir, execute
+	runDir = t.TempDir()
+	t.Cleanup(func() {
+		runDir, execute = oldDir, oldExecute
+	})
+	rule := Rule{Tool: "iptables", Chain: "POSTROUTING", Args: []string{"--comment", "ocfusion:zapret2"}}
+	path := filepath.Join(runDir, "resources.json")
+	if err := writeJSON(path, Resources{Queue: 200, Rules: []Rule{rule, rule}}); err != nil {
+		t.Fatal(err)
+	}
+
+	owned := `-A POSTROUTING -m comment --comment "ocfusion:zapret2" -j NFQUEUE --queue-num 200 --queue-bypass`
+	foreign := `-A POSTROUTING -m comment --comment "other-service" -j NFQUEUE --queue-num 201`
+	deletions := 0
+	execute = func(tool string, args ...string) (string, error) {
+		if args[2] == "-S" {
+			return owned + "\n" + foreign + "\n" + owned, nil
+		}
+		if args[2] != "-D" || strings.Contains(strings.Join(args, " "), "other-service") {
+			t.Fatal("unexpected mutation", args)
+		}
+		deletions++
+		return "", nil
+	}
+	if err := cleanup(); err != nil || deletions != 2 {
+		t.Fatal("duplicate recovery failed", deletions, err)
+	}
+
+	if err := writeJSON(path, Resources{Queue: 200, Rules: []Rule{rule}}); err != nil {
+		t.Fatal(err)
+	}
+	execute = func(tool string, args ...string) (string, error) {
+		return "", os.ErrPermission
+	}
+	if cleanup() == nil {
+		t.Fatal("unreadable firewall treated as empty")
+	}
+	if _, err := os.Stat(path); err != nil {
+		t.Fatal("unreadable firewall lost recovery record", err)
+	}
+}
+
+func TestFirewallCheckFailureCannotInstallDuplicates(t *testing.T) {
+	oldExecute := execute
+	t.Cleanup(func() {
+		execute = oldExecute
+	})
+	lockError := exec.Command("/bin/sh", "-c", "exit 4").Run()
+	for _, checkError := range []error{lockError, os.ErrPermission} {
+		calls := 0
+		execute = func(tool string, args ...string) (string, error) {
+			calls++
+			if args[2] != "-C" {
+				t.Fatal("failed check caused firewall mutation", args)
+			}
+			return "", checkError
+		}
+		if ensureRule(Rule{Tool: "iptables", Chain: "POSTROUTING"}) == nil || calls != 1 {
+			t.Fatal("firewall check failure was hidden", checkError)
+		}
+	}
+}
+
+func TestSecondAdapterCannotCleanUpActiveInstance(t *testing.T) {
+	oldDir := runDir
+	runDir = t.TempDir()
+	t.Cleanup(func() {
+		runDir = oldDir
+	})
+	lock, err := os.OpenFile(filepath.Join(runDir, "instance.lock"), os.O_CREATE|os.O_RDWR, 0600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer lock.Close()
+	if err := syscall.Flock(int(lock.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(runDir, "resources.json")
+	if err := os.WriteFile(path, []byte("invalid journal"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := run(); err == nil || !strings.Contains(err.Error(), "already running") {
+		t.Fatal("second adapter reached recovery", err)
+	}
+	if err := syscall.Flock(int(lock.Fd()), syscall.LOCK_UN); err != nil {
+		t.Fatal(err)
+	}
+	if err := run(); err == nil || !strings.Contains(err.Error(), "recovery record") {
+		t.Fatal("released instance lock prevented recovery", err)
 	}
 }

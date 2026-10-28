@@ -140,6 +140,16 @@ func run() error {
 	if err := os.MkdirAll(runDir, 0700); err != nil {
 		return err
 	}
+	lock, err := os.OpenFile(filepath.Join(runDir, "instance.lock"), os.O_CREATE|os.O_RDWR, 0600)
+	if err != nil {
+		return err
+	}
+	defer lock.Close()
+
+	if err := syscall.Flock(int(lock.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+		return errors.New("packet-processing adapter already running")
+	}
+
 	if err := errors.Join(cleanup(), cleanupAt(scanResources(), "ocfusion:zapret2-scan")); err != nil {
 		return err
 	}
@@ -341,7 +351,7 @@ func run() error {
 			}
 			if err == nil && worker != nil && time.Since(lastRepair) > 30*time.Second {
 				for _, rule := range resources.Rules {
-					if err = applyRule(rule, true); err != nil {
+					if err = ensureRule(rule); err != nil {
 						break
 					}
 				}

@@ -70,26 +70,21 @@ func writeJSONBytes(path string, raw []byte) error {
 	return os.Rename(path+".new", path)
 }
 
-func applyRule(rule Rule, add bool) error {
+func ensureRule(rule Rule) error {
 	base := []string{"-t", "mangle", "-C", rule.Chain}
 	_, err := execute(rule.Tool, append(base, rule.Args...)...)
-	if add && err == nil || !add && err != nil {
-		// A failed check is not evidence of absence when the table cannot be read.
-		if !add && err != nil {
-			if _, readErr := execute(rule.Tool, "-t", "mangle", "-S", rule.Chain); readErr != nil {
-				return readErr
-			}
-		}
-
+	if err == nil {
 		return nil
 	}
 
-	op := "-D"
-	if add {
-		op = "-A"
-		if strings.Contains(strings.Join(rule.Args, " "), "ocfusion:zapret2-scan") {
-			op = "-I"
-		}
+	var exitError *exec.ExitError
+	if !errors.As(err, &exitError) || exitError.ExitCode() != 1 {
+		return err
+	}
+
+	op := "-A"
+	if strings.Contains(strings.Join(rule.Args, " "), "ocfusion:zapret2-scan") {
+		op = "-I"
 	}
 
 	_, err = execute(rule.Tool, append([]string{"-t", "mangle", op, rule.Chain}, rule.Args...)...)
@@ -111,7 +106,7 @@ func cleanupAt(path, owner string) error {
 		return errors.New("invalid packet-processing recovery record")
 	}
 
-	var failures error
+	chains := map[string]Rule{}
 	for _, rule := range r.Rules {
 		if (rule.Tool != "iptables" && rule.Tool != "ip6tables") || (rule.Chain != "POSTROUTING" && rule.Chain != "PREROUTING" && !(owner == "ocfusion:zapret2-scan" && rule.Chain == "OUTPUT")) {
 			return errors.New("invalid packet-processing recovery rule")
@@ -128,9 +123,13 @@ func cleanupAt(path, owner string) error {
 			return errors.New("unowned packet-processing recovery rule")
 		}
 
-		failures = errors.Join(failures, applyRule(rule, false))
+		chains[rule.Tool+":"+rule.Chain] = rule
 	}
 
+	var failures error
+	for _, rule := range chains {
+		failures = errors.Join(failures, removeOwnedRules(rule.Tool, rule.Chain, owner))
+	}
 	if failures != nil {
 		return failures
 	}
@@ -138,6 +137,43 @@ func cleanupAt(path, owner string) error {
 	// Accounting is shared kernel state. Leave it enabled rather than undoing
 	// another service's subsequent dependency on it. No traffic rule remains.
 	return os.Remove(path)
+}
+
+// Read actual rules instead of interpreting a failed -C as absence. Besides
+// preserving recovery on xtables errors, this removes duplicate owned rules.
+func removeOwnedRules(tool, chain, owner string) error {
+	output, err := execute(tool, "-t", "mangle", "-S", chain)
+	if err != nil {
+		return err
+	}
+
+	for _, line := range strings.Split(output, "\n") {
+		args := strings.Fields(line)
+		if len(args) < 4 || args[0] != "-A" || args[1] != chain {
+			continue
+		}
+
+		owned := false
+		for i := 2; i+1 < len(args); i++ {
+			if args[i] == "--comment" && strings.Trim(args[i+1], "\"") == owner {
+				owned = true
+			}
+		}
+		if !owned {
+			continue
+		}
+
+		// Owned rules contain only fixed tokens, numeric selectors and interface
+		// names. iptables quotes their comment in -S output; no shell is used.
+		for i := range args {
+			args[i] = strings.Trim(args[i], "\"")
+		}
+		args[0] = "-D"
+		if _, err := execute(tool, append([]string{"-t", "mangle"}, args...)...); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func wan(family string) (string, error) {
