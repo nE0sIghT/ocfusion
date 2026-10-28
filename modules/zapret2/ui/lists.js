@@ -49,7 +49,7 @@ function renderServiceLists(statuses) {
     option.disabled = selectedServiceLists.includes(option.value);
   }
 
-  document.getElementById("service-refresh").disabled = serviceRefreshBusy || !config?.lists?.length || pending;
+  document.getElementById("service-refresh").disabled = serviceRefreshBusy || !savedServiceIDs().length || pending;
 
   if (root.dataset.rendered === signature) {
     return;
@@ -156,7 +156,7 @@ document.getElementById("service-add").addEventListener("click", () => {
 });
 
 document.getElementById("service-refresh").addEventListener("click", async () => {
-  if (serviceRefreshBusy || pending || !config?.lists?.length) {
+  if (serviceRefreshBusy || pending || !savedServiceIDs().length) {
     return;
   }
 
@@ -166,7 +166,7 @@ document.getElementById("service-refresh").addEventListener("click", async () =>
 
   try {
     await parent.EXTENSIONS.call("zapret2", "refresh-lists", {revision: config.revision});
-    currentServiceStatuses = currentServiceStatuses.map((entry) => config.lists.includes(entry.id) ? {...entry, state: "UPDATING"} : entry);
+    currentServiceStatuses = currentServiceStatuses.map((entry) => savedServiceIDs().includes(entry.id) ? {...entry, state: "UPDATING"} : entry);
   } catch (error) {
     document.getElementById("service-result").textContent = error.message;
   } finally {
@@ -174,3 +174,7 @@ document.getElementById("service-refresh").addEventListener("click", async () =>
     renderServiceLists();
   }
 });
+
+function savedServiceIDs() {
+  return [...new Set([...(config?.lists || []), ...(config?.rules || []).filter((rule) => rule.enabled).flatMap((rule) => rule.lists || [])])];
+}

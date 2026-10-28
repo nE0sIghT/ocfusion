@@ -153,3 +153,20 @@
 #scan-results button {
   margin: 3px;
 }
+
+.ocf-rule-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 0;
+}
+
+#destination-rules details {
+  margin: 12px 0;
+}
+
+#destination-rules textarea,
+#destination-rules select[multiple] {
+  width: 100%;
+  box-sizing: border-box;
+}

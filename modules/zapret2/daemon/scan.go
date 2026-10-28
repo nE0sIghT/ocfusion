@@ -31,6 +31,7 @@ type ScanRequest struct {
 
 type TargetProbe struct {
 	Target       int    `json:"target"`
+	Attempt      int    `json:"attempt,omitempty"`
 	Success      bool   `json:"success"`
 	Stage        string `json:"stage"`
 	Bytes        int64  `json:"bytes,omitempty"`
@@ -40,6 +41,9 @@ type TargetProbe struct {
 
 type ProbeResult struct {
 	Preset       string        `json:"preset"`
+	Confirmed    bool          `json:"confirmed,omitempty"`
+	Remembered   bool          `json:"remembered,omitempty"`
+	HistorySaved bool          `json:"history_saved,omitempty"`
 	Name         string        `json:"name,omitempty"`
 	Protocol     string        `json:"protocol,omitempty"`
 	Success      int           `json:"success"`
@@ -109,13 +113,26 @@ func requestScan(data []byte) (ScanState, error) {
 	if request.Mode == "" {
 		request.Mode = "search"
 	}
-	if request.Mode != "search" && request.Mode != "refine" && request.Mode != "lighten" {
+	if request.Mode != "search" && request.Mode != "refine" && request.Mode != "lighten" && request.Mode != "confirm" && request.Mode != "history" {
 		return ScanState{}, errors.New("invalid discovery mode")
 	}
 	if request.Mode == "search" && (request.From != "" || request.Parent != "") {
 		return ScanState{}, errors.New("invalid discovery mode")
 	}
-	if request.Mode != "search" {
+	if request.Mode == "history" {
+		for _, entry := range loadHistory() {
+			if entry.ID == request.From {
+				preset := Preset{ID: "memory-" + entry.ID, Name: entry.Name, Protocol: entry.Protocol, Settings: entry.Settings}
+				request.seed = &preset
+				request.Targets = entry.Targets
+				break
+			}
+		}
+		if request.seed == nil || request.Parent != "" {
+			return ScanState{}, errors.New("history entry unavailable")
+		}
+	}
+	if request.Mode != "search" && request.Mode != "history" {
 		previous := scanStatus()
 		if previous.ID != request.Parent || previous.Revision != c.Revision || previous.State != "COMPLETE" {
 			return ScanState{}, errors.New("test results changed; refresh before refining")
@@ -150,7 +167,7 @@ func requestScan(data []byte) (ScanState, error) {
 	if err != nil || time.Since(status.ModTime()) > 15*time.Second {
 		return ScanState{}, errors.New("module service unavailable")
 	}
-	if _, recoveryErr := os.Stat(scanResources()); recoveryErr == nil {
+	if _, recoveryErr := os.Stat(scanResources()); recoveryErr == nil && healthStatus().State != "CHECKING" {
 		return ScanState{}, errors.New("temporary resources require cleanup")
 	}
 	if err = os.Mkdir(scanPath("lock"), 0700); err != nil {
@@ -178,7 +195,7 @@ func requestScan(data []byte) (ScanState, error) {
 	if err != nil {
 		os.Remove(scanPath("lock"))
 	}
-	return state, err
+	return sanitizedScanState(state), err
 }
 
 func scanAddressAllowed(address netip.Addr) bool {
@@ -259,10 +276,14 @@ func routeForScan(address, iface string) (string, error) {
 	return source, nil
 }
 
-func publicScanStatus() ScanState {
-	state := scanStatus()
+func sanitizedScanState(state ScanState) ScanState {
+	state.Targets = append([]ScanTarget{}, state.Targets...)
 	for i := range state.Targets {
 		state.Targets[i].Path = ""
 	}
 	return state
+}
+
+func publicScanStatus() ScanState {
+	return sanitizedScanState(scanStatus())
 }

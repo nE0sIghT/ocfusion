@@ -50,7 +50,7 @@ func presetCatalog() []Preset {
 		data, _ := json.Marshal(c)
 		settings := map[string]any{}
 		_ = json.Unmarshal(data, &settings)
-		for _, key := range []string{"revision", "enabled", "networks", "domains", "lists", "applications", "tcp_ports", "udp_ports"} {
+		for _, key := range []string{"revision", "enabled", "networks", "domains", "lists", "applications", "tcp_ports", "udp_ports", "rules", "monitor"} {
 			delete(settings, key)
 		}
 		if catalog[i].Protocol == "tcp" {

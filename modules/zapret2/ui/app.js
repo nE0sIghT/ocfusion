@@ -130,6 +130,8 @@ async function load() {
     document.getElementById("auto_ttl").checked = config.auto_ttl || false;
     writeApplications(config.applications || [], false);
     updateStrategyFields();
+    initializeRules(config.rules);
+    loadMonitoringForm(config.monitor);
 
     renderedScan = "";
     renderScan(scan);
@@ -158,29 +160,16 @@ document.getElementById("settings").addEventListener("submit", async (event) => 
   result.textContent = "";
 
   try {
+    const rules = destinationRulesConfig();
     const next = {
+      ...draftBaseStrategy,
       revision: config.revision + 1,
       enabled: document.getElementById("enabled").checked,
       lists: serviceListsConfig(),
-      applications: readApplications(),
       networks: lines("networks"),
       domains: lines("domains"),
-      tcp_ports: ports("tcp_ports"),
-      udp_ports: ports("udp_ports"),
-      tcp_strategy: document.getElementById("tcp_strategy").value,
-      udp_strategy: document.getElementById("udp_strategy").value,
-      split_position: config.split_position || 2,
-      split_positions: document.getElementById("split_positions").value.trim(),
-      sequence_overlap: Number(document.getElementById("sequence_overlap").value),
-      fake_fooling: document.getElementById("fake_fooling").value,
-      fake_sni: document.getElementById("fake_sni").value.trim(),
-      auto_ttl: document.getElementById("auto_ttl").checked,
-      auto_ttl_delta: Number(document.getElementById("auto_ttl_delta").value),
-      auto_ttl_min: Number(document.getElementById("auto_ttl_min").value),
-      auto_ttl_max: Number(document.getElementById("auto_ttl_max").value),
-      packet_limit: Number(document.getElementById("packet_limit").value),
-      fake_ttl: Number(document.getElementById("fake_ttl").value),
-      fake_repeats: Number(document.getElementById("fake_repeats").value),
+      rules,
+      monitor: monitoringFormConfig(),
     };
     await parent.EXTENSIONS.configure(moduleID, next);
     pending = false;
@@ -207,6 +196,7 @@ async function updateStatus() {
     document.getElementById("state").textContent = labels[snapshot.data?.state] || "Unavailable";
     renderScan(snapshot.data?.scan);
     renderServiceLists(snapshot.data?.lists);
+    renderHealth(snapshot.data?.health);
     document.getElementById("diagnostic-version").textContent = snapshot.data?.version || "-";
     document.getElementById("diagnostic-engine").textContent = snapshot.data?.upstream || "-";
   } catch (error) {

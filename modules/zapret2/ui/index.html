@@ -31,6 +31,7 @@
         <button id="tab-strategies" type="button" role="tab" class="tab" aria-selected="false" aria-controls="panel-strategies" tabindex="-1">
           Strategies
         </button>
+        <button id="tab-rules" type="button" role="tab" class="tab" aria-selected="false" aria-controls="panel-rules" tabindex="-1">Rules</button>
         <button id="tab-finder" type="button" role="tab" class="tab" aria-selected="false" aria-controls="panel-finder" tabindex="-1">
           Strategy finder
         </button>
@@ -96,8 +97,23 @@
               </tr>
             </table>
             </details>
+            <details>
+              <summary>Availability monitoring</summary>
+              <label><input id="monitor-enabled" type="checkbox" /> Enable scheduled checks</label>
+              <label class="ext-field"><span>Check interval in minutes</span><input id="monitor-interval" type="number" min="5" max="1440" value="15" /></label>
+              <p id="monitor-target-count"></p>
+              <button id="monitor-use-targets" type="button" class="ext-secondary">Use strategy finder targets</button>
+              <p>Checks use the configured strategy for each destination. Failures are reported without changing settings.</p>
+            </details>
+          </section>
+          <section id="panel-rules" role="tabpanel" aria-labelledby="tab-rules" hidden>
+            <h2>Destination rules</h2>
+            <p>The first matching rule wins. Other selected destinations use the default strategy. Domains and subnets within a rule are combined.</p>
+            <button id="rule-add" type="button">Add rule from current strategy</button>
+            <div id="destination-rules"></div>
           </section>
           <section id="panel-strategies" role="tabpanel" aria-labelledby="tab-strategies" hidden>
+            <label class="ext-field"><span>Strategy for</span><select id="strategy-scope"></select></label>
             <h2>
               Strategy presets
             </h2>
@@ -496,7 +512,7 @@
                   Preset
                 </th>
                 <th>
-                  Successful targets
+                  Successful attempts
                 </th>
                 <th>
                   Test duration
@@ -516,6 +532,11 @@
         <p>
           Use settings fills the form. Apply saves the selected strategy.
         </p>
+        <details id="confirmed-history">
+          <summary>Confirmed strategies</summary>
+          <button id="history-refresh" type="button" class="ext-secondary">Refresh history</button>
+          <div id="history-results"></div>
+        </details>
         <details>
           <summary>About this test</summary>
           <p>Each target is resolved once. Tests compare the same public IPv4 endpoint through WAN, with and without processing. Saved settings and other connections are unchanged.</p>
@@ -524,6 +545,11 @@
         </details>
       </section>
       <section id="panel-diagnostics" role="tabpanel" aria-labelledby="tab-diagnostics" hidden>
+        <h2>Availability monitoring</h2>
+        <p id="health-state" role="status"></p>
+        <p><span>Last check</span>: <span id="health-time">-</span></p>
+        <button id="health-check" type="button" class="ext-secondary">Check now</button>
+        <div id="health-results"></div>
         <h2>
           Diagnostics
         </h2>
@@ -578,6 +604,8 @@
     <script src="lists.js"></script>
     <script src="applications.js"></script>
     <script src="discovery.js"></script>
+    <script src="rules.js"></script>
+    <script src="monitoring.js"></script>
     <script src="app.js">
     </script>
     <script src="translations.js">

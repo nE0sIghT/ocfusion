@@ -612,7 +612,8 @@ contains its unpredictable `id`, targets, current target and bounded results.
 Each result has a `preset` ID, name, protocol family, success/attempt counts,
 mean successful duration and per-target phase, bytes, status and outcome.
 Public status omits HTTP paths; original paths remain in private RAM state for
-refinement. Results are not persistent across reboot. DNS/route/connect/TLS/
+refinement. Live scan results are not persistent across reboot. Confirmed history is
+described below. DNS/route/connect/TLS/
 headers/body/QUIC/STUN failures describe the failed test phase, not a definitive
 classification of a provider's blocking mechanism.
 
@@ -693,3 +694,66 @@ protocols. Fragmentation retains the original packet if fragment transmission
 fails. Only initial outgoing data packets are processed. Discovery tests
 HTTP/TLS, HTTP/3 and STUN. It does not establish native MTProto, DTLS or complete
 call success. Verify these with the actual client and selected destinations.
+
+### Ordered destination rules
+
+Configuration `rules` accepts up to six objects with stable `id`, user-visible
+`name`, `enabled`, `domains`, `networks`, `lists` and `settings`. Settings accept
+only the module's bounded strategy/port fields; routing, lifecycle and selector
+fields cannot be injected into a strategy. Manual selectors retain normal
+validation and the complete platform configuration remains limited to 16 KiB.
+The UI uses the same strategy editor for the default and each named rule.
+
+Enabled rules run in array order before default selection. Domains and IPs
+within one rule are OR selectors. The first matching rule owns that destination;
+pass-through profiles prevent a disabled protocol or an unselected port in that
+rule from falling through into a later/default strategy. A rule cannot identify
+STUN/other hostname-free application packets by domain alone. Downloaded service
+lists expand independently for each rule. One worker/queue handles all rules;
+firewall ports are a disjoint union and selector files remain private to its UID.
+Changing monitoring settings or a rule label does not restart packet processing.
+
+### Confirmation and remembered results
+
+`scan-start` with `mode: "confirm"`, `parent` and `from` repeats the chosen
+result three times for every original target of that protocol family. A result
+is `confirmed` only if every attempt succeeds. Short responses still establish
+only connectivity; the original byte/stage details remain visible. Confirmation
+does not apply settings. `history_saved` indicates whether retention succeeded.
+
+At most eight confirmed entries are retained atomically in the module's private
+`data/strategy-history.json`. Entries include bounded settings, original test
+paths and a hashed WAN-interface/source-address fingerprint. `history` returns
+summaries without settings, paths or the WAN fingerprint. `history-settings`
+accepts an entry `id` and current configuration `revision` and returns its
+strategy projection for explicit application. `scan-start` with `mode: "history"` and an entry ID in `from` rechecks the
+original private targets/settings with three attempts each, without applying
+them. Normal removal retains this data; platform pruning removes it.
+
+For the same targets and WAN fingerprint, remembered strategies are tried first
+after the baseline. Equivalent candidates are deduplicated without increasing
+the protocol's discovery budget. A WAN address change prevents automatic
+prioritization; the history remains available for manual selection. Retained
+results are not a guarantee that a strategy still works.
+
+### Availability monitoring
+
+Configuration `monitor` contains `enabled` (default false), `interval_minutes`
+(5-1440, default 15) and up to four normal discovery `targets`. Configure targets
+through the finder and copy them into monitoring before saving. Scheduled checks
+run only while packet processing is active. `health-check` accepts the current
+`revision` and queues a manual check of saved targets; `health-status` returns
+details. Public status `health` contains only the bounded summary and timestamps.
+
+The daemon chooses the first matching configured rule/default strategy for each
+resolved public IPv4 target, honoring ports and disabled protocols. Its isolated
+probe uses that policy through direct WAN; it does not inspect VPN-forwarded
+client traffic. A destination outside processing selection is tested without
+processing. Checks report phases, duration and consecutive failures in RAM.
+A failed target yields `DEGRADED`, recovery resets its counter. Monitoring never
+changes configuration, starts strategy discovery or applies a fallback.
+
+Monitoring shares scanner ownership, queue and recovery handling. It runs only
+when discovery is idle; a newly queued manual scan preempts it. Configuration
+changes cancel the check. Disabled scheduling creates no periodic probe traffic,
+and result updates do not write flash. Interrupted checks recover as `PAUSED`.

@@ -7,8 +7,12 @@ import (
 	"errors"
 	"net"
 	"os"
+	"strings"
 	"time"
 )
+
+var discoveryResolve = resolveScanTargets
+var discoveryProbe = performProtocolProbe
 
 type resolvedScanTarget struct {
 	Address   string
@@ -87,11 +91,14 @@ func performScan(ctx context.Context, request ScanRequest, c Config, bypass stri
 		writeJSON(scanPath("status.json"), state)
 		os.Remove(scanPath("lock"))
 	}()
+	if err := cleanupAt(scanResources(), "ocfusion:zapret2-scan"); err != nil {
+		return err
+	}
 	if request.Revision != c.Revision {
 		return errors.New("settings changed")
 	}
 	writeJSON(scanPath("status.json"), state)
-	resolved := resolveScanTargets(ctx, request.Targets)
+	resolved := discoveryResolve(ctx, request.Targets)
 	saved := map[string]Preset{}
 	if err := writeJSON(scanPath("candidates.json"), saved); err != nil {
 		return err
@@ -109,12 +116,23 @@ func performScan(ctx context.Context, request ScanRequest, c Config, bypass stri
 		candidates := scanCandidates(protocol)
 		if request.seed != nil {
 			candidates = refinedCandidates(*request.seed, request.Mode)
+			if request.Mode == "confirm" || request.Mode == "history" {
+				candidates = []Preset{*request.seed}
+			}
+		} else {
+			targets := []ScanTarget{}
+			routes := []resolvedScanTarget{}
+			for _, i := range indices {
+				targets = append(targets, request.Targets[i])
+				routes = append(routes, resolved[i])
+			}
+			candidates = historyCandidates(candidates, targets, routes)
 		}
 		for _, preset := range candidates {
 			if len(state.Results) >= scanResultLimit {
 				break
 			}
-			result := ProbeResult{Preset: protocol + ":" + preset.ID, Name: preset.Name, Protocol: protocol}
+			result := ProbeResult{Preset: protocol + ":" + preset.ID, Name: preset.Name, Protocol: protocol, Remembered: strings.HasPrefix(preset.ID, "memory-")}
 			if preset.ID != "baseline" {
 				saved[result.Preset] = preset
 				if err := writeJSON(scanPath("candidates.json"), saved); err != nil {
@@ -122,43 +140,57 @@ func performScan(ctx context.Context, request ScanRequest, c Config, bypass stri
 				}
 			}
 			state.Current = result.Preset
-			for _, i := range indices {
-				if ctx.Err() != nil {
-					return ctx.Err()
-				}
-				state.CurrentTarget = i
-				writeJSON(scanPath("status.json"), state)
-				detail := TargetProbe{Target: i, Stage: resolved[i].Error}
-				if detail.Stage == "" {
-					trial, stop := context.WithTimeout(ctx, 9*time.Second)
-					observation, err := performProtocolProbe(trial, request.Targets[i], c, preset, resolved[i], bypass)
-					stop()
-					if errors.Is(err, errScanSetup) {
-						return err
+			attempts := 1
+			if request.Mode == "confirm" || request.Mode == "history" {
+				attempts = 3
+			}
+			for attempt := 0; attempt < attempts; attempt++ {
+				for _, i := range indices {
+					if ctx.Err() != nil {
+						return ctx.Err()
 					}
-					detail = observation
-					detail.Target = i
-					detail.Success = err == nil
-				}
-				result.Details = append(result.Details, detail)
-				result.Attempts++
-				if detail.Success {
-					result.Success++
-					result.Milliseconds += detail.Milliseconds
-					result.Status = detail.Status
-				} else {
-					result.Error = "Some targets failed"
-				}
-				if detail.Bytes > result.Bytes {
-					result.Bytes = detail.Bytes
-				}
-				if _, err := os.Stat(scanResources()); err == nil {
-					return errors.New("temporary resources remain")
+					state.CurrentTarget = i
+					writeJSON(scanPath("status.json"), state)
+					detail := TargetProbe{Target: i, Stage: resolved[i].Error}
+					if detail.Stage == "" {
+						trial, stop := context.WithTimeout(ctx, 9*time.Second)
+						observation, err := discoveryProbe(trial, request.Targets[i], c, preset, resolved[i], bypass)
+						stop()
+						if errors.Is(err, errScanSetup) {
+							return err
+						}
+						detail = observation
+						detail.Target = i
+						detail.Success = err == nil
+					}
+					if request.Mode == "confirm" || request.Mode == "history" {
+						detail.Attempt = attempt + 1
+					}
+					result.Details = append(result.Details, detail)
+					result.Attempts++
+					if detail.Success {
+						result.Success++
+						result.Milliseconds += detail.Milliseconds
+						result.Status = detail.Status
+					} else {
+						result.Error = "Some targets failed"
+					}
+					if detail.Bytes > result.Bytes {
+						result.Bytes = detail.Bytes
+					}
+					if _, err := os.Stat(scanResources()); err == nil {
+						return errors.New("temporary resources remain")
+					}
 				}
 			}
 			if result.Success > 0 {
 				result.Milliseconds /= int64(result.Success)
 			}
+			result.Confirmed = (request.Mode == "confirm" || request.Mode == "history") && result.Attempts == 3*len(indices) && result.Success == result.Attempts
+			if result.Confirmed {
+				result.HistorySaved = rememberConfirmed(request, preset, result, resolved, indices) == nil
+			}
+
 			state.Results = append(state.Results, result)
 			writeJSON(scanPath("status.json"), state)
 		}

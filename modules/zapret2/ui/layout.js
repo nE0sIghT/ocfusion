@@ -17,7 +17,7 @@ function selectTab(id) {
     document.getElementById(tab.getAttribute("aria-controls")).hidden = !active;
   }
 
-  document.getElementById("settings").hidden = !["management", "strategies"].includes(id);
+  document.getElementById("settings").hidden = !["management", "strategies", "rules"].includes(id);
 }
 
 function setDirty(dirty) {

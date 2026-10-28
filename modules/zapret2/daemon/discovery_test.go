@@ -268,11 +268,11 @@ func TestRefinementUsesPrivateResultAndKeepsOriginalTarget(t *testing.T) {
 		}
 	}
 	next, err := requestScan([]byte(`{"revision":3,"mode":"refine","parent":"prior","from":"tcp:split"}`))
-	if err != nil || next.Targets[0].Path != "/large?test=1" {
+	if err != nil || next.Targets[0].Path != "" {
 		t.Fatal(next, err)
 	}
 	pending, ok := pendingScan()
-	if !ok || pending.seed == nil || pending.seed.ID != seed.ID {
+	if !ok || pending.seed == nil || pending.seed.ID != seed.ID || pending.Targets[0].Path != "/large?test=1" {
 		t.Fatal(pending, ok)
 	}
 }

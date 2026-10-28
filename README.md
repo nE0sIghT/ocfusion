@@ -28,7 +28,8 @@ OCFusion is running.
   and domain lists on direct WAN connections. Includes TCP splitting,
   reordering, fake-packet combinations, QUIC fakes, application profiles for
   MTProto, DTLS, WireGuard and voice/game UDP, and an isolated multi-target
-  strategy finder with transfer tests and parameter refinement. Optional service
+  strategy finder with transfer tests and parameter refinement, per-destination
+  rules, confirmed strategy history and optional availability checks. Service
   domain/subnet lists update from their publisher and remain separate from custom
   addresses. Disabled by default; effectiveness depends on the provider and
   strategy. Build with `-Dmodules=all` or install its standalone

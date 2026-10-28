@@ -10,7 +10,10 @@ import (
 )
 
 func candidateID(preset Preset) string {
-	data, _ := json.Marshal(preset.Settings)
+	raw, _ := json.Marshal(preset.Settings)
+	var normalized any
+	json.Unmarshal(raw, &normalized)
+	data, _ := json.Marshal(normalized)
 	digest := sha256.Sum256(append([]byte(preset.Protocol), data...))
 	return "variant-" + hex.EncodeToString(digest[:6])
 }

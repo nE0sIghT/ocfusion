@@ -21,33 +21,37 @@ var domainPattern = regexp.MustCompile(`^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?
 var interfacePattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,14}$`)
 
 type Config struct {
-	Applications []ApplicationProfile `json:"applications"`
-	Lists        []string             `json:"lists"`
-	ManagedSets  bool                 `json:"-"`
-	Revision     uint64               `json:"revision"`
-	Enabled      bool                 `json:"enabled"`
-	Networks     []string             `json:"networks"`
-	Domains      []string             `json:"domains"`
-	TCPPorts     []int                `json:"tcp_ports"`
-	UDPPorts     []int                `json:"udp_ports"`
-	TCP          string               `json:"tcp_strategy"`
-	UDP          string               `json:"udp_strategy"`
-	Split        int                  `json:"split_position"`
-	Positions    string               `json:"split_positions"`
-	Overlap      int                  `json:"sequence_overlap"`
-	TTL          int                  `json:"fake_ttl"`
-	Repeats      int                  `json:"fake_repeats"`
-	Fooling      string               `json:"fake_fooling"`
-	FakeSNI      string               `json:"fake_sni"`
-	AutoTTL      bool                 `json:"auto_ttl"`
-	AutoDelta    int                  `json:"auto_ttl_delta"`
-	AutoMin      int                  `json:"auto_ttl_min"`
-	AutoMax      int                  `json:"auto_ttl_max"`
-	PacketLimit  int                  `json:"packet_limit"`
+	Monitor        MonitorConfig        `json:"monitor"`
+	Rules          []DestinationRule    `json:"rules,omitempty"`
+	SelectorPrefix string               `json:"-"`
+	Applications   []ApplicationProfile `json:"applications"`
+	Lists          []string             `json:"lists"`
+	ManagedSets    bool                 `json:"-"`
+	Revision       uint64               `json:"revision"`
+	Enabled        bool                 `json:"enabled"`
+	Networks       []string             `json:"networks"`
+	Domains        []string             `json:"domains"`
+	TCPPorts       []int                `json:"tcp_ports"`
+	UDPPorts       []int                `json:"udp_ports"`
+	TCP            string               `json:"tcp_strategy"`
+	UDP            string               `json:"udp_strategy"`
+	Split          int                  `json:"split_position"`
+	Positions      string               `json:"split_positions"`
+	Overlap        int                  `json:"sequence_overlap"`
+	TTL            int                  `json:"fake_ttl"`
+	Repeats        int                  `json:"fake_repeats"`
+	Fooling        string               `json:"fake_fooling"`
+	FakeSNI        string               `json:"fake_sni"`
+	AutoTTL        bool                 `json:"auto_ttl"`
+	AutoDelta      int                  `json:"auto_ttl_delta"`
+	AutoMin        int                  `json:"auto_ttl_min"`
+	AutoMax        int                  `json:"auto_ttl_max"`
+	PacketLimit    int                  `json:"packet_limit"`
 }
 
 func defaultConfig() Config {
 	return Config{
+		Monitor:     MonitorConfig{Interval: 15},
 		TCPPorts:    []int{80, 443},
 		UDPPorts:    []int{443},
 		TCP:         "split",
@@ -171,6 +175,12 @@ func parseConfig(data []byte) (Config, error) {
 		c.Domains[i] = value
 	}
 
+	if err := validateMonitor(&c); err != nil {
+		return c, err
+	}
+	if err := validateRules(&c); err != nil {
+		return c, err
+	}
 	return c, nil
 }
 
@@ -198,5 +208,13 @@ func portList(ports []int) string {
 }
 
 func hasSelection(c Config) bool {
-	return len(c.Networks)+len(c.Domains) > 0
+	if len(c.Networks)+len(c.Domains) > 0 {
+		return true
+	}
+	for _, rule := range c.Rules {
+		if rule.Enabled && len(rule.Domains)+len(rule.Networks) > 0 {
+			return true
+		}
+	}
+	return false
 }

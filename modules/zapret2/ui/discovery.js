@@ -66,6 +66,13 @@ function appendProbeDetails(cell, entry, state) {
     const name = document.createElement("span");
     name.textContent = scanTargetDescription(state, detail.target) + " · ";
     row.appendChild(name);
+    if (detail.attempt) {
+      const attempt = document.createElement("span");
+      attempt.textContent = "Attempt";
+      row.appendChild(attempt);
+      row.appendChild(document.createTextNode(" " + detail.attempt + " · "));
+    }
+
     const stage = document.createElement("span");
     stage.textContent = discoveryStages[detail.stage] || detail.stage;
     row.appendChild(stage);
@@ -110,6 +117,7 @@ function appendDiscoveryActions(cell, entry, state, running) {
 
   const actions = [
     {label: "Use settings", mode: "use"},
+    {label: "Confirm", mode: "confirm"},
     {label: "Refine", mode: "refine"},
     {label: "Simplify", mode: "lighten"},
   ];
@@ -181,6 +189,10 @@ function renderScan(state) {
     text.appendChild(detail);
   }
 
+  if (state.state === "COMPLETE" && state.results?.some((entry) => entry.history_saved)) {
+    refreshHistory();
+  }
+
   const table = document.getElementById("scan-results");
   table.replaceChildren();
 
@@ -205,6 +217,17 @@ function renderScan(state) {
     }
 
     name.appendChild(document.createTextNode(" · " + (entry.protocol || "tcp").toUpperCase()));
+    if (entry.confirmed || entry.remembered) {
+      const badge = document.createElement("span");
+      badge.className = "ext-badge";
+      badge.textContent = entry.confirmed ? "Confirmed" : "Previously confirmed";
+      name.appendChild(badge);
+    }
+    if (entry.confirmed && !entry.history_saved) {
+      const warning = document.createElement("p");
+      warning.textContent = "History could not be saved";
+      name.appendChild(warning);
+    }
     row.appendChild(name);
 
     for (const value of [entry.success + "/" + entry.attempts, entry.success ? entry.milliseconds + " ms" : "-"]) {
@@ -262,5 +285,74 @@ document.getElementById("scan-cancel").addEventListener("click", async () => {
   } finally {
     scanBusy = false;
     renderScan(scan);
+  }
+});
+
+let historyLoading = false;
+
+async function refreshHistory() {
+  if (historyLoading) {
+    return;
+  }
+
+  historyLoading = true;
+
+  try {
+    const entries = await parent.EXTENSIONS.action(moduleID, "history");
+    const root = document.getElementById("history-results");
+    root.replaceChildren();
+
+    for (const entry of entries) {
+      const card = document.createElement("p");
+      const name = document.createElement("span");
+      name.textContent = entry.name;
+      card.appendChild(name);
+      card.appendChild(document.createTextNode(" · " + entry.protocol.toUpperCase() + " · " + entry.targets.map((target) => target.host + ":" + target.port).join(", ")));
+      card.appendChild(document.createTextNode(" · " + entry.success + "/" + entry.attempts + " · " + new Date(entry.updated * 1000).toLocaleDateString()));
+      const use = document.createElement("button");
+      use.type = "button";
+      use.className = "ext-secondary";
+      use.textContent = "Use settings";
+      use.addEventListener("click", async () => {
+        if (!config || pending) {
+          return;
+        }
+
+        use.disabled = true;
+
+        try {
+          const preset = await parent.EXTENSIONS.call(moduleID, "history-settings", {id: entry.id, revision: config.revision});
+          fillStrategySettings(preset);
+          selectTab("strategies");
+        } catch (error) {
+          document.getElementById("scan-state").textContent = error.message;
+        } finally {
+          use.disabled = false;
+        }
+      });
+      card.appendChild(use);
+      const recheck = document.createElement("button");
+      recheck.type = "button";
+      recheck.className = "ext-secondary";
+      recheck.textContent = "Recheck";
+      recheck.addEventListener("click", () => startDiscovery({mode: "history", from: entry.id}));
+      card.appendChild(recheck);
+      root.appendChild(card);
+    }
+
+    if (entries.length === 0) {
+      root.textContent = "No confirmed strategies";
+    }
+  } catch (error) {
+    document.getElementById("history-results").textContent = error.message;
+  } finally {
+    historyLoading = false;
+  }
+}
+
+document.getElementById("history-refresh").addEventListener("click", refreshHistory);
+document.getElementById("confirmed-history").addEventListener("toggle", () => {
+  if (document.getElementById("confirmed-history").open) {
+    refreshHistory();
   }
 });

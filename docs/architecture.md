@@ -177,7 +177,11 @@ worker, queue and recovery journal. WAN-bound test sockets use exact destination
 and ephemeral source-port rules; their packets bypass the normal engine without
 bypassing foreign firewall rules. Generated packets retain both loop-protection
 bits. Configuration changes cancel the test before normal reconciliation.
-Results are informational and do not alter persistent configuration.
+Results do not alter persistent configuration. Optional monitoring reuses this
+isolation with the configured per-destination policy and yields to manual
+discovery. Confirmed history belongs to private module data; monitoring samples
+remain in RAM. Ordered destination rules and their selector files belong to the
+module, with one worker and queue for the complete policy.
 
 ## Global DNS and filtering
 

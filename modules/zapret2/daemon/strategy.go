@@ -132,6 +132,52 @@ func workerArgs(c Config, r Resources, directory string, uid int) []string {
 	for _, blob := range applicationBlobs() {
 		args = append(args, "--blob="+blob.Name+":@"+filepath.Join(directory, blob.File))
 	}
+	for _, selected := range processingConfigs(c) {
+		profiles := workerProfiles(selected, directory)
+		if len(profiles) > 0 {
+			if len(args) > 0 && hasWorkerProfiles(args) {
+				args = append(args, "--new")
+			}
+			args = append(args, profiles...)
+		}
+		if selected.SelectorPrefix != "" {
+			args = appendPassProfiles(args, selected, directory)
+		}
+	}
+	return args
+}
+
+func hasWorkerProfiles(args []string) bool {
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "--filter-") {
+			return true
+		}
+	}
+	return false
+}
+
+func appendPassProfiles(args []string, c Config, directory string) []string {
+	for _, selector := range []string{"networks", "domains"} {
+		if selector == "networks" && len(c.Networks) == 0 || selector == "domains" && len(c.Domains) == 0 {
+			continue
+		}
+		for _, transport := range []string{"tcp", "udp"} {
+			if hasWorkerProfiles(args) {
+				args = append(args, "--new")
+			}
+			args = append(args, "--filter-"+transport+"=*")
+			flag := "--ipset="
+			if selector == "domains" {
+				flag = "--hostlist="
+			}
+			args = append(args, flag+filepath.Join(directory, c.SelectorPrefix+selector+".txt"))
+		}
+	}
+	return args
+}
+
+func workerProfiles(c Config, directory string) []string {
+	args := []string{}
 	profiles := 0
 	for _, selector := range []string{"networks", "domains"} {
 		if (selector == "networks" && len(c.Networks) == 0) || (selector == "domains" && len(c.Domains) == 0) {
@@ -156,9 +202,9 @@ func workerArgs(c Config, r Resources, directory string, uid int) []string {
 				args = append(args, "--filter-l7=quic")
 			}
 			if selector == "networks" {
-				args = append(args, "--ipset="+filepath.Join(directory, "networks.txt"))
+				args = append(args, "--ipset="+filepath.Join(directory, c.SelectorPrefix+"networks.txt"))
 			} else {
-				args = append(args, "--hostlist="+filepath.Join(directory, "domains.txt"))
+				args = append(args, "--hostlist="+filepath.Join(directory, c.SelectorPrefix+"domains.txt"))
 			}
 			if protocol == "tcp" {
 				args = append(args, tcpStrategy(c)...)
@@ -175,7 +221,7 @@ func workerArgs(c Config, r Resources, directory string, uid int) []string {
 				args = append(args, "--new")
 			}
 			profiles++
-			args = append(args, "--filter-"+kind.Transport+"="+profile.Ports, "--filter-l7="+kind.L7, "--ipset="+filepath.Join(directory, "networks.txt"))
+			args = append(args, "--filter-"+kind.Transport+"="+profile.Ports, "--filter-l7="+kind.L7, "--ipset="+filepath.Join(directory, c.SelectorPrefix+"networks.txt"))
 			args = append(args, applicationStrategy(c, profile, kind)...)
 		}
 	}

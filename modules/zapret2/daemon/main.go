@@ -89,14 +89,30 @@ func prepareWorkerAt(c Config, uid int, directory string) error {
 			return err
 		}
 	}
-	for name, entries := range map[string][]string{"domains.txt": c.Domains, "networks.txt": c.Networks} {
-		path := filepath.Join(directory, name)
-		if err := os.WriteFile(path, workerListData(entries, name == "domains.txt"), 0640); err != nil {
-			return err
+	expected := map[string]bool{}
+	for _, selected := range processingConfigs(c) {
+		expected[selected.SelectorPrefix+"domains.txt"] = true
+		expected[selected.SelectorPrefix+"networks.txt"] = true
+	}
+	obsolete, _ := filepath.Glob(filepath.Join(directory, "rule-*.txt"))
+	for _, path := range obsolete {
+		if !expected[filepath.Base(path)] {
+			if err := os.Remove(path); err != nil {
+				return err
+			}
 		}
-		if err := os.Chown(path, 0, uid); err != nil {
-			return err
+	}
+	for _, selected := range processingConfigs(c) {
+		for name, entries := range map[string][]string{"domains.txt": selected.Domains, "networks.txt": selected.Networks} {
+			path := filepath.Join(directory, selected.SelectorPrefix+name)
+			if err := os.WriteFile(path, workerListData(entries, name == "domains.txt"), 0640); err != nil {
+				return err
+			}
+			if err := os.Chown(path, 0, uid); err != nil {
+				return err
+			}
 		}
+
 	}
 
 	return nil
@@ -105,7 +121,7 @@ func prepareWorkerAt(c Config, uid int, directory string) error {
 func publish(state string) {
 	writeJSON(scanPath("service.json"), map[string]string{"state": state})
 	if path := os.Getenv("EXT_PUBLIC_STATUS_PATH"); path != "" {
-		writeCompactJSON(path, map[string]any{"version": version, "state": state, "upstream": "1.0.6", "scan": publicScanStatus(), "lists": serviceStatuses()})
+		writeCompactJSON(path, map[string]any{"version": version, "state": state, "upstream": "1.0.6", "scan": publicScanStatus(), "lists": serviceStatuses(), "health": healthSummary()})
 	}
 }
 
@@ -128,6 +144,7 @@ func run() error {
 		return err
 	}
 	resetScan()
+	resetHealth()
 	listContext, cancelLists := context.WithCancel(context.Background())
 	lists := newServiceStore()
 	defer func() {
@@ -148,6 +165,7 @@ func run() error {
 	lastRepair := time.Time{}
 	var scanning <-chan error
 	var cancelScan context.CancelFunc
+	var scanningHealth bool
 
 	terminate := func() error {
 		err := cleanup()
@@ -169,7 +187,7 @@ func run() error {
 	for {
 		c, err := loadConfig()
 		if err == nil {
-			lists.refresh(listContext, c.Lists, serviceRefreshRequested(c))
+			lists.refresh(listContext, selectedServiceIDs(c), serviceRefreshRequested(c))
 			writeJSON(filepath.Join(runDir, "list-status.json"), lists.statuses())
 			c = lists.effective(c)
 		}
@@ -182,7 +200,7 @@ func run() error {
 				default:
 				}
 			}
-			if err != nil || scanCancelled(c) {
+			if err != nil || (!scanningHealth && scanCancelled(c)) || (scanningHealth && healthCancelled(c)) {
 				cancelScan()
 			}
 			select {
@@ -208,6 +226,7 @@ func run() error {
 			cancelScan = cancel
 			finished := make(chan error, 1)
 			scanning = finished
+			scanningHealth = false
 			bypass := ""
 			if worker != nil {
 				bypass = resources.Mark
@@ -218,6 +237,7 @@ func run() error {
 			}()
 			continue
 		}
+
 		state := "DISABLED"
 		if err != nil || !c.Enabled || !hasSelection(c) {
 			cleanupErr := terminate()
@@ -225,7 +245,7 @@ func run() error {
 				state = "ERROR"
 			} else if c.Enabled {
 				state = "EMPTY"
-				if len(c.Lists) > 0 {
+				if len(selectedServiceIDs(c)) > 0 {
 					state = "WAIT_LISTS"
 				}
 			}
@@ -238,7 +258,7 @@ func run() error {
 				default:
 				}
 			}
-			if worker != nil && !reflect.DeepEqual(active, c) {
+			if worker != nil && !reflect.DeepEqual(packetConfiguration(active), packetConfiguration(c)) {
 				err = terminate()
 			}
 			if worker != nil {
@@ -335,6 +355,22 @@ func run() error {
 		}
 
 		publish(state)
+		if err == nil && healthDue(c, worker != nil) {
+			ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+			cancelScan = cancel
+			finished := make(chan error, 1)
+			scanning = finished
+			scanningHealth = true
+			bypass := ""
+			if worker != nil {
+				bypass = resources.Mark
+			}
+			go func() {
+				defer cancel()
+				finished <- performHealth(ctx, c, bypass)
+			}()
+			continue
+		}
 		select {
 		case <-stop:
 			return nil
@@ -397,6 +433,35 @@ func main() {
 		err = requestServiceRefresh(envelope.Config)
 	case "presets":
 		result = presetCatalog()
+	case "history":
+		result = publicHistory()
+	case "history-settings":
+		var request struct {
+			ID       string `json:"id"`
+			Revision uint64 `json:"revision"`
+		}
+		err = decodeScan(envelope.Config, &request)
+		if err == nil {
+			c, loadErr := loadConfig()
+			err = loadErr
+			if err == nil && c.Revision != request.Revision {
+				err = errors.New("settings changed; reload before selecting")
+			}
+			if err == nil {
+				err = errors.New("history entry unavailable")
+				for _, entry := range loadHistory() {
+					if entry.ID == request.ID {
+						result = Preset{Name: entry.Name, Protocol: entry.Protocol, Settings: entry.Settings}
+						err = nil
+						break
+					}
+				}
+			}
+		}
+	case "health-status":
+		result = publicHealthStatus()
+	case "health-check":
+		err = requestHealth(envelope.Config)
 	case "scan-start":
 		result, err = requestScan(envelope.Config)
 	case "scan-settings":

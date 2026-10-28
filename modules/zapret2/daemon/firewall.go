@@ -171,6 +171,9 @@ var markRE = regexp.MustCompile(`(?:--mark|--set-xmark|--set-mark|fwmark)\s+(0x[
 var queueRE = regexp.MustCompile(`--queue-num\s+([0-9]+)`)
 
 func allocate(c Config) (Resources, error) {
+	if len(c.Rules) > 0 {
+		c.ManagedSets = true
+	}
 	var r Resources
 	state := ""
 	for _, tool := range []string{"iptables", "ip6tables"} {

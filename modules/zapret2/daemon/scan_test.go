@@ -30,7 +30,7 @@ func TestPresetCatalogIsBoundedAndReproducible(t *testing.T) {
 		if c.Revision != 8 || !c.Enabled || c.Networks[0] != base.Networks[0] || c.Domains[0] != base.Domains[0] {
 			t.Fatal("preset changed user selection")
 		}
-		for _, key := range []string{"enabled", "revision", "domains", "networks", "tcp_ports", "udp_ports"} {
+		for _, key := range []string{"enabled", "revision", "domains", "networks", "tcp_ports", "udp_ports", "rules", "monitor"} {
 			if _, ok := preset.Settings[key]; ok {
 				t.Fatal("catalog can overwrite selectors", key)
 			}

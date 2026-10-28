@@ -130,19 +130,26 @@ func (store *ServiceStore) statuses() []ServiceStatus {
 func (store *ServiceStore) effective(c Config) Config {
 	store.mu.Lock()
 	defer store.mu.Unlock()
-	c.Domains = append([]string{}, c.Domains...)
-	c.Networks = append([]string{}, c.Networks...)
-	for _, id := range c.Lists {
-		if entry := store.entries[id]; entry != nil {
-			c.Domains = append(c.Domains, entry.snapshot.Domains...)
-			c.Networks = append(c.Networks, entry.snapshot.Networks...)
+	expand := func(domains, networks, ids []string) ([]string, []string) {
+		domains = append([]string{}, domains...)
+		networks = append([]string{}, networks...)
+		for _, id := range ids {
+			if entry := store.entries[id]; entry != nil {
+				domains = append(domains, entry.snapshot.Domains...)
+				networks = append(networks, entry.snapshot.Networks...)
+			}
+		}
+		return uniqueEntries(domains), uniqueEntries(networks)
+	}
+	c.Domains, c.Networks = expand(c.Domains, c.Networks, c.Lists)
+	c.ManagedSets = len(c.Lists) > 0
+	c.Rules = append([]DestinationRule{}, c.Rules...)
+	for i := range c.Rules {
+		rule := &c.Rules[i]
+		if rule.Enabled {
+			rule.Domains, rule.Networks = expand(rule.Domains, rule.Networks, rule.Lists)
 		}
 	}
-	c.Domains = uniqueEntries(c.Domains)
-	c.Networks = uniqueEntries(c.Networks)
-	// Large IP feeds are selected by the engine's IP sets instead of installing
-	// a firewall rule for every subnet. This is independent of manual-list limits.
-	c.ManagedSets = len(c.Lists) > 0
 	return c
 }
 
@@ -224,7 +231,7 @@ func requestServiceRefresh(data []byte) error {
 		return errors.New("invalid list refresh request")
 	}
 	c, err := loadConfig()
-	if err != nil || c.Revision != request.Revision || len(c.Lists) == 0 {
+	if err != nil || c.Revision != request.Revision || len(selectedServiceIDs(c)) == 0 {
 		return errors.New("save service list selection before updating")
 	}
 	status, err := os.Stat(scanPath("service.json"))

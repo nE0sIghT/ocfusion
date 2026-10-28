@@ -155,10 +155,19 @@ func validateApplications(c *Config) error {
 }
 
 func usesEngineSets(c Config) bool {
-	return c.ManagedSets || len(c.Applications) > 0
+	return c.ManagedSets || len(c.Applications) > 0 || len(c.Rules) > 0
 }
 
 func processingPacketLimit(c Config) int {
+	if len(c.Rules) > 0 {
+		limit := c.PacketLimit
+		for _, selected := range processingConfigs(c) {
+			if value := processingPacketLimit(selected); value > limit {
+				limit = value
+			}
+		}
+		return limit
+	}
 	limit := c.PacketLimit
 	for _, profile := range c.Applications {
 		// Include TCP setup/ACK packets before the selected number of data packets.
@@ -170,6 +179,19 @@ func processingPacketLimit(c Config) int {
 }
 
 func firewallPortGroups(c Config, transport string) []string {
+	if len(c.Rules) > 0 {
+		ranges := []portRange{}
+		for _, selected := range processingConfigs(c) {
+			if !hasSelection(selected) {
+				continue
+			}
+			for _, group := range firewallPortGroups(selected, transport) {
+				parsed, _ := parsePortRanges(strings.ReplaceAll(group, ":", "-"))
+				ranges = append(ranges, parsed...)
+			}
+		}
+		return groupedPortRanges(ranges)
+	}
 	ports, method := c.TCPPorts, c.TCP
 	if transport == "udp" {
 		ports, method = c.UDPPorts, c.UDP
@@ -189,6 +211,10 @@ func firewallPortGroups(c Config, transport string) []string {
 			}
 		}
 	}
+	return groupedPortRanges(ranges)
+}
+
+func groupedPortRanges(ranges []portRange) []string {
 	ranges = mergePortRanges(ranges)
 	if len(ranges) == 1 && ranges[0] == (portRange{1, 65535}) {
 		return []string{"*"}

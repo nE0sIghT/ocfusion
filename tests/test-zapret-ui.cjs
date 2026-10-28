@@ -14,6 +14,8 @@ async function main() {
     "/module/applications.js": "modules/zapret2/ui/applications.js",
     "/module/lists.js": "modules/zapret2/ui/lists.js",
     "/module/discovery.js": "modules/zapret2/ui/discovery.js",
+    "/module/rules.js": "modules/zapret2/ui/rules.js",
+    "/module/monitoring.js": "modules/zapret2/ui/monitoring.js",
     "/module/app.js": "modules/zapret2/ui/app.js",
     "/module/targets.js": "modules/zapret2/ui/targets.js",
     "/module/layout.js": "modules/zapret2/ui/layout.js",
@@ -35,6 +37,10 @@ async function main() {
         window.listStatuses = [];
         window.EXTENSIONS = {
           action: async (id, operation) => {
+            if (operation === "history") {
+              return window.historyEntries || [];
+            }
+
             if (operation === "list-catalog") {
               return [{id: "telegram", name: "Telegram", paths: ["Services/telegram.lst", "Subnets/IPv4/telegram.lst"]}, {id: "youtube", name: "YouTube", paths: ["Services/youtube.lst"]}];
             }
@@ -57,7 +63,11 @@ async function main() {
               return {ok: true};
             }
 
-            if (operation === "scan-settings") {
+            if (operation === "health-check") {
+              return {ok:true};
+            }
+
+            if (operation === "scan-settings" || operation === "history-settings") {
               return {name:"Hostname split", protocol:"tcp", settings:{tcp_strategy:"split",split_positions:"1,midsld"}};
             }
 
@@ -173,7 +183,7 @@ async function main() {
       assert.equal((await page.evaluate(() => window.changes)).length, 1);
       assert.equal(await frame.locator("#tab-strategies").getAttribute("aria-selected"), "true");
       await frame.locator("#tab-finder").click();
-      await frame.locator("#scan-results button").nth(1).click();
+      await frame.locator("#scan-results button").nth(2).click();
       await frame.locator("#scan-cancel:not([disabled])").waitFor();
       assert.equal((await page.evaluate(() => window.lastCall)).request.mode, "refine");
       assert.equal((await page.evaluate(() => window.lastCall)).request.parent, "test");
@@ -210,6 +220,51 @@ async function main() {
       assert.equal(await frame.locator("#service-lists > div").count(), 0);
       assert.deepEqual(await page.evaluate(() => window.saved.lists), ["telegram"]);
       assert.equal(await frame.locator("#domains").inputValue(), "example.com");
+      await frame.locator("#tab-rules").click();
+      await frame.locator("#rule-add").click();
+      const rule = frame.locator("#destination-rules details").first();
+      await rule.locator('[data-rule-field="name"]').fill("Video rule");
+      await rule.locator('[data-rule-field="domains"]').fill("video.example.com");
+      await rule.locator('[data-rule-field="lists"]').selectOption(["telegram"]);
+      await rule.locator("button").nth(0).click();
+      assert.equal(await frame.locator("#tab-strategies").getAttribute("aria-selected"), "true");
+      await frame.locator("#tcp_strategy").selectOption("disorder");
+      await frame.locator("#strategy-scope").selectOption("");
+      assert.equal(await frame.locator("#tcp_strategy").inputValue(), "split");
+      await frame.locator("#tab-management").click();
+      await frame.locator("#monitor-use-targets").evaluate((element) => element.click());
+      await frame.locator("#monitor-enabled").evaluate((element) => element.click());
+      await frame.locator("#settings button[type=submit]").click();
+      await frame.locator("#fields:not([disabled])").waitFor();
+      const withRule = await page.evaluate(() => window.saved);
+      assert.equal(withRule.tcp_strategy, "split");
+      assert.equal(withRule.rules.length, 1);
+      assert.equal(withRule.rules[0].settings.tcp_strategy, "disorder");
+      assert.deepEqual(withRule.rules[0].domains, ["video.example.com"]);
+      assert.deepEqual(withRule.rules[0].lists, ["telegram"]);
+      assert.equal(withRule.monitor.enabled, true);
+      assert.equal(withRule.monitor.targets.length, 2);
+      await frame.locator("#tab-diagnostics").click();
+      await frame.locator("#health-check:not([disabled])").waitFor();
+      await frame.locator("#health-check").click();
+      assert.equal((await page.evaluate(() => window.lastCall)).operation, "health-check");
+      await frame.locator("#tab-finder").click();
+      await page.evaluate(() => {
+        window.scan = {id:"final", state:"COMPLETE", revision:window.saved.revision, results:[{preset:"hostname", success:1, attempts:1, milliseconds:20}]};
+      });
+      await page.waitForTimeout(3200);
+      await frame.locator("#scan-results button").nth(1).click();
+      assert.equal((await page.evaluate(() => window.lastCall)).request.mode, "confirm");
+      await page.evaluate(() => {
+        window.historyEntries = [{id:"remembered", name:"Hostname split", protocol:"tcp", updated:1793000000, success:3, attempts:3, targets:[{host:"example.com",port:443,protocol:"https"}]}];
+        window.scan = {id:"confirmed", state:"COMPLETE", revision:window.saved.revision, results:[{preset:"hostname", success:3, attempts:3, confirmed:true, history_saved:true, milliseconds:20}]};
+      });
+      await frame.locator("#confirmed-history summary").click();
+      await frame.locator("#history-results button").nth(1).waitFor();
+      await frame.locator("#history-results button").nth(1).click();
+      assert.equal((await page.evaluate(() => window.lastCall)).request.mode, "history");
+      assert.equal((await page.evaluate(() => window.lastCall)).request.from, "remembered");
+      assert.equal((await page.evaluate(() => window.changes)).length, 2);
       assert.deepEqual(errors, []);
       await page.close();
     }
