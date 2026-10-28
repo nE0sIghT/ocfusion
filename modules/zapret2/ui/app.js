@@ -131,6 +131,7 @@ async function load() {
     writeApplications(config.applications || [], false);
     updateStrategyFields();
     initializeRules(config.rules);
+    document.getElementById("default-policy").open = !config.rules?.length && Boolean(config.domains?.length || config.networks?.length || config.lists?.length);
     loadMonitoringForm(config.monitor);
 
     renderedScan = "";
@@ -141,6 +142,7 @@ async function load() {
     result.textContent = "";
   } catch (error) {
     result.textContent = error.message;
+    document.getElementById("monitor-result").textContent = error.message;
   } finally {
     pending = false;
     fields.disabled = !config;
@@ -157,6 +159,8 @@ document.getElementById("settings").addEventListener("submit", async (event) => 
 
   pending = true;
   fields.disabled = true;
+  document.getElementById("monitor-save").disabled = true;
+  document.getElementById("monitor-result").textContent = "";
   result.textContent = "";
 
   try {
@@ -176,9 +180,11 @@ document.getElementById("settings").addEventListener("submit", async (event) => 
     await load();
   } catch (error) {
     result.textContent = error.message;
+    document.getElementById("monitor-result").textContent = error.message;
   } finally {
     pending = false;
     fields.disabled = false;
+    document.getElementById("monitor-save").disabled = false;
     renderServiceLists();
   }
 });
@@ -191,12 +197,13 @@ async function updateStatus() {
       EMPTY: "Add destinations to start processing",
       WAIT_LISTS: "Waiting for service lists",
       RUNNING: "Running",
-      ERROR: "Packet processing unavailable",
+      ERROR: "Rules unavailable",
     };
     document.getElementById("state").textContent = labels[snapshot.data?.state] || "Unavailable";
     renderScan(snapshot.data?.scan);
     renderServiceLists(snapshot.data?.lists);
     renderHealth(snapshot.data?.health);
+    updateRuleRows(snapshot.data?.routing || []);
     document.getElementById("diagnostic-version").textContent = snapshot.data?.version || "-";
     document.getElementById("diagnostic-engine").textContent = snapshot.data?.upstream || "-";
   } catch (error) {

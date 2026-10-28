@@ -22,21 +22,20 @@
         </span>
       </div>
       <p>
-        Process selected connections to reduce DPI interference.
+        Choose how to connect to selected services.
       </p>
       <nav class="ocf-tabs" role="tablist" aria-label="Module sections">
         <button id="tab-management" type="button" role="tab" class="tabClicked" aria-selected="true" aria-controls="panel-management">
-          Management
+          Rules
         </button>
         <button id="tab-strategies" type="button" role="tab" class="tab" aria-selected="false" aria-controls="panel-strategies" tabindex="-1">
           Strategies
         </button>
-        <button id="tab-rules" type="button" role="tab" class="tab" aria-selected="false" aria-controls="panel-rules" tabindex="-1">Rules</button>
         <button id="tab-finder" type="button" role="tab" class="tab" aria-selected="false" aria-controls="panel-finder" tabindex="-1">
           Strategy finder
         </button>
         <button id="tab-diagnostics" type="button" role="tab" class="tab" aria-selected="false" aria-controls="panel-diagnostics" tabindex="-1">
-          Diagnostics
+          Status
         </button>
       </nav>
       <form id="settings">
@@ -44,13 +43,14 @@
           <section id="panel-management" role="tabpanel" aria-labelledby="tab-management">
             <label>
               <input id="enabled" type="checkbox" />
-              Enable packet processing
+              Enable rules
             </label>
-            <h2>
-              Destinations
-            </h2>
+            <p id="rules-empty">Add a rule to select a service and connection method.</p>
+            <button id="rule-add" type="button">Add rule</button>
+            <div id="destination-rules"></div>
+            <details id="default-policy"><summary>Other destinations</summary>
             <p>
-              Service lists and custom addresses are combined. Empty selections disable processing.
+              Use the default strategy for these destinations.
             </p>
 
             <h3>Service lists</h3>
@@ -63,7 +63,6 @@
             </div>
             <p id="service-result" role="status"></p>
             <div id="service-lists"></div>
-            <p>Lists select destinations only. Strategies and ports determine which traffic is processed.</p>
             <details id="manual-destinations">
               <summary>Custom addresses</summary>
             <table class="FormTable ocf-config-table">
@@ -91,32 +90,24 @@
                   <textarea id="domains" rows="4">
                   </textarea>
                   <p>
-                    One domain per line, without URLs or wildcards. Includes subdomains. Encrypted or unavailable names cannot be matched.
+                    One domain per line.
                   </p>
                 </td>
               </tr>
             </table>
             </details>
-            <details>
-              <summary>Availability monitoring</summary>
-              <label><input id="monitor-enabled" type="checkbox" /> Enable scheduled checks</label>
-              <label class="ext-field"><span>Check interval in minutes</span><input id="monitor-interval" type="number" min="5" max="1440" value="15" /></label>
-              <p id="monitor-target-count"></p>
-              <button id="monitor-use-targets" type="button" class="ext-secondary">Use strategy finder targets</button>
-              <p>Checks use the configured strategy for each destination. Failures are reported without changing settings.</p>
+
             </details>
           </section>
-          <section id="panel-rules" role="tabpanel" aria-labelledby="tab-rules" hidden>
-            <h2>Destination rules</h2>
-            <p>The first matching rule wins. Other selected destinations use the default strategy. Domains and subnets within a rule are combined.</p>
-            <button id="rule-add" type="button">Add rule from current strategy</button>
-            <div id="destination-rules"></div>
-          </section>
+
           <section id="panel-strategies" role="tabpanel" aria-labelledby="tab-strategies" hidden>
-            <label class="ext-field"><span>Strategy for</span><select id="strategy-scope"></select></label>
-            <h2>
-              Strategy presets
-            </h2>
+            <label class="ext-field"><span>Apply strategy to</span><select id="strategy-scope"></select></label>
+        <details id="confirmed-history">
+          <summary>Confirmed strategies</summary>
+          <button id="history-refresh" type="button" class="ext-secondary">Refresh history</button>
+          <div id="history-results"></div>
+        </details>
+            <h2>Ready strategies</h2>
             <table class="FormTable ocf-config-table">
               <tr>
                 <th>
@@ -155,9 +146,6 @@
               </div>
               <div><dt>Applications</dt><dd id="summary-applications">Off</dd></div>
             </dl>
-            <p>
-              Presets fill the form. Review the settings and select Apply to save changes.
-            </p>
             <p id="application-ip-notice" class="ext-managed-notice" hidden>Application profiles need destination IPs. Add server IPs or select service lists containing subnets.</p>
             <details id="custom-strategy">
               <summary>
@@ -428,11 +416,12 @@
       </form>
       <section id="panel-finder" role="tabpanel" aria-labelledby="tab-finder" hidden>
         <h2>
-          Find a working HTTPS strategy
+          Find a strategy
         </h2>
         <p>
-          Choose a service endpoint or enter a domain to compare TCP presets. Tests do not change your destination lists or settings.
+          Choose a service to test.
         </p>
+        <label class="ext-field"><span>Apply result to</span><select id="scan-scope"></select></label>
         <table class="FormTable ocf-config-table">
           <tr>
             <th>
@@ -493,7 +482,7 @@
         </table>
         <button id="scan-add-target" type="button" class="ext-secondary">Add target</button>
         <div id="scan-targets"></div>
-        <p>Up to four targets. Web tests read up to 64 KiB; choose a large file to check longer transfers. STUN tests a binding response, not a complete call.</p>
+        <p>Up to four test targets.</p>
         <div class="apply_gen">
           <button id="scan-start" type="button">
             Start test
@@ -521,7 +510,7 @@
                   Transfer and details
                 </th>
                 <th>
-                  Settings
+                  Actions
                 </th>
               </tr>
             </thead>
@@ -530,29 +519,37 @@
           </table>
         </div>
         <p>
-          Use settings fills the form. Apply saves the selected strategy.
+          Select a result, then apply it to the chosen rule.
         </p>
-        <details id="confirmed-history">
-          <summary>Confirmed strategies</summary>
-          <button id="history-refresh" type="button" class="ext-secondary">Refresh history</button>
-          <div id="history-results"></div>
-        </details>
+
         <details>
           <summary>About this test</summary>
-          <p>Each target is resolved once. Tests compare the same public IPv4 endpoint through WAN, with and without processing. Saved settings and other connections are unchanged.</p>
-          <p>HTTPS and HTTP/3 validate the server certificate and read up to 64 KiB without following redirects. A short response checks connectivity but cannot establish that larger downloads work.</p>
-          <p>Refine varies strategy parameters. Simplify tries less processing. Neither action applies settings automatically. Results describe these endpoints, not every function of a service.</p>
+          <p>Checks cover selected endpoints, not every feature of a service.</p>
+          <p>A short response does not measure download performance.</p>
         </details>
       </section>
       <section id="panel-diagnostics" role="tabpanel" aria-labelledby="tab-diagnostics" hidden>
-        <h2>Availability monitoring</h2>
+        <h2>Availability</h2>
+            <details id="monitor-settings">
+              <summary>Check settings</summary>
+              <label><input id="monitor-enabled" type="checkbox" /> Enable scheduled checks</label>
+              <label class="ext-field"><span>Check interval in minutes</span><input id="monitor-interval" type="number" min="5" max="1440" value="15" /></label>
+              <label class="ext-field"><span>Test addresses</span><textarea id="monitor-targets-input" rows="3" placeholder="https://example.com/"></textarea></label>
+              <p id="monitor-target-count"></p>
+              <p>Checks do not change your settings.</p>
+              <button id="monitor-save" type="button">Save checks</button>
+              <p id="monitor-result" role="status"></p>
+            </details>
         <p id="health-state" role="status"></p>
         <p><span>Last check</span>: <span id="health-time">-</span></p>
         <button id="health-check" type="button" class="ext-secondary">Check now</button>
         <div id="health-results"></div>
-        <h2>
-          Diagnostics
-        </h2>
+        <div class="ext-card-heading">
+          <h2>Diagnostics</h2>
+          <button id="copy-report" type="button" class="ext-secondary">Copy report</button>
+        </div>
+        <p id="report-result" role="status"></p>
+        <textarea id="diagnostic-report" rows="8" aria-label="Diagnostic report" readonly hidden></textarea>
         <dl class="ocf-diagnostics">
           <div>
             <dt>
@@ -592,7 +589,7 @@
             Processing scope
           </summary>
           <p>
-            Only selected direct WAN connections are processed. Domain matching requires a visible server name. Traffic inside a VPN tunnel is not inspected.
+            Rules apply to WAN traffic. Existing VPN assignments are preserved.
           </p>
         </details>
       </section>

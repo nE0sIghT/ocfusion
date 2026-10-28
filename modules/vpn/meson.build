@@ -1,5 +1,10 @@
 vpn_go = files(
     'daemon/go.mod',
+    'daemon/go.sum',
+    'daemon/destination.go',
+    'daemon/destination_route.go',
+    'daemon/destination_firewall.go',
+    'daemon/destination_dns.go',
     'daemon/config.go',
     'daemon/backup.go',
     'daemon/dns.go',
@@ -16,7 +21,7 @@ vpn_go = files(
 vpn_service = custom_target(
     'ocfusion-vpn',
     input: vpn_go,
-    output: 'ocfusion-vpn',
+    output: ['ocfusion-vpn', 'vpn-Go-dependencies.txt'],
     depend_files: go_builder,
     command: [
         python,
@@ -26,7 +31,9 @@ vpn_service = custom_target(
         '--module',
         source_root / 'modules/vpn/daemon',
         '--output',
-        '@OUTPUT@',
+        '@OUTPUT0@',
+        '--notices',
+        '@OUTPUT1@',
         '--version',
         version,
         '--revision',
@@ -36,11 +43,11 @@ vpn_service = custom_target(
 
 module_specs += {
     'vpn': {
-        'binaries': [vpn_service],
+        'binaries': [vpn_service[0]],
         'assets': files(
             'packaging/module.json.in',
             'ui/fusion.js',
         ),
-        'notices': [],
+        'notices': [vpn_service[1].full_path()],
     },
 }

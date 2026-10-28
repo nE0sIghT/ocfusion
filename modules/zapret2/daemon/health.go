@@ -5,7 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
+	"strconv"
 	"time"
 )
 
@@ -16,6 +18,7 @@ type MonitorConfig struct {
 }
 
 type HealthResult struct {
+	Path        string      `json:"path,omitempty"`
 	Target      ScanTarget  `json:"target"`
 	Strategy    string      `json:"strategy"`
 	Processed   bool        `json:"processed"`
@@ -142,7 +145,7 @@ func requestHealth(data []byte) error {
 	return writeJSON(scanPath("health-request.json"), request)
 }
 
-func healthDue(c Config, workerRunning bool) bool {
+func healthDue(c Config, processingActive bool) bool {
 	path := scanPath("health-request.json")
 	if data, err := os.ReadFile(path); err == nil {
 		os.Remove(path)
@@ -152,7 +155,7 @@ func healthDue(c Config, workerRunning bool) bool {
 		return decodeScan(data, &request) == nil && request.Revision == c.Revision && len(c.Monitor.Targets) > 0
 	}
 	state := healthStatus()
-	return c.Enabled && workerRunning && c.Monitor.Enabled && len(c.Monitor.Targets) > 0 && (state.Revision != c.Revision || time.Now().Unix() >= state.Next)
+	return c.Enabled && processingActive && c.Monitor.Enabled && len(c.Monitor.Targets) > 0 && (state.Revision != c.Revision || time.Now().Unix() >= state.Next)
 }
 
 func healthCancelled(c Config) bool {
@@ -194,8 +197,43 @@ func performHealth(ctx context.Context, c Config, bypass string) (failure error)
 		if row.Observation.Stage == "" {
 			preset, name := configuredProbePreset(c, target, resolved[i].Address)
 			row.Strategy, row.Processed = name, preset.ID != "baseline"
+			row.Path = "WAN"
+			if row.Processed {
+				row.Path = "DPI"
+			}
+
+			probeBypass := bypass
+			if len(routePolicies(c)) > 0 {
+				reply, routeErr := vpnRequest("destination-probe", []RoutePolicy{{ID: resolved[i].Address}})
+				if routeErr != nil || len(reply.Status) != 1 {
+					row.Observation.Stage = "route"
+				} else if selected := reply.Status[0]; selected.State == "BLOCKED" {
+					row.Observation.Stage = "vpn"
+					row.Path = "BLOCKED"
+				} else if selected.State == "VPN" || selected.State == "WAN" || selected.State == "NORMAL" {
+					row.Path = selected.State
+					if selected.State == "NORMAL" {
+						row.Strategy = "Without processing"
+					}
+					preset = Preset{ID: "baseline", Protocol: scanProtocol(target)}
+					row.Processed = false
+					resolved[i].Direct = true
+					if selected.State == "VPN" {
+						resolved[i].Interface, resolved[i].Source = selected.Interface, selected.Source
+						mark, _ := strconv.ParseUint(selected.Mark, 0, 32)
+						original, _ := strconv.ParseUint(bypass, 0, 32)
+						probeBypass = fmt.Sprintf("0x%x", mark|original)
+					}
+				}
+			}
 			trial, cancel := context.WithTimeout(ctx, 9*time.Second)
-			observation, err := discoveryProbe(trial, target, c, preset, resolved[i], bypass)
+			observation := row.Observation
+			var err error
+			if row.Observation.Stage == "" {
+				observation, err = discoveryProbe(trial, target, c, preset, resolved[i], probeBypass)
+			} else {
+				err = errors.New("selected route unavailable")
+			}
 			cancel()
 			if errors.Is(err, errScanSetup) {
 				return err

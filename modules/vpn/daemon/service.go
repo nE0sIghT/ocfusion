@@ -22,29 +22,33 @@ type Tunnel struct {
 }
 
 type Request struct {
-	Egress     *EgressRegistration   `json:"egress,omitempty"`
-	Resolver   *ResolverRegistration `json:"resolver,omitempty"`
-	PreferDNS  bool                  `json:"prefer_dns,omitempty"`
-	API        int                   `json:"api"`
-	Operation  string                `json:"operation"`
-	Client     string                `json:"client"`
-	Profile    string                `json:"profile"`
-	Connection string                `json:"connection,omitempty"`
-	Tunnel     *Tunnel               `json:"tunnel,omitempty"`
+	DestinationProbe string                `json:"destination_probe,omitempty"`
+	Destinations     []DestinationPolicy   `json:"destinations,omitempty"`
+	Egress           *EgressRegistration   `json:"egress,omitempty"`
+	Resolver         *ResolverRegistration `json:"resolver,omitempty"`
+	PreferDNS        bool                  `json:"prefer_dns,omitempty"`
+	API              int                   `json:"api"`
+	Operation        string                `json:"operation"`
+	Client           string                `json:"client"`
+	Profile          string                `json:"profile"`
+	Connection       string                `json:"connection,omitempty"`
+	Tunnel           *Tunnel               `json:"tunnel,omitempty"`
 }
 
 type Response struct {
-	EgressDemand bool                  `json:"egress_demand,omitempty"`
-	Targets      []EgressTarget        `json:"targets,omitempty"`
-	Egress       *EgressRegistration   `json:"egress,omitempty"`
-	Resolver     *ResolverRegistration `json:"resolver,omitempty"`
-	DNSStatus    *DNSStatus            `json:"dns_status,omitempty"`
-	Connections  []Manifest            `json:"connections,omitempty"`
-	OK           bool                  `json:"ok"`
-	Manifest     Manifest              `json:"manifest"`
-	Networks     []Network             `json:"networks"`
-	DNS          string                `json:"dns,omitempty"`
-	Error        string                `json:"error,omitempty"`
+	DestinationStatus []DestinationStatus   `json:"destination_status,omitempty"`
+	DestinationMask   string                `json:"destination_mask,omitempty"`
+	EgressDemand      bool                  `json:"egress_demand,omitempty"`
+	Targets           []EgressTarget        `json:"targets,omitempty"`
+	Egress            *EgressRegistration   `json:"egress,omitempty"`
+	Resolver          *ResolverRegistration `json:"resolver,omitempty"`
+	DNSStatus         *DNSStatus            `json:"dns_status,omitempty"`
+	Connections       []Manifest            `json:"connections,omitempty"`
+	OK                bool                  `json:"ok"`
+	Manifest          Manifest              `json:"manifest"`
+	Networks          []Network             `json:"networks"`
+	DNS               string                `json:"dns,omitempty"`
+	Error             string                `json:"error,omitempty"`
 }
 
 type Service struct {
@@ -229,6 +233,10 @@ func serveUntil(stop <-chan struct{}) error {
 		return err
 	}
 
+	if err := service.recoverDestinations(); err != nil {
+		return err
+	}
+
 	path := filepath.Join(runDir, "control.sock")
 	os.Remove(path)
 	listener, err := net.Listen("unix", path)
@@ -271,7 +279,7 @@ func serveUntil(stop <-chan struct{}) error {
 		case connection := <-requests:
 			connection.SetDeadline(time.Now().Add(25 * time.Second))
 			var request Request
-			err := json.NewDecoder(io.LimitReader(connection, 16385)).Decode(&request)
+			err := json.NewDecoder(io.LimitReader(connection, (1<<20)+1)).Decode(&request)
 			response := Response{}
 			if err == nil {
 				response, err = service.handle(request)

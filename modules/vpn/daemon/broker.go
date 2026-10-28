@@ -3,6 +3,7 @@ package main
 
 import (
 	"errors"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -12,11 +13,13 @@ import (
 var identifier = regexp.MustCompile(`^[a-z][a-z0-9-]{0,31}$`)
 
 type Broker struct {
-	egress   map[string]*EgressLease
-	resolver *ResolverLease
-	registry Connections
-	services map[string]*Service
-	dns      DNSRouter
+	destinations   map[string]*DestinationLease
+	destinationDNS DestinationDNS
+	egress         map[string]*EgressLease
+	resolver       *ResolverLease
+	registry       Connections
+	services       map[string]*Service
+	dns            DNSRouter
 }
 
 func newBroker(registry Connections) *Broker {
@@ -32,6 +35,10 @@ func newBroker(registry Connections) *Broker {
 func (b *Broker) handle(request Request) (Response, error) {
 	if request.API != 1 || !identifier.MatchString(request.Client) {
 		return Response{}, errors.New("invalid VPN owner or API")
+	}
+
+	if request.Operation == "destination-probe" || request.Operation == "destination-list" || request.Operation == "destination-register" || request.Operation == "destination-release" {
+		return b.destinationRequest(request)
 	}
 
 	if request.Operation == "egress-list" || request.Operation == "egress-register" || request.Operation == "egress-release" {
@@ -167,10 +174,22 @@ func (b *Broker) reconcile() {
 	b.dns.reconcile(b.services)
 	b.reconcileResolver()
 	b.reconcileEgress()
+	if err := b.reconcileDestinations(); err != nil {
+		saveJSON(filepath.Join(runDir, "destination-error.json"), map[string]string{"error": err.Error()})
+	} else {
+		os.Remove(filepath.Join(runDir, "destination-error.json"))
+	}
 	saveJSON(filepath.Join(runDir, "status.json"), map[string]any{"connections": statuses, "dns": b.dns.status})
 }
 
 func (b *Broker) down() {
+	b.destinationDNS.stop()
+	for _, lease := range b.destinations {
+		lease.Heartbeat = time.Time{}
+		for _, route := range lease.Routes {
+			route.reconcile(EgressTarget{}, false)
+		}
+	}
 	b.dns.reset()
 	if b.resolver != nil {
 		resolverCapture(b.resolver.Registration, "del")
@@ -208,6 +227,18 @@ func (b *Broker) checkNetworks(target string) error {
 }
 
 func (b *Broker) egressDemand(client, profile string) bool {
+	for _, lease := range b.destinations {
+		if time.Since(lease.Heartbeat) > 12*time.Second {
+			continue
+		}
+		for _, policy := range lease.Policies {
+			for _, m := range b.registry.Items {
+				if policy.Action == "vpn" && policy.Target == "managed:"+m.ID && m.Client == client && m.Profile == profile {
+					return true
+				}
+			}
+		}
+	}
 	for _, lease := range b.egress {
 		if time.Since(lease.Heartbeat) > 12*time.Second {
 			continue

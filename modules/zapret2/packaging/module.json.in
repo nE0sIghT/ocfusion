@@ -6,8 +6,8 @@
   "module_api": 1,
   "entrypoint": "bin/ocfusion-zapret2",
   "ui": "ui/index.html",
-  "dependencies": [],
-  "actions": ["settings", "catalog", "application-catalog", "list-catalog", "refresh-lists", "presets", "scan-start", "scan-cancel", "scan-settings", "history", "history-settings", "health-check", "health-status"],
-  "capabilities": ["network.packet-processing"],
+  "dependencies": [{"id": "vpn", "api": 1}],
+  "actions": ["vpn-targets", "settings", "catalog", "application-catalog", "list-catalog", "refresh-lists", "presets", "scan-start", "scan-cancel", "scan-settings", "history", "history-settings", "health-check", "health-status"],
+  "capabilities": ["network.packet-processing", "network.destination-routing"],
   "resources": {"packet-processing.zapret2": "wan"}
 }

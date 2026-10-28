@@ -271,3 +271,8 @@ module versions and content digests are pinned in the adapter's `go.mod` and
 licenses and notices for its actual linked Go dependencies into both runtime
 and standalone module distributions. These MIT/BSD libraries retain their own
 licenses; the adapter remains GPL-3.0-or-later.
+
+The VPN provider links the same pinned golang.org/x/net 0.55.0 module for
+DNS messages in destination policies. Its BSD license and notices are collected
+from the actual linked dependency into runtime and standalone VPN packages.
+The corresponding module content digests are in its `go.mod` and `go.sum`.

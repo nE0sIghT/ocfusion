@@ -15,6 +15,7 @@ var discoveryResolve = resolveScanTargets
 var discoveryProbe = performProtocolProbe
 
 type resolvedScanTarget struct {
+	Direct    bool
 	Address   string
 	Interface string
 	Source    string

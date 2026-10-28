@@ -17,7 +17,7 @@ function selectTab(id) {
     document.getElementById(tab.getAttribute("aria-controls")).hidden = !active;
   }
 
-  document.getElementById("settings").hidden = !["management", "strategies", "rules"].includes(id);
+  document.getElementById("settings").hidden = !["management", "strategies"].includes(id);
 }
 
 function setDirty(dirty) {
@@ -62,5 +62,34 @@ window.addEventListener("beforeunload", (event) => {
   if (settingsDirty) {
     event.preventDefault();
     event.returnValue = "";
+  }
+});
+
+document.getElementById("copy-report").addEventListener("click", async () => {
+  const button = document.getElementById("copy-report");
+  const status = document.getElementById("report-result");
+  const report = document.getElementById("diagnostic-report");
+  button.disabled = true;
+  status.textContent = "";
+  try {
+    const snapshot = await parent.EXTENSIONS.status(moduleID);
+    report.value = JSON.stringify(snapshot.data || {}, null, 2);
+    try {
+      await navigator.clipboard.writeText(report.value);
+      report.hidden = true;
+      button.textContent = "Copied";
+      setTimeout(() => {
+        button.textContent = "Copy report";
+      }, 2000);
+    } catch (error) {
+      report.hidden = false;
+      report.focus();
+      report.select();
+      status.textContent = "Select and copy the report.";
+    }
+  } catch (error) {
+    status.textContent = "Report unavailable";
+  } finally {
+    button.disabled = false;
   }
 });

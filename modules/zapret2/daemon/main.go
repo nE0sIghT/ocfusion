@@ -121,12 +121,12 @@ func prepareWorkerAt(c Config, uid int, directory string) error {
 func publish(state string) {
 	writeJSON(scanPath("service.json"), map[string]string{"state": state})
 	if path := os.Getenv("EXT_PUBLIC_STATUS_PATH"); path != "" {
-		writeCompactJSON(path, map[string]any{"version": version, "state": state, "upstream": "1.0.6", "scan": publicScanStatus(), "lists": serviceStatuses(), "health": healthSummary()})
+		writeCompactJSON(path, map[string]any{"version": version, "state": state, "upstream": "1.0.6", "scan": publicScanStatus(), "lists": serviceStatuses(), "health": healthSummary(), "routing": routingStatus()})
 	}
 }
 
 func queueReady(queue int) bool {
-	data, _ := os.ReadFile("/proc/net/netfilter/nfnetlink_queue")
+	data, _ := readNFQueues()
 	for _, line := range strings.Split(string(data), "\n") {
 		fields := strings.Fields(line)
 		if len(fields) > 1 && fields[0] == strconv.Itoa(queue) {
@@ -192,6 +192,11 @@ func run() error {
 			<-scanning
 		}
 		terminate()
+		if _, err := os.Stat(scanPath("vpn-routing.json")); err == nil {
+			if _, err := vpnRequest("destination-release", nil); err == nil {
+				os.Remove(scanPath("vpn-routing.json"))
+			}
+		}
 	}()
 
 	for {
@@ -200,6 +205,7 @@ func run() error {
 			lists.refresh(listContext, selectedServiceIDs(c), serviceRefreshRequested(c))
 			writeJSON(filepath.Join(runDir, "list-status.json"), lists.statuses())
 			c = lists.effective(c)
+			err = reconcileRoutes(&c)
 		}
 		if scanning != nil {
 			if worker != nil {
@@ -219,7 +225,9 @@ func run() error {
 				cancelScan = nil
 			default:
 				state := "DISABLED"
-				if worker != nil {
+				if err != nil {
+					state = "ERROR"
+				} else if worker != nil || (c.Enabled && hasSelection(c) && !hasDPISelection(c)) {
 					state = "RUNNING"
 				}
 				publish(state)
@@ -249,10 +257,12 @@ func run() error {
 		}
 
 		state := "DISABLED"
-		if err != nil || !c.Enabled || !hasSelection(c) {
+		if err != nil || !c.Enabled || !hasDPISelection(c) {
 			cleanupErr := terminate()
 			if err != nil || cleanupErr != nil {
 				state = "ERROR"
+			} else if c.Enabled && hasSelection(c) {
+				state = "RUNNING"
 			} else if c.Enabled {
 				state = "EMPTY"
 				if len(selectedServiceIDs(c)) > 0 {
@@ -365,7 +375,7 @@ func run() error {
 		}
 
 		publish(state)
-		if err == nil && healthDue(c, worker != nil) {
+		if err == nil && healthDue(c, c.Enabled && hasSelection(c)) {
 			ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 			cancelScan = cancel
 			finished := make(chan error, 1)
@@ -431,6 +441,10 @@ func main() {
 		err = os.MkdirAll(runDir, 0700)
 	case "run":
 		err = run()
+	case "vpn-targets":
+		var reply RouteReply
+		reply, err = vpnRequest("destination-list", nil)
+		result = reply.Targets
 	case "settings":
 		result, err = loadConfig()
 	case "catalog":
@@ -495,6 +509,13 @@ func main() {
 		err = cancelRequestedScan(envelope.Config)
 	case "remove":
 		err = errors.Join(cleanup(), cleanupAt(scanResources(), "ocfusion:zapret2-scan"))
+		if _, exists := os.Stat(scanPath("vpn-routing.json")); exists == nil {
+			_, releaseErr := vpnRequest("destination-release", nil)
+			err = errors.Join(err, releaseErr)
+			if releaseErr == nil {
+				os.Remove(scanPath("vpn-routing.json"))
+			}
+		}
 	case "diagnose":
 		result = map[string]string{"version": version, "state": "UNAVAILABLE"}
 		data, readErr := os.ReadFile(os.Getenv("EXT_PUBLIC_STATUS_PATH"))

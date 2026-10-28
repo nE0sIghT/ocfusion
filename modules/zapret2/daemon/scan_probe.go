@@ -38,6 +38,10 @@ func (session *probeSession) close() {
 
 func (session *probeSession) start(ctx context.Context, target ScanTarget, base Config, preset Preset, destination resolvedScanTarget, port int, bypass string) error {
 	var err error
+	if destination.Direct {
+		session.Started = time.Now()
+		return nil
+	}
 	if session.Worker != nil {
 		return errScanSetup
 	}

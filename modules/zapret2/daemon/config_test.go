@@ -11,6 +11,14 @@ import (
 	"testing"
 )
 
+// Unit fixtures must not depend on queues or /proc permissions of the host.
+// Individual allocation/readiness tests override this with kernel snapshots.
+func init() {
+	readNFQueues = func() ([]byte, error) {
+		return nil, nil
+	}
+}
+
 func TestDefaultAndEmptySelectionNeverIntercept(t *testing.T) {
 	for _, data := range []string{"", "null", `{"enabled":true}`} {
 		c, err := parseConfig([]byte(data))
@@ -347,5 +355,33 @@ func TestSecondAdapterCannotCleanUpActiveInstance(t *testing.T) {
 	}
 	if err := run(); err == nil || !strings.Contains(err.Error(), "recovery record") {
 		t.Fatal("released instance lock prevented recovery", err)
+	}
+}
+
+func TestAllocationRespectsKernelQueueSnapshotAndReadErrors(t *testing.T) {
+	oldExecute, oldRead := execute, readNFQueues
+	t.Cleanup(func() {
+		execute, readNFQueues = oldExecute, oldRead
+	})
+	execute = func(tool string, args ...string) (string, error) {
+		if strings.Contains(strings.Join(args, " "), "route show") {
+			return "default dev ppp0", nil
+		}
+		return "", nil
+	}
+	readNFQueues = func() ([]byte, error) {
+		return []byte("200 1234 0 2 65535 0 0 0 1\n"), nil
+	}
+	c := defaultConfig()
+	c.Networks = []string{"203.0.113.0/24"}
+	resources, err := allocate(c)
+	if err != nil || resources.Queue != 201 || !queueReady(200) || queueReady(201) {
+		t.Fatal(resources, err)
+	}
+	readNFQueues = func() ([]byte, error) {
+		return nil, os.ErrPermission
+	}
+	if _, err := allocate(c); err == nil || queueReady(200) {
+		t.Fatal("unreadable kernel queue state accepted")
 	}
 }

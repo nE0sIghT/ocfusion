@@ -595,10 +595,66 @@ read `egress_demand` in `dns-state` for their own module/profile pair; this does
 not select or change global DNS policy. Native Fusion connections must be
 activated in ASUS. The provider does not start them on the consumer's behalf.
 
+### Destination routing leases
+
+A module may register an ordered set of destination policies with the VPN
+provider. These steer forwarded LAN/SDN traffic, not a process UID. API 1
+requests include `client` and do not allocate a Fusion profile.
+
+| Operation | Effect |
+| --- | --- |
+| `destination-list` | Return existing managed/native VPN targets |
+| `destination-register` | Replace or renew this owner's ordered policies |
+| `destination-release` | Remove this owner's rules, sets and routing resources |
+| `destination-probe` | Identify the effective policy for an IPv4 address in `destination_probe` |
+
+`destination-register` takes a `destinations` array, with at most seven policies:
+
+```json
+{
+  "id": "video",
+  "action": "vpn",
+  "target": "native:7:012345abcdef",
+  "failure": "block",
+  "networks": ["203.0.113.0/24"],
+  "domains": ["example.com"]
+}
+```
+
+Actions are `vpn`, `dpi` and `normal`. Only `vpn` takes `target` and `failure`
+(`block` or `wan`). Include earlier `dpi`/`normal` policies to preserve first-match
+priority; their matched addresses prevent lower VPN policies from capturing
+those destinations. Target IDs come from provider discovery. Renew within
+12 seconds. Expiry blocks matched VPN traffic even for a WAN-fallback policy.
+Explicit release removes resources. The provider retains expired resources for
+recovery and connection owners see destination demand through `egress_demand`.
+
+This API requires stock IP sets and netfilter set matching. Requests are bounded
+to 1 MiB; each policy accepts at most 16,384 prefixes and 2,048 domains, with
+4,096 distinct domains across all owners. DNS answers are limited to 64
+addresses per name. The provider owns all sets and updates them with
+staging/swap; consumers must not edit its sets or rules. Replies include
+`destination_mask` for excluding these marks from separate packet processing,
+and bounded `destination_status` rows with state, address/pending/stale counts.
+Probe replies additionally identify the selected tunnel/source/mark. This lets
+an owner test its path without routing unrelated router processes.
+
+Only traffic whose ordinary policy uses WAN is eligible. Native Fusion network,
+device and default VPN assignments remain authoritative even when unavailable.
+Domain routing resolves exact configured names through router DNS, refreshes
+addresses by TTL (30 seconds to one day), and retains last-good addresses on
+lookup failure. It does not discover every subdomain or observe client DNS.
+Shared IPs and differing CDN answers can affect matching. IPv4 VPN targets block
+matched IPv6 traffic while connected; explicit WAN fallback permits both
+families on target loss. Changes can require affected connections to reconnect;
+no global conntrack flush is performed. Owned conntrack bits retain VPN
+selection across DNS refreshes for established connections; recent addresses
+are retained for up to one day for that purpose, not for new connections.
+
 ## zapret2 strategy actions
 
 The optional `zapret2` module declares strategy discovery actions in addition
-to `settings`. `presets` returns bounded built-in strategy objects with `id`,
+to `settings`. `vpn-targets` returns the provider's existing VPN choices. `presets` returns bounded built-in strategy objects with `id`,
 `name`, `description`, `protocol` and a `settings` projection. Selecting a result
 fills the form; use normal revision-aware configuration updates to save it.
 Arbitrary command lines and Lua imports are not accepted.
@@ -701,18 +757,23 @@ call success. Verify these with the actual client and selected destinations.
 ### Ordered destination rules
 
 Configuration `rules` accepts up to six objects with stable `id`, user-visible
-`name`, `enabled`, `domains`, `networks`, `lists` and `settings`. Settings accept
+`name`, `enabled`, `domains`, `networks`, `lists`, `action` and `settings`.
+`action` defaults to `dpi`; `normal` bypasses packet processing, while `vpn`
+adds a discovered `target` and `failure` (`block`, the default, or `wan`). Settings accept
 only the module's bounded strategy/port fields; routing, lifecycle and selector
 fields cannot be injected into a strategy. Manual selectors retain normal
 validation and the complete platform configuration remains limited to 16 KiB.
-The UI uses the same strategy editor for the default and each named rule.
+The Rules page edits destinations and connection method together. DPI strategy
+selection and finder results have an explicit rule/default destination. Edits
+remain drafts until Apply.
 
 Enabled rules run in array order before default selection. Domains and IPs
 within one rule are OR selectors. The first matching rule owns that destination;
 pass-through profiles prevent a disabled protocol or an unselected port in that
-rule from falling through into a later/default strategy. A rule cannot identify
+rule from falling through into a later/default strategy. A DPI rule cannot identify
 STUN/other hostname-free application packets by domain alone. Downloaded service
-lists expand independently for each rule. One worker/queue handles all rules;
+lists expand independently for each rule. VPN forwarding uses provider-owned
+destination leases; it does not run through nfqws2. One worker/queue handles DPI rules;
 firewall ports are a disjoint union and selector files remain private to its UID.
 Changing monitoring settings or a rule label does not restart packet processing.
 
@@ -743,15 +804,16 @@ results are not a guarantee that a strategy still works.
 
 Configuration `monitor` contains `enabled` (default false), `interval_minutes`
 (5-1440, default 15) and up to four normal discovery `targets`. Configure targets
-through the finder and copy them into monitoring before saving. Scheduled checks
-run only while packet processing is active. `health-check` accepts the current
+in Status directly or open check setup from a destination rule. Scheduled checks
+run while the configured packet processing or VPN policies are active. `health-check` accepts the current
 `revision` and queues a manual check of saved targets; `health-status` returns
 details. Public status `health` contains only the bounded summary and timestamps.
 
 The daemon chooses the first matching configured rule/default strategy for each
 resolved public IPv4 target, honoring ports and disabled protocols. Its isolated
-probe uses that policy through direct WAN; it does not inspect VPN-forwarded
-client traffic. A destination outside processing selection is tested without
+probe uses DPI policies through direct WAN. For VPN policies the provider
+identifies the selected address set and the probe binds to that tunnel; blocked
+policies fail without a WAN probe. It does not inspect client connections. A destination outside processing selection is tested without
 processing. Checks report phases, duration and consecutive failures in RAM.
 A failed target yields `DEGRADED`, recovery resets its counter. Monitoring never
 changes configuration, starts strategy discovery or applies a fallback.

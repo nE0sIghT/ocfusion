@@ -29,7 +29,10 @@ OCFusion is running.
   reordering, fake-packet combinations, QUIC fakes, application profiles for
   MTProto, DTLS, WireGuard and voice/game UDP, and an isolated multi-target
   strategy finder with transfer tests and parameter refinement, per-destination
-  rules, confirmed strategy history and optional availability checks. Service
+  rules, confirmed strategy history and optional availability checks. Rules can
+  also send selected destinations through an existing ASUS Fusion or OCFusion
+  VPN, with blocking or WAN fallback when it is unavailable. Domain addresses
+  refresh automatically. Existing VPN network assignments are preserved. Service
   domain/subnet lists update from their publisher and remain separate from custom
   addresses. Disabled by default; effectiveness depends on the provider and
   strategy. Build with `-Dmodules=all` or install its standalone

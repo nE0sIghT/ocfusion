@@ -122,6 +122,18 @@ def main():
         ),
         (
             "vpn",
+            "modules/vpn/daemon/destination_dns.go",
+            ["ocfusion-vpn"],
+            [*C_TARGETS, "AdGuardHome", "extd", "ocfusion-zapret2"],
+        ),
+        (
+            "vpn",
+            "modules/vpn/daemon/destination_firewall.go",
+            ["ocfusion-vpn"],
+            [*C_TARGETS, "AdGuardHome", "extd", "ocfusion-zapret2"],
+        ),
+        (
+            "vpn",
             "modules/vpn/daemon/service.go",
             ["ocfusion-vpn"],
             [*C_TARGETS, "ocfusion-openconnect", "extd"],

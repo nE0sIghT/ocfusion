@@ -30,6 +30,18 @@ func remove() error {
 			return errors.New("reassign native networks before removing VPN provider")
 		}
 	}
+	broker := newBroker(registry)
+	if err := broker.recoverDestinations(); err != nil {
+		return err
+	}
+	for _, lease := range broker.destinations {
+		if err := lease.remove(); err != nil {
+			return err
+		}
+	}
+	os.Remove(filepath.Join(runDir, "destinations.json"))
+	os.Remove(filepath.Join(runDir, "destination-dns.json"))
+
 	for _, manifest := range registry.Items {
 		if err := closeTunnel(manifest); err != nil {
 			return err

@@ -12,6 +12,9 @@ import (
 )
 
 type DestinationRule struct {
+	Action   string         `json:"action,omitempty"`
+	Target   string         `json:"target,omitempty"`
+	Failure  string         `json:"failure,omitempty"`
 	ID       string         `json:"id"`
 	Name     string         `json:"name"`
 	Enabled  bool           `json:"enabled"`
@@ -54,6 +57,9 @@ func ruleConfig(base Config, rule DestinationRule) Config {
 	c, _ := tunedConfig(base, rule.Settings)
 	c.Domains, c.Networks, c.Lists = rule.Domains, rule.Networks, rule.Lists
 	c.ManagedSets = len(rule.Lists) > 0
+	if ruleAction(rule) != "dpi" {
+		c.TCP, c.UDP, c.Applications = "off", "off", nil
+	}
 	c.SelectorPrefix = "rule-" + rule.ID + "-"
 	return c
 }
@@ -68,6 +74,12 @@ func validateRules(c *Config) error {
 		rule.Name = strings.TrimSpace(rule.Name)
 		if !ruleIDPattern.MatchString(rule.ID) || seen[rule.ID] || rule.Name == "" || len(rule.Name) > 256 || utf8.RuneCountInString(rule.Name) > 64 || strings.IndexFunc(rule.Name, unicode.IsControl) >= 0 {
 			return errors.New("invalid or duplicate destination rule")
+		}
+		if rule.ID == "default" {
+			return errors.New("reserved destination rule identity")
+		}
+		if err := validateRuleAction(rule); err != nil {
+			return err
 		}
 		seen[rule.ID] = true
 		next, err := tunedConfig(*c, rule.Settings)

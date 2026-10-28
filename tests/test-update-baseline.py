@@ -102,7 +102,7 @@ def main():
         provider_source = root / "provider"
         provider_source.mkdir()
         for source in (PROJECT_ROOT / "modules/vpn/daemon").iterdir():
-            if source.suffix == ".go" or source.name == "go.mod":
+            if source.suffix == ".go" or source.name in {"go.mod", "go.sum"}:
                 shutil.copy2(source, provider_source / source.name)
         entrypoint = provider_source / "main.go"
         entrypoint.write_text(

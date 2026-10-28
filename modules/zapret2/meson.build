@@ -4,6 +4,7 @@ zapret_adapter = custom_target(
         'daemon/go.mod',
         'daemon/go.sum',
         'daemon/config.go',
+        'daemon/destinations.go',
         'daemon/rules.go',
         'daemon/history.go',
         'daemon/health.go',

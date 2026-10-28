@@ -33,6 +33,10 @@ var execute = func(tool string, args ...string) (string, error) {
 	return "", errors.New("required network tool unavailable")
 }
 
+var readNFQueues = func() ([]byte, error) {
+	return os.ReadFile("/proc/net/netfilter/nfnetlink_queue")
+}
+
 type Rule struct {
 	Tool  string   `json:"tool"`
 	Chain string   `json:"chain"`
@@ -267,7 +271,7 @@ func allocate(c Config) (Resources, error) {
 		q, _ := strconv.Atoi(match[1])
 		queues[q] = true
 	}
-	data, readErr := os.ReadFile("/proc/net/netfilter/nfnetlink_queue")
+	data, readErr := readNFQueues()
 	if readErr != nil && !os.IsNotExist(readErr) {
 		return r, readErr
 	}
@@ -334,7 +338,18 @@ func allocate(c Config) (Resources, error) {
 						if ports != "*" {
 							args = append(args, "-m", "multiport", portsFlag, ports)
 						}
-						args = append(args, "-m", "mark", "!", "--mark", r.Mark+"/"+r.Mark,
+						markArgs := []string{"-m", "mark", "!", "--mark", r.Mark + "/" + r.Mark}
+						if c.RouteMask != 0 {
+							bit, _ := strconv.ParseUint(r.Mark, 0, 32)
+							markArgs = []string{"-m", "mark", "--mark", fmt.Sprintf("0x0/0x%x", bit|uint64(c.RouteMask))}
+						}
+						args = append(args, markArgs...)
+						if c.RouteMask != 0 {
+							// Replies retain native routing, so inspect the connection
+							// mark without restoring the VPN mark onto reply packets.
+							args = append(args, "-m", "connmark", "--mark", fmt.Sprintf("0x0/0x%x", c.RouteMask))
+						}
+						args = append(args,
 							"-m", "connbytes", "--connbytes", "1:"+strconv.Itoa(processingPacketLimit(c)), "--connbytes-dir", direction, "--connbytes-mode", "packets",
 							"-m", "comment", "--comment", "ocfusion:zapret2", "-j", "NFQUEUE", "--queue-num", strconv.Itoa(r.Queue), "--queue-bypass")
 						r.Rules = append(r.Rules, Rule{Tool: tool, Chain: chain, Args: args})

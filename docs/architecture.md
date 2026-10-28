@@ -148,9 +148,11 @@ and the global DNS policy below.
 ## Selective packet processing
 
 The optional zapret2 module owns only its narrowly scoped WAN NFQUEUE rules,
-queue allocation and worker lifecycle. It does not allocate VPN resources or
-change routing, DNS configuration, native startup scripts or global hardware
-acceleration. The VPN provider continues to own VPN routing/firewall resources.
+queue allocation and worker lifecycle. Rules can alternatively request VPN
+forwarding through a provider-owned destination lease. The module never
+allocates Fusion profiles or directly changes VPN routing, native DNS/startup
+configuration or global hardware acceleration. The VPN provider owns destination
+sets, marks, routing tables, scoped NAT and rule recovery.
 Manual IP-only selection occurs before queueing; managed service lists use
 engine IP sets to keep firewall rule count bounded. Domain filters are evaluated by the
 pinned upstream engine. Separate ordered IP and domain profiles combine
@@ -185,7 +187,30 @@ Results do not alter persistent configuration. Optional monitoring reuses this
 isolation with the configured per-destination policy and yields to manual
 discovery. Confirmed history belongs to private module data; monitoring samples
 remain in RAM. Ordered destination rules and their selector files belong to the
-module, with one worker and queue for the complete policy.
+module, with one worker and queue for the DPI portion of the policy. VPN-only
+configuration does not start nfqws2. The provider excludes WAN-fallback packets
+from DPI processing using its allocated marks.
+
+Destination leases apply only to forwarded LAN/SDN traffic normally using WAN.
+Native network/device/default VPN assignments, including disconnected ones,
+remain authoritative. Existing-VPN targets use the same stable discovery as
+process egress leases; those UID leases remain separate. Domain names are
+resolved through the router resolver and refreshed by bounded DNS TTLs. Lookup
+failures retain the last successful address set. Matching is by the resulting
+IP addresses, so CDN variation, unlisted subdomains and shared addresses limit
+precision. DNS configuration and client DNS traffic are not intercepted by this
+feature.
+
+The provider atomically replaces its own chains and swaps bounded private IP
+sets. Masked conntrack marks retain the selected VPN for established
+connections while recently selected addresses are kept for up to one day.
+Only original-direction LAN packets restore these marks; replies keep native
+routing. It changes only its allocated mark bits and routes. Target loss selects
+an unreachable route or explicit WAN fallthrough; lease expiry always blocks.
+The existing target discovery supports IPv4 VPNs, so matched IPv6 traffic is
+blocked while a VPN is selected. WAN fallback permits both families when the
+target is unavailable. Route/address changes can require affected applications
+to reconnect; the provider does not flush router conntrack state.
 
 ## Global DNS and filtering
 

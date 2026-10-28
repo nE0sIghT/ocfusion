@@ -21,6 +21,7 @@ var domainPattern = regexp.MustCompile(`^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?
 var interfacePattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,14}$`)
 
 type Config struct {
+	RouteMask      uint32               `json:"-"`
 	Monitor        MonitorConfig        `json:"monitor"`
 	Rules          []DestinationRule    `json:"rules,omitempty"`
 	SelectorPrefix string               `json:"-"`

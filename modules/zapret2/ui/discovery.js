@@ -5,6 +5,7 @@ let discoveryTargets = [];
 
 const discoveryStages = {
   dns: "DNS lookup failed",
+  vpn: "VPN unavailable",
   address: "No public IPv4 address",
   route: "Direct WAN route unavailable",
   connect: "TCP connection failed",
@@ -116,7 +117,7 @@ function appendDiscoveryActions(cell, entry, state, running) {
   }
 
   const actions = [
-    {label: "Use settings", mode: "use"},
+    {label: "Select", mode: "use"},
     {label: "Confirm", mode: "confirm"},
     {label: "Refine", mode: "refine"},
     {label: "Simplify", mode: "lighten"},
@@ -138,6 +139,8 @@ function appendDiscoveryActions(cell, entry, state, running) {
 
       try {
         const candidate = await parent.EXTENSIONS.call(moduleID, "scan-settings", {id: entry.preset, parent: state.id});
+        rememberStrategyScope();
+        showStrategyScope(document.getElementById("scan-scope").value);
         fillStrategySettings(candidate);
         selectTab("strategies");
         document.getElementById("preset").scrollIntoView({block: "center", behavior: "smooth"});
@@ -147,7 +150,20 @@ function appendDiscoveryActions(cell, entry, state, running) {
         button.disabled = false;
       }
     });
-    cell.appendChild(button);
+    if (action.mode === "use") {
+      cell.appendChild(button);
+    } else {
+      let more = cell.querySelector("details");
+      if (!more) {
+        more = document.createElement("details");
+        more.className = "ocf-result-actions";
+        const summary = document.createElement("summary");
+        summary.textContent = "More tests";
+        more.appendChild(summary);
+        cell.appendChild(more);
+      }
+      more.appendChild(button);
+    }
   }
 }
 
@@ -335,7 +351,11 @@ async function refreshHistory() {
       recheck.type = "button";
       recheck.className = "ext-secondary";
       recheck.textContent = "Recheck";
-      recheck.addEventListener("click", () => startDiscovery({mode: "history", from: entry.id}));
+      recheck.addEventListener("click", () => {
+        document.getElementById("scan-scope").value = strategyScope;
+        selectTab("finder");
+        startDiscovery({mode: "history", from: entry.id});
+      });
       card.appendChild(recheck);
       root.appendChild(card);
     }

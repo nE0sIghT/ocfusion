@@ -8,7 +8,8 @@ let healthDetailsBusy = false;
 let latestHealth = null;
 
 function showMonitoringTargets() {
-  document.getElementById("monitor-target-count").textContent = monitoringTargets.map((target) => target.protocol.toUpperCase() + " · " + target.host + ":" + target.port).join("; ");
+  document.getElementById("monitor-target-count").textContent = "";
+  document.getElementById("monitor-targets-input").value = monitoringTargets.map((target) => target.protocol + "://" + target.host + ":" + target.port + (target.path || "")).join("\n");
 }
 
 function loadMonitoringForm(saved) {
@@ -19,10 +20,18 @@ function loadMonitoringForm(saved) {
 }
 
 function monitoringFormConfig() {
+  const targets = document.getElementById("monitor-targets-input").value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).map((line) => {
+    const url = new URL(line.includes("://") ? line : "https://" + line);
+    const protocol = url.protocol.slice(0, -1);
+    if (!["https", "https12", "http", "http3", "stun"].includes(protocol) || url.username || url.password || url.hash) {
+      throw new Error("Invalid test address");
+    }
+    return {host: url.hostname, port: Number(url.port || (protocol === "http" ? 80 : protocol === "stun" ? 3478 : 443)), protocol, path: protocol === "stun" ? "" : url.pathname + url.search || "/"};
+  });
   return {
     enabled: document.getElementById("monitor-enabled").checked,
     interval_minutes: Number(document.getElementById("monitor-interval").value),
-    targets: structuredClone(monitoringTargets),
+    targets,
   };
 }
 
@@ -52,6 +61,12 @@ async function renderHealth(state) {
       status.textContent = row.observation.success && row.observation.stage === "complete" ? "Available" : discoveryStages[row.observation.stage] || "Unavailable";
       card.appendChild(status);
       card.appendChild(document.createTextNode(" · " + (row.observation.milliseconds || 0) + " ms · "));
+      if (row.path) {
+        const path = document.createElement("span");
+        path.className = "ext-badge";
+        path.textContent = {VPN: "VPN", WAN: "WAN", DPI: "DPI bypass", BLOCKED: "Blocked", NORMAL: "Without processing"}[row.path] || "Unavailable";
+        card.appendChild(path);
+      }
       const strategy = document.createElement("span");
       strategy.textContent = row.strategy || "Not tested";
       card.appendChild(strategy);
@@ -70,19 +85,6 @@ async function renderHealth(state) {
     healthDetailsBusy = false;
   }
 }
-
-document.getElementById("monitor-use-targets").addEventListener("click", () => {
-  const targets = discoveryTargets.length ? discoveryTargets : [currentDiscoveryTarget()];
-
-  if (targets.some((target) => !target.host)) {
-    result.textContent = "Choose monitoring targets";
-    return;
-  }
-
-  monitoringTargets = structuredClone(targets);
-  showMonitoringTargets();
-  setDirty(true);
-});
 
 document.getElementById("health-check").addEventListener("click", async () => {
   if (!config || pending || healthBusy) {
@@ -104,3 +106,33 @@ document.getElementById("health-check").addEventListener("click", async () => {
 });
 
 document.getElementById("tab-diagnostics").addEventListener("click", () => renderHealth(latestHealth));
+
+for (const id of ["monitor-enabled", "monitor-interval", "monitor-targets-input"]) {
+  document.getElementById(id).addEventListener("input", () => setDirty(true));
+}
+
+document.getElementById("monitor-save").addEventListener("click", () => {
+  document.getElementById("settings").requestSubmit();
+});
+
+function setupRuleChecks(rule) {
+  const service = moduleCatalog.lists.find((entry) => rule.lists?.includes(entry.id));
+  const host = rule.domains?.[0] || targetSuggestions[service?.name]?.[0];
+  if (host) {
+    let targets;
+    try {
+      targets = monitoringFormConfig().targets;
+    } catch (error) {
+      targets = structuredClone(monitoringTargets);
+    }
+    if (!targets.some((target) => target.host === host) && targets.length < 4) {
+      targets.push({host, port: 443, protocol: "https", path: "/"});
+      monitoringTargets = targets;
+      showMonitoringTargets();
+      setDirty(true);
+    }
+  }
+  selectTab("diagnostics");
+  document.getElementById("monitor-settings").open = true;
+  document.getElementById("monitor-targets-input").focus();
+}

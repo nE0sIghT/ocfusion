@@ -84,7 +84,14 @@ func probeWorkerConfig(base Config, preset Preset, target ScanTarget, address st
 
 func startProbeWorker(ctx context.Context, target ScanTarget, base Config, preset Preset, address, iface string, port int, bypass string) (*exec.Cmd, chan error, error) {
 	c := probeWorkerConfig(base, preset, target, address)
-	resources, err := allocate(c)
+	allocation := c
+	if preset.ID == "baseline" {
+		// No engine is launched. Allocate only recovery/loop-protection identity,
+		// independent of whether the selected protocol has any enabled strategy.
+		allocation.TCP = "split"
+		allocation.TCPPorts = []int{target.Port}
+	}
+	resources, err := allocate(allocation)
 	if err != nil {
 		return nil, nil, err
 	}
