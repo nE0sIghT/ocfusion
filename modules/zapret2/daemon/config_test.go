@@ -75,6 +75,12 @@ func TestFirewallScopesBothDirectionsAndReservesForeignMarks(t *testing.T) {
 	}
 	for _, rule := range r.Rules {
 		args := strings.Join(rule.Args, " ")
+		if rule.Chain == "PREROUTING" && strings.Contains(args, "-p tcp") && !strings.Contains(args, "--tcp-flags SYN,ACK SYN,ACK") {
+			t.Fatal("incoming TCP data must bypass the queue", args)
+		}
+		if rule.Chain == "POSTROUTING" && strings.Contains(args, "--tcp-flags") {
+			t.Fatal("outgoing TLS fragments must remain eligible", args)
+		}
 		if !strings.Contains(args, "ppp0") || !strings.Contains(args, "--queue-bypass") || !strings.Contains(args, "--connbytes 1:12") {
 			t.Fatal("rule lost WAN, initial-packet bound or bypass", rule)
 		}

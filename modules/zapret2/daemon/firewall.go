@@ -349,6 +349,12 @@ func allocate(c Config) (Resources, error) {
 							// mark without restoring the VPN mark onto reply packets.
 							args = append(args, "-m", "connmark", "--mark", fmt.Sprintf("0x0/0x%x", c.RouteMask))
 						}
+						// TCP strategies modify outgoing requests only. Automatic TTL
+						// needs the SYN/ACK, not incoming application data.
+						if incoming && protocol == "tcp" {
+							args = append(args, "--tcp-flags", "SYN,ACK", "SYN,ACK")
+						}
+
 						args = append(args,
 							"-m", "connbytes", "--connbytes", "1:"+strconv.Itoa(processingPacketLimit(c)), "--connbytes-dir", direction, "--connbytes-mode", "packets",
 							"-m", "comment", "--comment", "ocfusion:zapret2", "-j", "NFQUEUE", "--queue-num", strconv.Itoa(r.Queue), "--queue-bypass")

@@ -276,3 +276,19 @@ The VPN provider links the same pinned golang.org/x/net 0.55.0 module for
 DNS messages in destination policies. Its BSD license and notices are collected
 from the actual linked dependency into runtime and standalone VPN packages.
 The corresponding module content digests are in its `go.mod` and `go.sum`.
+
+
+### Native zapret2 packet-path fixture
+
+With the patched locked zapret2 source and native static dependencies built,
+run the packet-path fixture without root or a live queue:
+
+```sh
+python3 tests/test-zapret-packet-path.py --source /path/to/patched-zapret2 \
+  --prefix /path/to/native-prefix --output build/zapret-packet-path-test
+```
+
+The prefix supplies Lua, zlib and netfilter libraries and headers. The fixture
+uses synthetic IPv4/IPv6 TLS packets, host filters and injected raw-send errors.
+It checks pass-through before reassembly, selected and fragmented-SNI handling,
+and transient replay retries. It does not exercise ASUS hardware acceleration.

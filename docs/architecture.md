@@ -155,7 +155,13 @@ configuration or global hardware acceleration. The VPN provider owns destination
 sets, marks, routing tables, scoped NAT and rule recovery.
 Manual IP-only selection occurs before queueing; managed service lists use
 engine IP sets to keep firewall rule count bounded. Domain filters are evaluated by the
-pinned upstream engine. Separate ordered IP and domain profiles combine
+pinned upstream engine. Incoming TCP interception observes SYN/ACK only; bulk
+reply data stays outside NFQUEUE. Outgoing initial packets remain eligible for
+TLS/HTTP classification. When a complete SNI already excludes all actions, the
+engine passes the original packet without waiting for the full TLS record.
+An incomplete SNI still requires bounded reassembly. Transient raw replay send
+failures are retried without rerunning Lua actions or resending successful
+packets; permanent failures are logged and TCP retransmission remains necessary. Separate ordered IP and domain profiles combine
 selectors as a union (OR).
 IP profiles do not require a hostname match. When domains are configured, the
 firewall queues candidate initial packets independently of the IP list, while

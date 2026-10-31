@@ -121,7 +121,7 @@ func prepareWorkerAt(c Config, uid int, directory string) error {
 func publish(state string) {
 	writeJSON(scanPath("service.json"), map[string]string{"state": state})
 	if path := os.Getenv("EXT_PUBLIC_STATUS_PATH"); path != "" {
-		writeCompactJSON(path, map[string]any{"version": version, "state": state, "upstream": "1.0.6", "scan": publicScanStatus(), "lists": serviceStatuses(), "health": healthSummary(), "routing": routingStatus()})
+		writeCompactJSON(path, map[string]any{"version": version, "state": state, "upstream": "1.0.6", "scan": publicScanStatus(), "lists": serviceStatuses(), "health": healthSummary(), "routing": routingStatus(), "queue": queueStatus()})
 	}
 }
 

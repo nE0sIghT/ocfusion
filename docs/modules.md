@@ -822,3 +822,14 @@ Monitoring shares scanner ownership, queue and recovery handling. It runs only
 when discovery is idle; a newly queued manual scan preempts it. Configuration
 changes cancel the check. Disabled scheduling creates no periodic probe traffic,
 and result updates do not write flash. Interrupted checks recover as `PAUSED`.
+
+
+### Packet queue diagnostics
+
+The zapret2 public snapshot includes `queue` when the owned kernel queue is
+available: `id`, `consumer_portid`, `pending`, `kernel_dropped`, `userspace_dropped` and
+`sequence`.
+These are kernel queue counters, not end-to-end loss measurements. They reset
+when the queue is reopened; compare samples only while `id` and `consumer_portid` remain unchanged.
+The copied diagnostic report includes this snapshot. Raw replay failures are
+recorded in the bounded private worker log, without packet payloads.

@@ -1,0 +1,21 @@
+--- a/nfq2/desync.c
++++ b/nfq2/desync.c
+@@ -1605,6 +1605,18 @@
+ 			DLOG(bReqFull ? "TLS client hello is FULL\n" : "TLS client hello is PARTIAL\n");
+ 
+ 			if (bReqFull) TLSDebug(rdata_payload, rlen_payload);
++
++			// A complete SNI can precede the end of a large TLS record. Decide
++			// pass-through before replacing original packets with raw replay.
++			if (!replay_piece_count && ps.ctrack && ReasmIsEmpty(&ps.ctrack->reasm_client) &&
++				TLSHelloExtractHost(rdata_payload, rlen_payload, ps.host, sizeof(ps.host), true))
++			{
++				ps.bHaveHost = true;
++				if (!dp_rediscovery(&ps) || !LIST_FIRST(&ps.dp->lua_desync))
++				{
++					goto pass_reasm_cancel;
++				}
++			}
+ 
+ 			if (ps.ctrack && !l7_payload_match(ps.l7payload, params.reasm_payload_disable))
+ 			{

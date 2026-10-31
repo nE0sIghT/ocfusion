@@ -243,6 +243,10 @@
         "nfq2/crypto/aes.c",
         "nfq2/crypto/sha.h",
         "nfq2/crypto/gcm.c"
+      ],
+      "patches": [
+        "modules/zapret2/patches/0001-pass-unmatched-tls-before-reassembly.patch",
+        "modules/zapret2/patches/0002-retry-transient-replay-errors.patch"
       ]
     }
   }

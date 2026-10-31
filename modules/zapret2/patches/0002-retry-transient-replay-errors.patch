@@ -1,0 +1,59 @@
+--- a/nfq2/desync.c
++++ b/nfq2/desync.c
+@@ -1645,7 +1645,10 @@
+ 					}
+ 					if (ReasmIsFull(&ps.ctrack->reasm_client))
+ 					{
+-						replay_queue(&ps.ctrack->delayed);
++						if (!replay_queue(&ps.ctrack->delayed))
++						{
++							DLOG_ERR("TCP reassembly replay incomplete; awaiting retransmission\n");
++						}
+ 						reasm_client_fin(ps.ctrack);
+ 					}
+ 					return VERDICT_DROP;
+@@ -2277,20 +2280,30 @@
+ 		DLOG("REPLAYING delayed packet #%u offset %zu\n", i+1, offset);
+ 		modlen = sizeof(mod);
+ 		uint8_t verdict = dpi_desync_packet_play(i, count, offset, rp->fwmark_orig, rp->ifin, rp->ifout, rp->tpos_present ? &rp->tpos : NULL, rp->packet, rp->len, mod, &modlen);
+-		switch (verdict & VERDICT_MASK)
+-		{
+-		case VERDICT_MODIFY:
+-			DLOG("SENDING delayed packet #%u modified\n", i+1);
+-			b &= rawsend((struct sockaddr*)&rp->dst,rp->fwmark,rp->ifout,mod,modlen);
+-			break;
+-		case VERDICT_PASS:
+-			DLOG("SENDING delayed packet #%u unmodified\n", i+1);
+-			b &= rawsend_rp(rp);
+-			break;
+-		case VERDICT_DROP:
+-			DLOG("DROPPING delayed packet #%u\n", i+1);
+-			break;
+-		}
++		bool sent = true;
++		for (unsigned int attempt = 0; attempt < 3; attempt++)
++		{
++			switch (verdict & VERDICT_MASK)
++			{
++			case VERDICT_MODIFY:
++				sent = rawsend((struct sockaddr*)&rp->dst,rp->fwmark,rp->ifout,mod,modlen);
++				break;
++			case VERDICT_PASS:
++				sent = rawsend_rp(rp);
++				break;
++			case VERDICT_DROP:
++				break;
++			}
++			if (sent || (errno != EAGAIN && errno != ENOBUFS))
++			{
++				break;
++			}
++		}
++		if (!sent)
++		{
++			DLOG_ERR("replay send failed for delayed packet #%u\n", i+1);
++		}
++		b &= sent;
+ 
+ 		if (!bseq)
+ 			offset += rp->len_payload;
