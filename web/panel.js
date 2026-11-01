@@ -216,10 +216,6 @@ async function uploadConfig(
     throw Error("Configuration exceeds 16 KiB");
   }
 
-  if (bytes.length > 1024 && location.protocol !== "https:") {
-    throw Error("Open the panel over HTTPS to upload configuration.");
-  }
-
   onProgress("Uploading configuration: 0%");
   const config = JSON.parse(new TextDecoder().decode(bytes));
   const action = kind === "module.call" ? "module.call" : "module.configure";

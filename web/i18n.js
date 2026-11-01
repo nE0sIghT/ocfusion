@@ -51,8 +51,6 @@ const OCF_TRANSLATIONS = {
     "Дождитесь завершения текущего действия",
   "Uploading configuration: ": "Загрузка конфигурации: ",
   "Unable to read status: ": "Не удалось получить статус: ",
-  "Open the panel over HTTPS to upload configuration.":
-    "Откройте панель по HTTPS для загрузки конфигурации.",
   About: "О проекте",
   "Report an issue ↗": "Сообщить об ошибке ↗",
   "Releases ↗": "Релизы ↗",

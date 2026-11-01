@@ -233,10 +233,10 @@ contain a random request ID, receiver instance and CRC32/IEEE of their exact
 UTF-8 payload strings. Requests expire after at most one minute. A bad checksum
 is discarded before dispatch; a matching HTTP upload response alone is not
 acknowledgement. Calls/configuration data are limited to 16 KiB and sent in one
-request, without chunks or browser Web Crypto. Calls up to 1024 bytes work over
-HTTP and HTTPS; larger calls/configuration require HTTPS to protect private data
-in transit. Browser JSON action responses are limited to 16 KiB after
-compaction. The escaped reply envelope is bounded to 128 KiB; the CLI output
+request, without chunks or browser Web Crypto. HTTP and HTTPS use the same
+16 KiB limit and the existing authenticated ASUS session. HTTPS encrypts private
+data in transit; HTTP does not. Browser JSON action responses are limited to
+16 KiB after compaction. The escaped reply envelope is bounded to 128 KiB; the CLI output
 bound remains 32 KiB. Entry failure rejects the Promise with a generic message;
 stderr and raw errors are not exposed.
 

@@ -206,7 +206,7 @@ function createContext(nodes, mailbox) {
   };
 }
 
-async function testProfileUpload(acknowledge, operation = "") {
+async function testProfileUpload(acknowledge, operation = "", protocol = "https:") {
   const nodes = createNodes();
   const profile = JSON.stringify({
     schema: 1,
@@ -219,6 +219,7 @@ async function testProfileUpload(acknowledge, operation = "") {
 
   const mailbox = createMailbox(acknowledge);
   const context = createContext(nodes, mailbox);
+  context.location.protocol = protocol;
 
   vm.runInNewContext(panelScript, context);
 
@@ -367,13 +368,23 @@ async function testHTTPWithoutWebCrypto() {
   });
 
   assert.equal(result.result, "accepted");
+  const config = {
+    rules: [{ name: "Example", domains: Array(100).fill("example.com") }],
+  };
+  await context.window.EXTENSIONS.configure("example", config);
+  assert.equal(mailbox.requests.length, 2);
+  assert.deepEqual(mailbox.requests[1].config, config);
+
+  const maximum = {
+    value: "x".repeat(16384 - Buffer.byteLength('{"value":""}')),
+  };
+  await context.window.EXTENSIONS.configure("example", maximum);
+  assert.deepEqual(mailbox.requests[2].config, maximum);
   await assert.rejects(
-    context.window.EXTENSIONS.configure("example", {
-      secret: "x".repeat(2000),
-    }),
-    /HTTPS/,
+    context.window.EXTENSIONS.configure("example", { value: maximum.value + "x" }),
+    /Configuration exceeds 16 KiB/,
   );
-  assert.equal(mailbox.requests.length, 1);
+  assert.equal(mailbox.requests.length, 3);
 }
 
 async function testLargeModuleResponses() {
@@ -408,6 +419,8 @@ async function main() {
   await testProfileUpload(false);
   await testProfileUpload("corrupt");
   await testProfileUpload(true, "update-settings");
+  await testProfileUpload(true, "", "http:");
+  await testProfileUpload(true, "update-settings", "http:");
   console.log(
     "PASS: direct >4KiB RAM upload, CRC32, nonce acknowledgement and readiness; stale replies cannot acknowledge",
   );
