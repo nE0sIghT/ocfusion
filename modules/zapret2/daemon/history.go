@@ -115,7 +115,7 @@ func rememberConfirmed(request ScanRequest, preset Preset, result ProbeResult, r
 }
 
 func publicHistory() []HistoryEntry {
-	entries := loadHistory()
+	entries := append([]HistoryEntry{}, loadHistory()...)
 	for i := range entries {
 		entries[i].Settings = nil
 		entries[i].Network = ""

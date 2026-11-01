@@ -142,3 +142,11 @@ func TestMonitoringChecksAppliedPolicyAndOnlyReportsFailures(t *testing.T) {
 		t.Fatal("manual discovery did not preempt monitoring")
 	}
 }
+
+func TestEmptyHistorySerializesAsList(t *testing.T) {
+	discoveryFixture(t)
+	data, err := json.Marshal(publicHistory())
+	if err != nil || string(data) != "[]" {
+		t.Fatal(string(data), err)
+	}
+}

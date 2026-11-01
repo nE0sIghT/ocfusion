@@ -351,7 +351,8 @@ async function refreshHistory() {
   historyLoading = true;
 
   try {
-    const entries = await parent.EXTENSIONS.action(moduleID, "history");
+    const response = await parent.EXTENSIONS.action(moduleID, "history");
+    const entries = Array.isArray(response) ? response : [];
     const root = document.getElementById("history-results");
     root.replaceChildren();
 
