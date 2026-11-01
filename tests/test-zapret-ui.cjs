@@ -255,6 +255,12 @@ async function main() {
       assert.equal(saved.rules[0].failure, "wan");
       assert.equal(saved.rules[0].target, "native:2:012345abcdef");
       assert.equal(await frame.locator("#save-bar").isVisible(), false);
+      const unsavedText = language === "ru" ? "Есть несохранённые изменения" : "Unsaved changes";
+      assert(!(await frame.locator("#destination-rules").innerText()).includes(unsavedText));
+      await frame.locator("body").evaluate(() => setDirty(true));
+      assert((await frame.locator("#destination-rules").innerText()).includes(unsavedText));
+      await frame.locator("body").evaluate(() => setDirty(false));
+      assert(!(await frame.locator("#destination-rules").innerText()).includes(unsavedText));
 
       await frame.locator('[data-rule-row="telegram"] input[type=checkbox]').uncheck();
       await frame.locator("#settings button[type=submit]").click();

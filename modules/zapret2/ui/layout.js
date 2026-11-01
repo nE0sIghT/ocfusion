@@ -23,6 +23,7 @@ function setDirty(dirty) {
   settingsDirty = dirty;
   document.getElementById("unsaved").hidden = !dirty;
   document.getElementById("save-bar").hidden = !dirty;
+  updateRuleRows();
 }
 
 for (const tab of tabs) {
