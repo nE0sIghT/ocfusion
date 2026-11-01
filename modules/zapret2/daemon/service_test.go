@@ -119,7 +119,14 @@ func TestServiceSelectionPreservesManualDataAndCache(t *testing.T) {
 	})}
 	store.refresh(context.Background(), []string{"telegram"}, true)
 	store.wait()
-	if store.statuses()[7].State != "ERROR" || len(store.effective(c).Domains) != 2 {
+	state := ""
+	for _, status := range store.statuses() {
+		if status.ID == "telegram" {
+			state = status.State
+			break
+		}
+	}
+	if state != "ERROR" || len(store.effective(c).Domains) != 2 {
 		t.Fatal("failed update state")
 	}
 	if _, err := loadServiceSnapshot(path, "telegram"); err != nil {

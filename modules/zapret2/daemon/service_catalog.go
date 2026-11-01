@@ -19,7 +19,6 @@ func serviceCatalog() []ServiceList {
 		{ID: "google-meet", Name: "Google Meet", Paths: []string{"Services/google_meet.lst", "Subnets/IPv4/google_meet.lst", "Subnets/IPv6/google_meet.lst"}},
 		{ID: "google-play", Name: "Google Play", Paths: []string{"Services/google_play.lst"}},
 		{ID: "hdrezka", Name: "HDrezka", Paths: []string{"Services/hdrezka.lst"}},
-		{ID: "meta", Name: "Meta (Instagram, Facebook, WhatsApp)", Paths: []string{"Services/meta.lst", "Subnets/IPv4/meta.lst", "Subnets/IPv6/meta.lst"}},
 		{ID: "roblox", Name: "Roblox", Paths: []string{"Services/roblox.lst", "Subnets/IPv4/roblox.lst"}},
 		{ID: "telegram", Name: "Telegram", Paths: []string{"Services/telegram.lst", "Subnets/IPv4/telegram.lst", "Subnets/IPv6/telegram.lst"}},
 		{ID: "tiktok", Name: "TikTok", Paths: []string{"Services/tiktok.lst"}},
