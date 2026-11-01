@@ -86,6 +86,12 @@ def main():
     changes = [
         (
             "zapret2",
+            "modules/zapret2/patches/0003-observe-quic-without-replaying-originals.patch",
+            ["zapret2"],
+            ["AdGuardHome", "extd", "ocfusion-vpn", "ocfusion-zapret2"],
+        ),
+        (
+            "zapret2",
             "modules/zapret2/patches/0001-pass-unmatched-tls-before-reassembly.patch",
             ["zapret2"],
             ["AdGuardHome", "extd", "ocfusion-vpn", "ocfusion-zapret2"],

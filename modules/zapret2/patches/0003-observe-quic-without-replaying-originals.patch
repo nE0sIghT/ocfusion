@@ -1,0 +1,133 @@
+--- a/nfq2/desync.c
++++ b/nfq2/desync.c
+@@ -1899,10 +1899,21 @@
+ 							goto rediscover_cancel;
+ 						}
+ 					}
+-					size_t hello_offset, hello_len, defrag_len = sizeof(defrag);
++					size_t hello_offset, hello_len, defrag_len = sizeof(defrag), contiguous_len;
+ 					bool bFull;
+-					if (QUICDefragCrypto(pclean, clean_len, defrag, &defrag_len, &bFull))
++					if (QUICDefragCrypto(pclean, clean_len, defrag, &defrag_len, &bFull, &contiguous_len))
+ 					{
++						// Only contiguous CRYPTO bytes starting at offset zero may
++						// identify SNI. Never interpret zero-filled gaps as TLS data.
++						if (params.quic_initial_passthrough && !replay_piece_count &&
++							TLSHelloExtractHostFromHandshake(defrag + 10, contiguous_len, ps.host, sizeof(ps.host), true))
++						{
++							ps.bHaveHost = true;
++							data_decrypt = defrag + 10;
++							len_decrypt = contiguous_len;
++							goto rediscover_cancel;
++						}
++
+ 						if (bFull)
+ 						{
+ 							DLOG("QUIC initial contains CRYPTO with full fragment coverage\n");
+@@ -1924,6 +1935,14 @@
+ 								}
+ 								if (!ReasmIsEmpty(&ps.ctrack->reasm_client))
+ 								{
++									if (params.quic_initial_passthrough)
++									{
++										if (bReqFull)
++										{
++											goto rediscover_cancel;
++										}
++										goto pass;
++									}
+ 									if (rawpacket_queue(&ps.ctrack->delayed, &ps.dst, fwmark, desync_fwmark, ifin, ifout, dis->data_pkt, dis->len_pkt, dis->len_payload, &ps.ctrack->pos, false))
+ 									{
+ 										DLOG("DELAY desync until reasm is complete (#%u)\n", rawpacket_queue_count(&ps.ctrack->delayed));
+@@ -1963,6 +1982,10 @@
+ 									// preallocate max buffer to avoid reallocs that cause memory copy
+ 									if (!reasm_client_start(ps.ctrack, IPPROTO_UDP, L7P_QUIC_INITIAL, UDP_MAX_REASM, UDP_MAX_REASM, clean, clean_len))
+ 										goto rediscover_cancel;
++								}
++								if (params.quic_initial_passthrough)
++								{
++									goto pass;
+ 								}
+ 								if (rawpacket_queue(&ps.ctrack->delayed, &ps.dst, fwmark, desync_fwmark, ifin, ifout, dis->data_pkt, dis->len_pkt, dis->len_payload, &ps.ctrack->pos, false))
+ 								{
+--- a/nfq2/params.h
++++ b/nfq2/params.h
+@@ -191,6 +191,7 @@
+ 	unsigned int ipcache_lifetime;
+ 	ip_cache ipcache;
+ 	uint64_t reasm_payload_disable;
++	bool quic_initial_passthrough;
+ 	uint64_t payload_disable;
+ 
+ 	struct str_list_head lua_init_scripts;
+--- a/nfq2/nfqws.c
++++ b/nfq2/nfqws.c
+@@ -1841,6 +1841,7 @@
+ 		" --server=[0|1]\t\t\t\t\t\t; change multiple aspects of src/dst ip/port handling for incoming connections\n"
+ 		" --ipcache-lifetime=<int>\t\t\t\t; time in seconds to keep cached hop count and domain name (default %u). 0 = no expiration\n"
+ 		" --ipcache-hostname=[0|1]\t\t\t\t; 1 or no argument enables ip->hostname caching\n"
++		" --quic-initial-passthrough\t\t\t; observe QUIC CRYPTO without delaying originals; for additive fakes only\n"
+ 		" --reasm-disable=[type[,type]]\t\t\t\t; disable reasm for these L7 payloads : tls_client_hello quic_initial . if no argument - disable all reasm.\n"
+ #ifdef __CYGWIN__
+ 		"\nWINDIVERT FILTER:\n"
+@@ -2005,6 +2006,7 @@
+ 	IDX_IPCACHE_LIFETIME,
+ 	IDX_IPCACHE_HOSTNAME,
+ 	IDX_REASM_DISABLE,
++	IDX_QUIC_INITIAL_PASSTHROUGH,
+ #ifdef __linux__
+ 	IDX_FWMARK,
+ #elif defined(SO_USER_COOKIE)
+@@ -2115,6 +2117,7 @@
+ 	[IDX_SERVER] = {"server", optional_argument, 0, 0},
+ 	[IDX_IPCACHE_LIFETIME] = {"ipcache-lifetime", required_argument, 0, 0},
+ 	[IDX_IPCACHE_HOSTNAME] = {"ipcache-hostname", optional_argument, 0, 0},
++	[IDX_QUIC_INITIAL_PASSTHROUGH] = {"quic-initial-passthrough", no_argument, 0, 0},
+ 	[IDX_REASM_DISABLE] = {"reasm-disable", optional_argument, 0, 0},
+ #ifdef __linux__
+ 	[IDX_FWMARK] = {"fwmark", required_argument, 0, 0},
+@@ -2512,6 +2515,9 @@
+ 			else
+ 				params.payload_disable = L7P_ALL;
+ 			break;
++		case IDX_QUIC_INITIAL_PASSTHROUGH:
++			params.quic_initial_passthrough = true;
++			break;
+ 		case IDX_REASM_DISABLE:
+ 			if (optarg)
+ 			{
+--- a/nfq2/protocol.c
++++ b/nfq2/protocol.c
+@@ -1251,8 +1251,10 @@
+ }
+ */
+ 
+-bool QUICDefragCrypto(const uint8_t *clean,size_t clean_len, uint8_t *defrag,size_t *defrag_len, bool *bFull)
+-{
++bool QUICDefragCrypto(const uint8_t *clean,size_t clean_len, uint8_t *defrag,size_t *defrag_len, bool *bFull, size_t *contiguous_len)
++{
++	*contiguous_len = 0;
++
+ 	// Crypto frame can be split into multiple chunks
+ 	// chromium randomly splits it and pads with zero/one bytes to force support the standard
+ 	// mozilla does not split
+@@ -1343,6 +1345,10 @@
+ 		*defrag_len = (size_t)(szmax+10);
+ 
+ 		*bFull = range==1 && !ranges[0].offset;
++		if (range && !ranges[0].offset)
++		{
++			*contiguous_len = ranges[0].len;
++		}
+ 		//printf("bFull=%u\n",*bFull);
+ 	}
+ 	return found;
+--- a/nfq2/protocol.h
++++ b/nfq2/protocol.h
+@@ -182,5 +182,5 @@
+ 
+ bool QUICDecryptInitial(const uint8_t *data, size_t data_len, uint8_t *clean, size_t *clean_len);
+ // returns true if crypto frames were found . bFull = true if crypto frame fragments have full coverage
+-bool QUICDefragCrypto(const uint8_t *clean,size_t clean_len, uint8_t *defrag,size_t *defrag_len, bool *bFull);
++bool QUICDefragCrypto(const uint8_t *clean,size_t clean_len, uint8_t *defrag,size_t *defrag_len, bool *bFull, size_t *contiguous_len);
+ //bool QUICExtractHostFromInitial(const uint8_t *data, size_t data_len, char *host, size_t len_host, bool *bDecryptOK, bool *bIsCryptoHello);

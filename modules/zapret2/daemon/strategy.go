@@ -125,6 +125,7 @@ func workerArgs(c Config, r Resources, directory string, uid int) []string {
 		"--fwmark=" + r.Mark,
 		"--uid=" + strconv.Itoa(uid) + ":" + strconv.Itoa(uid),
 		"--bind-fix4", "--bind-fix6",
+		"--quic-initial-passthrough",
 		"--lua-init=@" + filepath.Join(directory, "zapret-lib.lua"),
 		"--lua-init=@" + filepath.Join(directory, "zapret-antidpi.lua"),
 		"--lua-init=@" + filepath.Join(directory, "ocfusion-strategies.lua"),

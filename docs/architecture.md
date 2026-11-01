@@ -159,9 +159,15 @@ pinned upstream engine. Incoming TCP interception observes SYN/ACK only; bulk
 reply data stays outside NFQUEUE. Outgoing initial packets remain eligible for
 TLS/HTTP classification. When a complete SNI already excludes all actions, the
 engine passes the original packet without waiting for the full TLS record.
-An incomplete SNI still requires bounded reassembly. Transient raw replay send
+An incomplete TCP SNI still requires bounded reassembly. QUIC uses an explicit
+observe-only Initial mode: bounded decrypted CRYPTO copies are assembled while
+original datagrams pass immediately. Only a contiguous prefix from CRYPTO offset
+zero may identify the hostname. The supported additive QUIC fake strategy runs
+before the current matching datagram, without replaying earlier originals.
+Transient raw replay send
 failures are retried without rerunning Lua actions or resending successful
-packets; permanent failures are logged and TCP retransmission remains necessary. Separate ordered IP and domain profiles combine
+packets; permanent failures are logged and TCP retransmission remains necessary.
+Separate ordered IP and domain profiles combine
 selectors as a union (OR).
 IP profiles do not require a hostname match. When domains are configured, the
 firewall queues candidate initial packets independently of the IP list, while

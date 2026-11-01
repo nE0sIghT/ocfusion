@@ -109,6 +109,7 @@ foreach component : components
         inputs += files(
             '../modules/zapret2/patches/0001-pass-unmatched-tls-before-reassembly.patch',
             '../modules/zapret2/patches/0002-retry-transient-replay-errors.patch',
+            '../modules/zapret2/patches/0003-observe-quic-without-replaying-originals.patch',
         )
         compatibility_headers = custom_target(
             'zapret-compatibility-headers',

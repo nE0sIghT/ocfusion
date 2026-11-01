@@ -285,10 +285,14 @@ run the packet-path fixture without root or a live queue:
 
 ```sh
 python3 tests/test-zapret-packet-path.py --source /path/to/patched-zapret2 \
-  --prefix /path/to/native-prefix --output build/zapret-packet-path-test
+  --prefix /path/to/native-prefix --output build/zapret-packet-path-test \
+  --check-regression
 ```
 
 The prefix supplies Lua, zlib and netfilter libraries and headers. The fixture
 uses synthetic IPv4/IPv6 TLS packets, host filters and injected raw-send errors.
 It checks pass-through before reassembly, selected and fragmented-SNI handling,
-and transient replay retries. It does not exercise ASUS hardware acceleration.
+and transient replay retries. Encrypted QUIC v1 Initial fixtures cover split SNI,
+CRYPTO gaps, selected/nonselected hosts and unchanged original datagrams. The
+optional regression check verifies that the legacy buffering mode fails the
+same original-packet assertion. It does not exercise ASUS hardware acceleration.

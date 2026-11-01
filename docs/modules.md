@@ -830,6 +830,12 @@ The zapret2 public snapshot includes `queue` when the owned kernel queue is
 available: `id`, `consumer_portid`, `pending`, `kernel_dropped`, `userspace_dropped` and
 `sequence`.
 These are kernel queue counters, not end-to-end loss measurements. They reset
-when the queue is reopened; compare samples only while `id` and `consumer_portid` remain unchanged.
+when the queue is reopened; compare samples only while `id` and
+`consumer_portid` remain unchanged.
 The copied diagnostic report includes this snapshot. Raw replay failures are
 recorded in the bounded private worker log, without packet payloads.
+
+The supported QUIC strategy adds fakes without withholding original Initial
+packets. Hostname discovery assembles bounded copies of decrypted CRYPTO data;
+it does not replay client datagrams. This mode is internal to the adapter and
+is not an arbitrary engine-option interface.
