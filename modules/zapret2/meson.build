@@ -14,6 +14,8 @@ zapret_adapter = custom_target(
         'daemon/service_fetch.go',
         'daemon/service_store.go',
         'daemon/strategy.go',
+        'daemon/protocol_options.go',
+        'daemon/quic_strategy.go',
         'daemon/presets.go',
         'daemon/scan.go',
         'daemon/scan_targets.go',

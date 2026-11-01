@@ -662,7 +662,9 @@ Arbitrary command lines and Lua imports are not accepted.
 `scan-start` accepts a current `revision`, `mode: "search"` and up to four
 `targets`. Each target contains a domain `host`, `port`, `protocol` and an
 optional HTTP `path` (including a query string). Protocols are `http`, `https`,
-`https12` (TLS 1.2 only), `http3` and `stun`. HTTP paths cannot change the server.
+`https12` (TLS 1.2 only), `http3` and `stun`. Optional `family` is 4
+(the default) or 6; IPv6 discovery is currently supported for `http3` only.
+HTTP paths cannot change the server.
 Targets need not be in the processing selection. They authorize only temporary
 probe sockets and never change persistent settings.
 
@@ -676,7 +678,8 @@ described below. DNS/route/connect/TLS/
 headers/body/QUIC/STUN failures describe the failed test phase, not a definitive
 classification of a provider's blocking mechanism.
 
-Tests resolve each target once to a public IPv4 endpoint and use that same
+Tests resolve each target once to a public endpoint in the selected IP family
+and use that same
 address for baseline and candidates. HTTP tests read up to 64 KiB; short valid
 responses establish connectivity without proving large transfers. Truncated
 bodies fail. HTTPS and HTTP/3 validate certificates, do not follow redirects and
@@ -698,8 +701,9 @@ settings projection of a published result. Stale scan IDs are rejected.
 Normal traffic keeps its configured strategy: the test has its own worker,
 queue, UID and exact WAN socket tuple rules for TCP or UDP. Rules are journaled
 before insertion and removed before terminating the queue consumer. Recovery
-after interruption removes only scanner-owned rules. IPv6 discovery is not
-implemented.
+after interruption removes only scanner-owned rules. IPv6 QUIC tests use
+`ip6tables`, a direct IPv6 WAN route and an IPv6 UDP socket; they do not fall
+back to IPv4 when IPv6 is unavailable.
 
 ### Managed service lists
 
@@ -869,7 +873,24 @@ when the queue is reopened; compare samples only while `id` and
 The copied diagnostic report includes this snapshot. Raw replay failures are
 recorded in the bounded private worker log, without packet payloads.
 
-The supported QUIC strategy adds fakes without withholding original Initial
-packets. Hostname discovery assembles bounded copies of decrypted CRYPTO data;
+QUIC discovery includes the technique families from the pinned upstream
+`blockcheck2.d/standard/90-quic.sh`: fake Initial packets with 1, 2, 5, 10 or
+20 repeats; IP fragmentation at offsets 8, 16, 32 or 64; and fake packets
+combined with fragmentation. The established AutoTTL fake preset remains
+available. IPv6 targets additionally test Hop-by-Hop, Destination Options and
+both extension headers. IPv6-only methods are skipped for IPv4 targets and
+filter IPv6 explicitly at runtime. Refinement and simplification retain the
+QUIC method and its bounded options.
+
+`udp_strategy` accepts `off`, `fake-quic`, `fragment-quic`,
+`fake-fragment-quic`, `hopbyhop-quic`, `destopt-quic` and
+`hopbyhop-destopt-quic`. `udp_fragment` is an offset in bytes (8-1200, multiple
+of 8, default 8). `udp_protection` is `ttl` (the established default) or `none`;
+the latter sends fakes without TTL modifications, matching upstream tests.
+Found settings use the same worker generator in discovery and normal rules.
+
+Fake-only QUIC strategies retain original Initial packets. Fragmentation and
+IPv6 header strategies send transformed packets and drop their originals.
+Hostname discovery assembles bounded copies of decrypted CRYPTO data;
 it does not replay client datagrams. This mode is internal to the adapter and
 is not an arbitrary engine-option interface.

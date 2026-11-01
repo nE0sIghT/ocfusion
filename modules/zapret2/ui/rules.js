@@ -13,6 +13,8 @@ function readStrategyForm() {
     udp_ports: ports("udp_ports"),
     tcp_strategy: document.getElementById("tcp_strategy").value,
     udp_strategy: document.getElementById("udp_strategy").value,
+    udp_fragment: Number(document.getElementById("udp_fragment").value),
+    udp_protection: document.getElementById("udp_protection").value,
     split_position: strategySplitPosition,
     split_positions: document.getElementById("split_positions").value.trim(),
     sequence_overlap: Number(document.getElementById("sequence_overlap").value),

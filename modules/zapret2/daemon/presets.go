@@ -23,6 +23,11 @@ func presets() []Preset {
 		{"interleave", "Interleaved segments", "Alternate fake and real segments with TCP sequence protection.", "tcp", map[string]any{"tcp_strategy": "fakedsplit", "split_positions": "midsld", "fake_fooling": "badseq", "auto_ttl": true}},
 		{"hostfake", "Fake hostname", "Split the handshake around a fake server name.", "tcp", map[string]any{"tcp_strategy": "hostfakesplit", "fake_fooling": "md5", "auto_ttl": true}},
 		{"quic", "QUIC fake packets", "Send repeated fake QUIC Initial packets.", "udp", map[string]any{"udp_strategy": "fake-quic", "fake_repeats": 6, "auto_ttl": true}},
+		{"quic-fragment", "QUIC IP fragmentation", "Fragment QUIC Initial packets.", "udp", map[string]any{"udp_strategy": "fragment-quic", "udp_fragment": 8}},
+		{"quic-fake-fragment", "QUIC fake packets and fragmentation", "Combine fake QUIC Initial packets and IP fragmentation.", "udp", map[string]any{"udp_strategy": "fake-fragment-quic", "udp_fragment": 8, "udp_protection": "none", "fake_repeats": 1}},
+		{"quic-hopbyhop", "QUIC IPv6 Hop-by-Hop", "Use an IPv6 Hop-by-Hop header.", "udp", map[string]any{"udp_strategy": "hopbyhop-quic"}},
+		{"quic-destopt", "QUIC IPv6 Destination Options", "Use an IPv6 Destination Options header.", "udp", map[string]any{"udp_strategy": "destopt-quic"}},
+		{"quic-ipv6-headers", "QUIC IPv6 extension headers", "Use both IPv6 extension headers.", "udp", map[string]any{"udp_strategy": "hopbyhop-destopt-quic"}},
 	}, applicationPresets()...)
 }
 
@@ -55,6 +60,8 @@ func presetCatalog() []Preset {
 		}
 		if catalog[i].Protocol == "tcp" {
 			delete(settings, "udp_strategy")
+			delete(settings, "udp_fragment")
+			delete(settings, "udp_protection")
 		} else if catalog[i].Protocol == "udp" {
 			// Expose only the fields that belong to QUIC.
 			for _, key := range []string{"tcp_strategy", "split_position", "split_positions", "sequence_overlap", "fake_fooling", "fake_sni", "packet_limit"} {

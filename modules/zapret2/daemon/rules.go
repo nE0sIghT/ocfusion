@@ -27,7 +27,7 @@ type DestinationRule struct {
 }
 
 var ruleIDPattern = regexp.MustCompile(`^[a-z][a-z0-9-]{0,23}$`)
-var tuningKeys = []string{"protocol_options", "applications", "tcp_ports", "udp_ports", "tcp_strategy", "udp_strategy", "split_position", "split_positions", "sequence_overlap", "fake_ttl", "fake_repeats", "fake_fooling", "fake_sni", "auto_ttl", "auto_ttl_delta", "auto_ttl_min", "auto_ttl_max", "packet_limit"}
+var tuningKeys = []string{"protocol_options", "applications", "tcp_ports", "udp_ports", "tcp_strategy", "udp_strategy", "udp_fragment", "udp_protection", "split_position", "split_positions", "sequence_overlap", "fake_ttl", "fake_repeats", "fake_fooling", "fake_sni", "auto_ttl", "auto_ttl_delta", "auto_ttl_min", "auto_ttl_max", "packet_limit"}
 
 func strategyProjection(c Config) map[string]any {
 	data, _ := json.Marshal(c)

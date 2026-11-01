@@ -39,7 +39,7 @@ func TestPresetCatalogIsBoundedAndReproducible(t *testing.T) {
 	}
 }
 
-func TestScanOnlyUsesPublicIPv4(t *testing.T) {
+func TestScanOnlyUsesPublicAddresses(t *testing.T) {
 	for _, value := range []string{"127.0.0.1", "10.1.2.3", "192.168.1.1", "169.254.1.1", "224.0.0.1", "::1", "2001:db8::1"} {
 		if scanAddressAllowed(netip.MustParseAddr(value)) {
 			t.Fatal("non-public destination accepted", value)

@@ -124,7 +124,11 @@ func listenProbeUDP(ctx context.Context, destination resolvedScanTarget, bypass 
 		})
 		return errors.Join(err, setupErr)
 	}}
-	return config.ListenPacket(ctx, "udp4", net.JoinHostPort(destination.Source, "0"))
+	network := "udp4"
+	if net.ParseIP(destination.Address).To4() == nil {
+		network = "udp6"
+	}
+	return config.ListenPacket(ctx, network, net.JoinHostPort(destination.Source, "0"))
 }
 
 var openProbePacket = listenProbeUDP

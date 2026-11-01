@@ -113,7 +113,7 @@ async function main() {
 
             if (operation === "scan-settings") {
               if (request.id === "quic") {
-                return {id:"quic",name:"QUIC fake packets",protocol:"udp",settings:{udp_strategy:"fake-quic",fake_ttl:6,fake_repeats:11,auto_ttl:false,auto_ttl_delta:-1,auto_ttl_min:3,auto_ttl_max:20}};
+                return {id:"quic",name:"QUIC fake packets and fragmentation",protocol:"udp",settings:{udp_strategy:"fake-fragment-quic",udp_fragment:32,udp_protection:"none",fake_ttl:6,fake_repeats:11,auto_ttl:false,auto_ttl_delta:-1,auto_ttl_min:3,auto_ttl_max:20}};
               }
               return {id:"disorder",name:"Reordered segments",protocol:"tcp",settings:{tcp_strategy:"disorder",split_position:2,split_positions:"1,midsld",sequence_overlap:0,fake_ttl:9,fake_repeats:7,auto_ttl:true,auto_ttl_delta:-1,auto_ttl_min:3,auto_ttl_max:20,packet_limit:12,fake_fooling:"md5",fake_sni:""}};
             }
@@ -367,7 +367,10 @@ async function main() {
       assert.equal(await frame.locator("#scan-use").innerText(), language === "ru" ? "Использовать для QUIC" : "Use for QUIC");
       await frame.locator("#scan-use").click();
       assert.equal(await frame.locator("#preset").inputValue(), "disorder");
-      assert.equal(await frame.locator("#quic-preset option:checked").innerText(), language === "ru" ? "Подставные пакеты QUIC" : "QUIC fake packets");
+      assert.equal(await frame.locator("#quic-preset option:checked").innerText(), language === "ru" ? "Подставные пакеты QUIC и фрагментация" : "QUIC fake packets and fragmentation");
+      assert.equal(await frame.locator("#udp_strategy").inputValue(), "fake-fragment-quic");
+      assert.equal(await frame.locator("#udp_fragment").inputValue(), "32");
+      assert.equal(await frame.locator("#udp_protection").inputValue(), "none");
       assert.deepEqual(await frame.locator("body").evaluate(() => readPacketOptions("tcp")), tcpBeforeQUIC);
       assert((await frame.locator("#summary-tcp").innerText()).includes(language === "ru" ? "Проверено подбором" : "Tested by finder"));
       await frame.locator("#settings button[type=submit]").click();
@@ -375,6 +378,7 @@ async function main() {
       const both = normalizeWithBackend(await page.evaluate(() => window.saved));
       assert.equal(both.rules.find((entry) => entry.id === "main").strategy_selections.tcp.checked, true);
       assert.equal(both.rules.find((entry) => entry.id === "main").strategy_selections.udp.checked, true);
+      assert.equal(both.rules.find((entry) => entry.id === "main").settings.udp_fragment, 32);
       await frame.locator("[data-rule-row=main] button").click();
       await frame.locator(".ocf-rule-editor button").filter({hasText: language === "ru" ? "К списку правил" : "Back to rules"}).click();
 

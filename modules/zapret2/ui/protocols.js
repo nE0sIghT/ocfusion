@@ -76,6 +76,8 @@ function collectProtocolOptions() {
 
 function writeStrategySettings(settings, selections = {}) {
   strategySplitPosition = settings.split_position || 2;
+  document.getElementById("udp_fragment").value = settings.udp_fragment ?? 8;
+  document.getElementById("udp_protection").value = settings.udp_protection ?? "ttl";
   for (const [key, value] of Object.entries(settings)) {
     const field = document.getElementById(key);
     if (field && ["INPUT", "SELECT"].includes(field.tagName)) {
@@ -110,6 +112,8 @@ function protocolSnapshot(scope) {
       fake_sni: document.getElementById("fake_sni").value.trim(),
     });
   } else if (scope === "udp") {
+    snapshot.udp_fragment = Number(document.getElementById("udp_fragment").value);
+    snapshot.udp_protection = document.getElementById("udp_protection").value;
     snapshot.udp_strategy = document.getElementById("udp_strategy").value;
     snapshot.udp_ports = ports("udp_ports");
   } else {
@@ -226,8 +230,12 @@ function applyProtocolPreset(preset, checked = false) {
       }
     }
   }
-  if (scopes.includes("udp") && settings.udp_strategy !== undefined) {
-    document.getElementById("udp_strategy").value = settings.udp_strategy;
+  if (scopes.includes("udp")) {
+    for (const key of ["udp_strategy", "udp_fragment", "udp_protection"]) {
+      if (settings[key] !== undefined) {
+        document.getElementById(key).value = settings[key];
+      }
+    }
   }
   if (settings.applications) {
     const incoming = new Set(settings.applications.map((profile) => profile.id));
@@ -269,11 +277,14 @@ for (const [scope, id] of [["tcp", "preset"], ["udp", "quic-preset"], ["applicat
 function updateProtocolOptionVisibility() {
   for (const scope of strategyScopes().filter((value) => value !== "tcp")) {
     const kind = applicationKinds.find((entry) => entry.id === scope);
-    const fake = scope === "udp" ? document.getElementById("udp_strategy").value !== "off" : applicationInput(kind, "enabled").checked && applicationInput(kind, "method").value.includes("fake");
+    const fake = scope === "udp" ? ["fake-quic", "fake-fragment-quic"].includes(document.getElementById("udp_strategy").value) : applicationInput(kind, "enabled").checked && applicationInput(kind, "method").value.includes("fake");
     const automatic = scopeField(scope, "auto_ttl").checked;
     for (const key of packetOptionKeys) {
       const row = scopeField(scope, key).closest("tr");
       row.hidden = scope !== "udp" && key === "fake_repeats" ? true : key === "packet_limit" ? false : !fake || key === "fake_fooling" && (scope === "udp" || kind.transport !== "tcp") || key.startsWith("auto_ttl_") && !automatic;
+      if (scope === "udp" && document.getElementById("udp_protection").value === "none" && ["fake_ttl", "auto_ttl", "auto_ttl_delta", "auto_ttl_min", "auto_ttl_max"].includes(key)) {
+        row.hidden = true;
+      }
     }
   }
 }

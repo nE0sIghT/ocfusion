@@ -313,6 +313,11 @@
                         <option value="fake-quic">
                           QUIC fake packets
                         </option>
+                        <option value="fragment-quic">QUIC IP fragmentation</option>
+                        <option value="fake-fragment-quic">QUIC fake packets and fragmentation</option>
+                        <option value="hopbyhop-quic">QUIC IPv6 Hop-by-Hop</option>
+                        <option value="destopt-quic">QUIC IPv6 Destination Options</option>
+                        <option value="hopbyhop-destopt-quic">QUIC IPv6 extension headers</option>
                       </select>
                     </td>
                   </tr>
@@ -327,7 +332,11 @@
                     </td>
                   </tr>
                 </table>
-                  <table id="quic-packet-options" class="ocf-config-table"></table>
+                  <table class="ocf-config-table">
+                  <tr id="quic-fragment-row"><th><label for="udp_fragment">Fragment position</label></th><td><input id="udp_fragment" type="number" min="8" max="1200" step="8" value="8" /></td></tr>
+                  <tr id="quic-protection-row"><th><label for="udp_protection">Fake packet protection</label></th><td><select id="udp_protection"><option value="none">None</option><option value="ttl">TTL / AutoTTL</option></select></td></tr>
+                </table>
+                <table id="quic-packet-options" class="ocf-config-table"></table>
                 </details>
               </section>
               <section class="ocf-protocol-card" data-protocol="applications">
@@ -450,6 +459,10 @@
             Advanced test settings
           </summary>
           <table class="ocf-config-table">
+            <tr>
+              <th><label for="scan-family">Address family</label></th>
+              <td><select id="scan-family"><option value="4">IPv4</option><option value="6" disabled>IPv6 (QUIC)</option></select></td>
+            </tr>
             <tr>
               <th>
                 <label for="scan-port">

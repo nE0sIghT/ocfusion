@@ -36,6 +36,8 @@ type Config struct {
 	TCPPorts        []int                     `json:"tcp_ports"`
 	UDPPorts        []int                     `json:"udp_ports"`
 	TCP             string                    `json:"tcp_strategy"`
+	UDPFragment     int                       `json:"udp_fragment"`
+	UDPProtection   string                    `json:"udp_protection"`
 	UDP             string                    `json:"udp_strategy"`
 	Split           int                       `json:"split_position"`
 	Positions       string                    `json:"split_positions"`
@@ -53,19 +55,21 @@ type Config struct {
 
 func defaultConfig() Config {
 	return Config{
-		Monitor:     MonitorConfig{Interval: 15},
-		TCPPorts:    []int{80, 443},
-		UDPPorts:    []int{443},
-		TCP:         "split",
-		UDP:         "off",
-		Split:       2,
-		TTL:         3,
-		Repeats:     3,
-		Fooling:     "ttl",
-		AutoDelta:   -1,
-		AutoMin:     3,
-		AutoMax:     20,
-		PacketLimit: 12,
+		Monitor:       MonitorConfig{Interval: 15},
+		TCPPorts:      []int{80, 443},
+		UDPPorts:      []int{443},
+		TCP:           "split",
+		UDP:           "off",
+		UDPFragment:   8,
+		UDPProtection: "ttl",
+		Split:         2,
+		TTL:           3,
+		Repeats:       3,
+		Fooling:       "ttl",
+		AutoDelta:     -1,
+		AutoMin:       3,
+		AutoMax:       20,
+		PacketLimit:   12,
 	}
 }
 

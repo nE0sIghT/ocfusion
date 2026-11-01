@@ -7,7 +7,7 @@ const discoveryStages = {
   dns: "DNS lookup failed",
   "rule-selection": "Target does not match this rule",
   vpn: "VPN unavailable",
-  address: "No public IPv4 address",
+  address: "No public address",
   route: "Direct WAN route unavailable",
   connect: "TCP connection failed",
   tls: "TLS handshake failed",
@@ -24,6 +24,7 @@ function currentDiscoveryTarget() {
   return {
     host: document.getElementById("scan-host").value.trim(),
     port: Number(document.getElementById("scan-port").value),
+    family: Number(document.getElementById("scan-family").value),
     protocol: document.getElementById("scan-protocol").value,
     path: document.getElementById("scan-protocol").value === "stun" ? "" : document.getElementById("scan-path").value.trim(),
   };
@@ -37,7 +38,7 @@ function renderDiscoveryTargets() {
     const row = document.createElement("div");
     row.className = "ocf-discovery-target";
     const name = document.createElement("span");
-    name.textContent = target.protocol.toUpperCase() + " · " + target.host + ":" + target.port + (target.path || "");
+    name.textContent = "IPv" + (target.family || 4) + " · " + target.protocol.toUpperCase() + " · " + target.host + ":" + target.port + (target.path || "");
     row.appendChild(name);
     const remove = document.createElement("button");
     remove.type = "button";
@@ -206,7 +207,7 @@ function renderScan(state) {
   }
   const running = ["QUEUED", "RUNNING"].includes(state.state);
 
-  for (const id of ["scan-start", "scan-host", "scan-target", "scan-port", "scan-protocol", "scan-path", "scan-add-target"]) {
+  for (const id of ["scan-start", "scan-host", "scan-target", "scan-port", "scan-protocol", "scan-family", "scan-path", "scan-add-target"]) {
     document.getElementById(id).disabled = running || scanBusy || !config;
   }
 
@@ -315,6 +316,11 @@ document.getElementById("scan-add-target").addEventListener("click", () => {
 
 document.getElementById("scan-protocol").addEventListener("change", () => {
   const stun = document.getElementById("scan-protocol").value === "stun";
+  const family = document.getElementById("scan-family");
+  family.querySelector('[value="6"]').disabled = document.getElementById("scan-protocol").value !== "http3";
+  if (document.getElementById("scan-protocol").value !== "http3") {
+    family.value = "4";
+  }
   document.getElementById("scan-path-row").hidden = stun;
   document.getElementById("scan-port").value = stun ? "19302" : document.getElementById("scan-protocol").value === "http" ? "80" : "443";
 

@@ -52,6 +52,11 @@ function updateStrategyFields() {
   document.getElementById("fake_sni").closest("tr").hidden = !standaloneFakes && tcp !== "hostfakesplit";
   document.getElementById("fake_repeats").closest("tr").hidden = !standaloneFakes;
 
+  const quic = document.getElementById("udp_strategy").value;
+  const quicFakes = ["fake-quic", "fake-fragment-quic"].includes(quic);
+  document.getElementById("quic-fragment-row").hidden = !["fragment-quic", "fake-fragment-quic"].includes(quic);
+  document.getElementById("quic-protection-row").hidden = !quicFakes;
+  document.getElementById("quic-packet-options").hidden = !quicFakes;
   updateProtocolOptionVisibility();
   refreshProtocolSelections();
   updateApplicationSummary();

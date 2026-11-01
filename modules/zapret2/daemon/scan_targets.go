@@ -5,7 +5,6 @@ import (
 	"errors"
 	"net"
 	"net/url"
-	"strconv"
 	"strings"
 )
 
@@ -13,6 +12,7 @@ const scanBodyLimit = 64 * 1024
 const scanResultLimit = 18
 
 type ScanTarget struct {
+	Family   int    `json:"family,omitempty"`
 	Host     string `json:"host"`
 	Port     int    `json:"port"`
 	Protocol string `json:"protocol"`
@@ -35,6 +35,12 @@ func normalizeScanTargets(request *ScanRequest) error {
 		}
 		if target.Protocol != "http" && target.Protocol != "https" && target.Protocol != "https12" && target.Protocol != "http3" && target.Protocol != "stun" {
 			return errors.New("invalid test protocol")
+		}
+		if target.Family != 0 && target.Family != 4 && (target.Family != 6 || target.Protocol != "http3") {
+			return errors.New("invalid test address family")
+		}
+		if target.Family == 4 {
+			target.Family = 0
 		}
 		if len(target.Host) > 253 || !domainPattern.MatchString(target.Host) || net.ParseIP(target.Host) != nil || target.Port < 1 || target.Port > 65535 {
 			return errors.New("choose a domain and service port")
@@ -80,16 +86,18 @@ func scanCandidates(protocol string) []Preset {
 		}
 		return canonicalScanCandidates(result)
 	}
+	if protocol == "udp" {
+		for _, preset := range presetCatalog() {
+			if preset.ID == "quic" {
+				result = append(result, preset)
+			}
+		}
+		result = append(result, quicCandidates()...)
+		return canonicalScanCandidates(result)
+	}
 	for _, preset := range presetCatalog() {
 		if preset.Protocol == protocol {
 			result = append(result, preset)
-		}
-	}
-	if protocol == "udp" {
-		for _, repeats := range []int{2, 10} {
-			c := defaultConfig()
-			c.Repeats, c.UDP, c.AutoTTL = repeats, "fake-quic", true
-			result = append(result, Preset{ID: "quic-" + strconv.Itoa(repeats), Name: "QUIC fake packets - " + strconv.Itoa(repeats), Protocol: "udp", Settings: map[string]any{"udp_strategy": c.UDP, "fake_repeats": repeats, "auto_ttl": true}})
 		}
 	}
 	return canonicalScanCandidates(result)
@@ -124,7 +132,10 @@ func canonicalScanPreset(preset Preset) Preset {
 		settings["packet_limit"] = c.PacketLimit
 	case "udp":
 		settings["udp_strategy"] = c.UDP
+		settings["udp_fragment"] = c.UDPFragment
+		settings["udp_protection"] = c.UDPProtection
 		settings["fake_repeats"] = c.Repeats
+		settings["packet_limit"] = c.PacketLimit
 	case "stun":
 		settings["applications"] = c.Applications
 	}

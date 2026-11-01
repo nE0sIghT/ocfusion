@@ -180,6 +180,30 @@ func TestHTTP3ProbeUsesRealQUICAndReadsBody(t *testing.T) {
 	}
 }
 
+func TestHTTP3IPv6ProbeUsesRealQUICAndReadsBody(t *testing.T) {
+	certificateSource := httptest.NewTLSServer(http.NotFoundHandler())
+	certificate := certificateSource.TLS.Certificates[0]
+	certificateSource.Close()
+	configureProbeFixture(t, certificate)
+	openProbePacket = func(context.Context, resolvedScanTarget, string) (net.PacketConn, error) {
+		return net.ListenPacket("udp6", "[::1]:0")
+	}
+	packet, err := net.ListenPacket("udp6", "[::1]:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := http3.Server{TLSConfig: &tls.Config{Certificates: []tls.Certificate{certificate}}, Handler: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { io.WriteString(w, strings.Repeat("h", 65536)) })}
+	done := make(chan error, 1)
+	go func() { done <- server.Serve(packet) }()
+	defer func() { server.Close(); <-done; packet.Close() }()
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	result, err := performProtocolProbe(ctx, ScanTarget{Host: "example.com", Port: packet.LocalAddr().(*net.UDPAddr).Port, Protocol: "http3", Path: "/"}, defaultConfig(), Preset{ID: "baseline"}, resolvedScanTarget{Address: "::1"}, "")
+	if err != nil || result.Bytes != 65536 || result.Stage != "complete" {
+		t.Fatal(result, err)
+	}
+}
+
 func TestProbeDoesNotAcceptCertificateFailure(t *testing.T) {
 	response := httptest.NewTLSServer(http.NotFoundHandler())
 	defer response.Close()

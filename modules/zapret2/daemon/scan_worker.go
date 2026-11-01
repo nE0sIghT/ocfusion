@@ -65,13 +65,17 @@ func installScanRules(resources Resources) error {
 func probeWorkerConfig(base Config, preset Preset, target ScanTarget, address string) Config {
 	resolved := presetConfig(base, preset)
 	c := resolved
-	c.Networks, c.Domains = []string{address + "/32"}, nil
+	prefix := "/32"
+	if net.ParseIP(address).To4() == nil {
+		prefix = "/128"
+	}
+	c.Networks, c.Domains = []string{address + prefix}, nil
 	c.TCP, c.UDP, c.Applications = "off", "off", nil
 	if scanProtocol(target) == "tcp" {
 		c.TCP = resolved.TCP
 		c.TCPPorts = []int{target.Port}
 	} else if target.Protocol == "http3" {
-		c.UDP = "fake-quic"
+		c.UDP = resolved.UDP
 		c.UDPPorts = []int{target.Port}
 	} else {
 		c.Applications = resolved.Applications

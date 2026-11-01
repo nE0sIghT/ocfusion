@@ -81,7 +81,9 @@ func protocolSnapshot(c Config, scope string) map[string]any {
 			result[key] = all[key]
 		}
 	case "udp":
-		result["udp_strategy"], result["udp_ports"] = all["udp_strategy"], all["udp_ports"]
+		for _, key := range []string{"udp_strategy", "udp_ports", "udp_fragment", "udp_protection"} {
+			result[key] = all[key]
+		}
 	default:
 		profiles := []ApplicationProfile{}
 		for _, profile := range c.Applications {

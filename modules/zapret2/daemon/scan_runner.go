@@ -26,7 +26,11 @@ func resolveScanTargets(ctx context.Context, targets []ScanTarget) []resolvedSca
 	resolved := make([]resolvedScanTarget, len(targets))
 	for i, target := range targets {
 		deadline, cancel := context.WithTimeout(ctx, 8*time.Second)
-		addresses, err := net.DefaultResolver.LookupNetIP(deadline, "ip4", target.Host)
+		network, family := "ip4", "-4"
+		if target.Family == 6 {
+			network, family = "ip6", "-6"
+		}
+		addresses, err := net.DefaultResolver.LookupNetIP(deadline, network, target.Host)
 		cancel()
 		if err != nil {
 			resolved[i].Error = "dns"
@@ -42,7 +46,7 @@ func resolveScanTargets(ctx context.Context, targets []ScanTarget) []resolvedSca
 			resolved[i].Error = "address"
 			continue
 		}
-		iface, err := wan("-4")
+		iface, err := wan(family)
 		if err != nil {
 			resolved[i].Error = "route"
 			continue
@@ -130,6 +134,9 @@ func performScan(ctx context.Context, request ScanRequest, c Config, bypass stri
 			candidates = historyCandidates(candidates, targets, routes)
 		}
 		for _, preset := range candidates {
+			if quicIPv6Only(presetConfig(c, preset).UDP) && !hasIPv6Target(request.Targets, indices) {
+				continue
+			}
 			if len(state.Results) >= scanResultLimit {
 				break
 			}
@@ -147,6 +154,9 @@ func performScan(ctx context.Context, request ScanRequest, c Config, bypass stri
 			}
 			for attempt := 0; attempt < attempts; attempt++ {
 				for _, i := range indices {
+					if quicIPv6Only(presetConfig(c, preset).UDP) && request.Targets[i].Family != 6 {
+						continue
+					}
 					if ctx.Err() != nil {
 						return ctx.Err()
 					}

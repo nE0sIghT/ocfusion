@@ -151,7 +151,7 @@ func requestScan(data []byte) (ScanState, error) {
 		request.seed = &preset
 		request.Targets = nil
 		for _, target := range previous.Targets {
-			if scanProtocol(target) == preset.Protocol {
+			if scanProtocol(target) == preset.Protocol && (!quicIPv6Only(presetConfig(c, preset).UDP) || target.Family == 6) {
 				request.Targets = append(request.Targets, target)
 			}
 		}
@@ -199,7 +199,7 @@ func requestScan(data []byte) (ScanState, error) {
 }
 
 func scanAddressAllowed(address netip.Addr) bool {
-	return address.Is4() && address.IsGlobalUnicast() && !address.IsPrivate()
+	return address.IsGlobalUnicast() && !address.IsPrivate() && !netip.MustParsePrefix("2001:db8::/32").Contains(address)
 }
 
 func pendingScan() (ScanRequest, bool) {
@@ -245,18 +245,26 @@ func scanRulesForProtocol(r Resources, iface, address string, port, source int, 
 	queue := append(mark, "-m", "comment", "--comment", "ocfusion:zapret2-scan", "-j", "NFQUEUE", "--queue-num", strconv.Itoa(r.Queue), "--queue-bypass")
 	outgoing := []string{"-o", iface, "-p", protocol, "-d", address, "--dport", strconv.Itoa(port), "--sport", strconv.Itoa(source)}
 	incoming := []string{"-i", iface, "-p", protocol, "-s", address, "--sport", strconv.Itoa(port), "--dport", strconv.Itoa(source)}
-	rules := []Rule{{Tool: "iptables", Chain: "OUTPUT", Args: append(outgoing, queue...)}}
+	tool := "iptables"
+	if net.ParseIP(address).To4() == nil {
+		tool = "ip6tables"
+	}
+	rules := []Rule{{Tool: tool, Chain: "OUTPUT", Args: append(outgoing, queue...)}}
 	if bypass != "" {
 		// Mark only this reply tuple before the regular module's PREROUTING rules.
 		args := append(append([]string{}, incoming...), "-m", "comment", "--comment", "ocfusion:zapret2-scan", "-j", "MARK", "--set-xmark", bypass+"/"+bypass)
-		rules = append(rules, Rule{Tool: "iptables", Chain: "PREROUTING", Args: args})
+		rules = append(rules, Rule{Tool: tool, Chain: "PREROUTING", Args: args})
 	}
-	rules = append(rules, Rule{Tool: "iptables", Chain: "PREROUTING", Args: append(incoming, queue...)})
+	rules = append(rules, Rule{Tool: tool, Chain: "PREROUTING", Args: append(incoming, queue...)})
 	return rules
 }
 
 func routeForScan(address, iface string) (string, error) {
-	output, err := execute("ip", "-4", "route", "get", address, "oif", iface)
+	family := "-4"
+	if net.ParseIP(address).To4() == nil {
+		family = "-6"
+	}
+	output, err := execute("ip", family, "route", "get", address, "oif", iface)
 	if err != nil {
 		return "", err
 	}
@@ -270,7 +278,8 @@ func routeForScan(address, iface string) (string, error) {
 			source = fields[i+1]
 		}
 	}
-	if device != iface || net.ParseIP(source).To4() == nil {
+	sourceIP := net.ParseIP(source)
+	if device != iface || sourceIP == nil || (sourceIP.To4() != nil) != (family == "-4") {
 		return "", errors.New("direct WAN route unavailable")
 	}
 	return source, nil

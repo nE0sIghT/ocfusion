@@ -64,6 +64,9 @@ func refinedCandidates(seed Preset, mode string) []Preset {
 		}
 		return result
 	}
+	if seed.Protocol == "udp" {
+		return refineQUIC(seed, mode)
+	}
 	if mode == "lighten" {
 		changes := map[string]any{"fake_repeats": 1}
 		if seed.Protocol == "tcp" {

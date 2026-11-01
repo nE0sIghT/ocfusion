@@ -17,8 +17,16 @@ func validateStrategy(c Config) error {
 	default:
 		return errors.New("invalid TCP strategy")
 	}
-	if c.UDP != "off" && c.UDP != "fake-quic" {
+	switch c.UDP {
+	case "off", "fake-quic", "fragment-quic", "fake-fragment-quic", "hopbyhop-quic", "destopt-quic", "hopbyhop-destopt-quic":
+	default:
 		return errors.New("invalid UDP strategy")
+	}
+	if c.UDPFragment < 8 || c.UDPFragment > 1200 || c.UDPFragment%8 != 0 {
+		return errors.New("invalid QUIC fragment position")
+	}
+	if c.UDPProtection != "none" && c.UDPProtection != "ttl" {
+		return errors.New("invalid QUIC fake protection")
 	}
 	if c.Fooling != "ttl" && c.Fooling != "badseq" && c.Fooling != "md5" && c.Fooling != "badsum" {
 		return errors.New("invalid fake packet protection")
@@ -212,8 +220,7 @@ func workerProfiles(c Config, directory string) []string {
 			if protocol == "tcp" {
 				args = append(args, tcpStrategy(c)...)
 			} else {
-				options := protocolConfig(c, "udp")
-				args = append(args, "--payload=quic_initial", "--lua-desync=fake:blob=fake_default_quic"+fakeOptions(options, false)+":repeats="+strconv.Itoa(options.Repeats))
+				args = append(args, quicStrategy(c)...)
 			}
 		}
 	}
