@@ -306,3 +306,47 @@ func TestPartialDNSFailureRetainsOnlyFailedFamily(t *testing.T) {
 		t.Fatal("partial failure discarded protected addresses or new A reply", answer)
 	}
 }
+
+func TestDestinationIPv6LocalBypassWithoutAddrtypeExtension(t *testing.T) {
+	_, _, batches := destinationFixture(t)
+	previous := runner
+	runner = func(name string, args ...string) (string, error) {
+		if name == "ip" && strings.Join(args, " ") == "-6 route show table local" {
+			return "local ::1 dev lo\nlocal 2001:db8::1/128 dev br0\nlocal 2001:db8::1 dev br0\nlocal fe80::1 dev br0\nmulticast ff00::/8 dev br0\nlocal ::/0 dev br0", nil
+		}
+		return previous(name, args...)
+	}
+	lease := &DestinationLease{Owner: "consumer", Routes: map[string]*DestinationRoute{"vpn": {Mark: "0x10000/0x10000"}}, Policies: []DestinationPolicy{{ID: "vpn", Action: "vpn", Target: "managed:owner", Failure: "wan", Networks: []string{"203.0.113.0/24"}}}}
+	cache := DestinationDNS{answers: map[string]DestinationAnswer{}}
+	if err := lease.install(&cache, nil, []string{"br0"}); err != nil {
+		t.Fatal(err)
+	}
+	var ipv6 string
+	for _, batch := range *batches {
+		if strings.HasPrefix(batch, "ip6tables-restore ") {
+			ipv6 = batch
+		}
+	}
+	if ipv6 == "" || strings.Contains(ipv6, "addrtype") || strings.Contains(ipv6, "-d ::/0") {
+		t.Fatal("unsupported extension or broad local bypass", ipv6)
+	}
+	for _, address := range []string{"::1/128", "2001:db8::1/128", "fe80::1/128"} {
+		if strings.Count(ipv6, "-d "+address+" -j RETURN") != 1 {
+			t.Fatal("missing or duplicate local IPv6 exclusion", ipv6)
+		}
+	}
+	if !strings.Contains(ipv6, "CONNMARK --save-mark") || !strings.Contains(ipv6, "--match-set") {
+		t.Fatal("IPv6 destination protection removed", ipv6)
+	}
+}
+
+func TestDestinationCommandDiagnosticsAreBounded(t *testing.T) {
+	output := &destinationCommandOutput{}
+	data := []byte(strings.Repeat("x", 6000))
+	for range 2 {
+		n, err := output.Write(data)
+		if n != len(data) || err != nil || len(output.data) != 4096 {
+			t.Fatal(n, err, len(output.data))
+		}
+	}
+}

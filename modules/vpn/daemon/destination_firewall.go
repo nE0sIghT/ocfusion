@@ -31,12 +31,30 @@ var destinationInput = func(tool, input string, args ...string) error {
 		defer cancel()
 		cmd := exec.CommandContext(ctx, path, args...)
 		cmd.Stdin = strings.NewReader(input)
+		stderr := &destinationCommandOutput{}
+		cmd.Stderr = stderr
 		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("destination %s update failed: %w", tool, err)
+			return fmt.Errorf("destination %s update failed: %w: %s", tool, err, strings.TrimSpace(string(stderr.data)))
 		}
 		return nil
 	}
 	return errors.New("destination routing tool unavailable")
+}
+
+// Network tool diagnostics stay in the provider's private error file. Never
+// publish command stderr through a module's browser status.
+type destinationCommandOutput struct {
+	data []byte
+}
+
+func (output *destinationCommandOutput) Write(data []byte) (int, error) {
+	size := len(data)
+	remaining := 4096 - len(output.data)
+	if len(data) > remaining {
+		data = data[:remaining]
+	}
+	output.data = append(output.data, data...)
+	return size, nil
 }
 
 func (l *DestinationLease) prefix() string {
@@ -156,7 +174,36 @@ func (l *DestinationLease) install(dns *DestinationDNS, exclusions [][]string, b
 		appendRule := func(args string) {
 			fmt.Fprintf(&rules, "-A %s %s\n", chain, args)
 		}
-		appendRule("-m addrtype --dst-type LOCAL -j RETURN")
+		if family == 4 {
+			appendRule("-m addrtype --dst-type LOCAL -j RETURN")
+		} else {
+			// Stock ASUS supplies the IPv4-only libipt_addrtype extension.
+			// Read local IPv6 host routes instead of requiring ip6t_addrtype.
+			local, err := runner("ip", "-6", "route", "show", "table", "local")
+			if err != nil {
+				return err
+			}
+			seen := map[string]bool{}
+			for _, line := range strings.Split(local, "\n") {
+				fields := strings.Fields(line)
+				if len(fields) < 2 || fields[0] != "local" {
+					continue
+				}
+				prefix, err := netip.ParsePrefix(fields[1])
+				if err != nil {
+					address, err := netip.ParseAddr(fields[1])
+					if err != nil || !address.Is6() || address.Is4In6() {
+						continue
+					}
+					prefix = netip.PrefixFrom(address, 128)
+				}
+				if !prefix.Addr().Is6() || prefix.Addr().Is4In6() || prefix.Bits() != 128 || seen[prefix.String()] {
+					continue
+				}
+				seen[prefix.String()] = true
+				appendRule("-d " + prefix.String() + " -j RETURN")
+			}
+		}
 		localRoutes, err := runner("ip", "-"+strconv.Itoa(family), "route", "show", "table", "main")
 		if err != nil {
 			return err

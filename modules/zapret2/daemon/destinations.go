@@ -135,6 +135,8 @@ func reconcileRoutes(c *Config) error {
 	}
 	reply, err := vpnRequest("destination-register", policies)
 	if err != nil {
+		// vpnRequest returns fixed redacted messages, never provider stderr.
+		writeJSON(path, map[string]string{"state": "ERROR", "message": err.Error()})
 		return err
 	}
 	mask, err := strconv.ParseUint(reply.Mask, 0, 32)
