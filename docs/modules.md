@@ -770,9 +770,8 @@ and repeated tests require an explicitly selected result. Edits remain drafts
 until Save changes. The header pause/resume control applies to all rules and
 preserves their configuration independently of the platform module lifecycle.
 The module uses OCFusion's shared dark controls, orange actions and table
-palette consistently across stock ASUS themes. Rule check setup opens the
-shared check form inline without changing tabs; its schedule and target limit
-remain module-wide.
+palette consistently across stock ASUS themes. Each rule editor contains its
+own check targets, schedule and results.
 
 Existing top-level destination selection is displayed as a final ordinary rule
 with its original strategy. An explicit save writes it into `rules` and clears
@@ -814,19 +813,22 @@ results are not a guarantee that a strategy still works.
 
 ### Availability monitoring
 
-Configuration `monitor` contains `enabled` (default false), `interval_minutes`
-(5-1440, default 15) and up to four normal discovery `targets`. Configure targets
-in Status directly or open check setup from a destination rule. Scheduled checks
-run while the configured packet processing or VPN policies are active. `health-check` accepts the current
-`revision` and queues a manual check of saved targets; `health-status` returns
-details. Public status `health` contains only the bounded summary and timestamps.
+Each destination rule's `monitor` contains `enabled` (default false),
+`interval_minutes` (5-1440, default 15) and up to four discovery `targets`.
+Targets, schedule and results are edited in that rule's Checks section.
+Scheduled checks skip disabled rules and run while packet processing or VPN
+policies are active. `health-check` accepts the current `revision` and `rule_id`
+and queues a check of that rule's saved targets. `health-status` returns results
+keyed by rule ID. Public status includes per-rule summaries without targets.
+Results and independent schedules are stored in RAM. Existing module-wide check
+settings are not assigned to a rule automatically.
 
 The daemon chooses the first matching configured rule/default strategy for each
 resolved public IPv4 target, honoring ports and disabled protocols. Its isolated
 probe uses DPI policies through direct WAN. For VPN policies the provider
 identifies the selected address set and the probe binds to that tunnel; blocked
-policies fail without a WAN probe. It does not inspect client connections. A destination outside processing selection is tested without
-processing. Checks report phases, duration and consecutive failures in RAM.
+policies fail without a WAN probe. It does not inspect client connections. A target outside its rule or shadowed by an earlier rule is reported as a
+selection mismatch without a probe. Checks report phases, duration and consecutive failures in RAM.
 A failed target yields `DEGRADED`, recovery resets its counter. Monitoring never
 changes configuration, starts strategy discovery or applies a fallback.
 

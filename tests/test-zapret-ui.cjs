@@ -66,7 +66,7 @@ async function main() {
             }
 
             if (operation === "history") {
-              return window.historyEntries || [];
+              return window.historyEntries === undefined ? [] : window.historyEntries;
             }
 
             if (operation === "list-catalog") {
@@ -192,13 +192,10 @@ async function main() {
         const style = getComputedStyle(element);
         return element.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom) >= parseFloat(style.fontSize);
       }));
-      const checks = frame.locator('[data-rule-action="checks"]');
-      assert.equal(await checks.isVisible(), true);
-      await checks.click();
-      assert.equal(await frame.locator("#panel-management").isVisible(), true);
-      assert.equal(await frame.locator("#panel-diagnostics").isVisible(), false);
-      assert.equal(await frame.locator("#rule-checks-slot #monitor-settings").isVisible(), true);
-      assert((await frame.locator("#monitor-targets-input").inputValue()).includes("t.me"));
+      assert.equal(await frame.locator('[data-rule-action="checks"]').count(), 0);
+      assert.equal(await frame.locator(".ocf-rule-editor #rule-checks").isVisible(), true);
+      await frame.locator("#monitor-targets-input").fill("https://telegram.org/");
+      await frame.locator("#monitor-enabled").check();
 
       await frame.locator('[data-rule-field="name"]').fill("Draft VPN name");
       await page.waitForTimeout(3200);
@@ -307,19 +304,28 @@ async function main() {
       if (process.env.OCF_UI_SCREENSHOT_DIR) {
         await frame.locator("body").screenshot({path:path.join(process.env.OCF_UI_SCREENSHOT_DIR, "zapret-diagnostics-" + theme + "-" + language + ".png")});
       }
-      if (await frame.locator("#monitor-settings").getAttribute("open") === null) {
-        await frame.locator("#monitor-settings > summary").click();
-      }
+      assert.equal(await frame.locator("#panel-diagnostics #rule-checks").count(), 0);
+      await frame.locator("#tab-management").click();
+      await frame.locator("[data-rule-row=main] button").click();
       await frame.locator("#monitor-targets-input").fill("https://example.com/\nstun://stun.example.net:19302");
       await frame.locator("#monitor-enabled").check();
-      await frame.locator("#monitor-save").click();
-      await frame.locator("#monitor-save:not([disabled])").waitFor();
-      assert.equal((await page.evaluate(() => window.saved)).monitor.targets.length, 2);
+      await frame.locator("#settings button[type=submit]").click();
+      await frame.locator("#fields:not([disabled])").waitFor();
+      assert.equal((await page.evaluate(() => window.saved)).rules.find((rule) => rule.id === "main").monitor.targets.length, 2);
+      assert.equal((await page.evaluate(() => window.saved)).rules.find((rule) => rule.id === "telegram").monitor?.targets?.length || 0, 0);
+      await frame.locator("[data-rule-row=main] button").click();
+      await frame.locator("#health-check:not([disabled])").click();
+      assert.equal((await page.evaluate(() => window.lastCall)).request.rule_id, "main");
+      await frame.locator("#tab-diagnostics").click();
       await frame.locator("#copy-report").click();
       await frame.locator("#copy-report:not([disabled])").waitFor();
       assert.equal(JSON.parse(await frame.locator("#diagnostic-report").inputValue()).state, "RUNNING");
       await frame.locator("#tab-management").click();
-      await frame.locator("[data-rule-row=main] button").click();
+      await page.evaluate(() => { window.historyEntries = null; });
+      await frame.locator("#confirmed-history > summary").click();
+      await frame.locator("#history-refresh").click();
+      await frame.locator("#history-results").filter({hasText: language === "ru" ? "Нет сохранённых" : "No saved"}).waitFor();
+      await frame.locator("#confirmed-history > summary").click();
       await page.evaluate(() => {
         window.historyEntries = [{id:"remembered",name:"Hostname split",protocol:"tcp",updated:1793000000,success:3,attempts:3,targets:[{host:"example.com",port:443,protocol:"https"}]}];
       });

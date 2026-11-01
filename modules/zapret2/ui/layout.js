@@ -9,9 +9,6 @@ for (const option of document.querySelectorAll("#tcp_strategy option, #udp_strat
 }
 
 function selectTab(id) {
-  if (id === "diagnostics") {
-    returnChecksToDiagnostics();
-  }
   for (const tab of tabs) {
     const active = tab.id === "tab-" + id;
     tab.setAttribute("aria-selected", String(active));

@@ -160,7 +160,7 @@ func TestMonitoringAndLabelsDoNotChangePacketIdentity(t *testing.T) {
 	next.Rules = append([]DestinationRule{}, base.Rules...)
 	next.Rules[0].Name = "Renamed"
 	next.Revision = 9
-	next.Monitor = MonitorConfig{Enabled: true, Interval: 30, Targets: []ScanTarget{{Host: "example.com", Port: 443, Protocol: "https"}}}
+	next.Rules[0].Monitor = MonitorConfig{Enabled: true, Interval: 30, Targets: []ScanTarget{{Host: "example.com", Port: 443, Protocol: "https"}}}
 	if !reflect.DeepEqual(packetConfiguration(base), packetConfiguration(next)) {
 		t.Fatal("metadata restarted packet policy")
 	}

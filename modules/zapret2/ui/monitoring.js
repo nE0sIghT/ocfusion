@@ -13,6 +13,9 @@ function showMonitoringTargets() {
 }
 
 function loadMonitoringForm(saved) {
+  healthDetailsSignature = "";
+  document.getElementById("health-results").replaceChildren();
+  document.getElementById("monitor-result").textContent = "";
   document.getElementById("monitor-enabled").checked = saved?.enabled || false;
   document.getElementById("monitor-interval").value = saved?.interval_minutes || 15;
   monitoringTargets = structuredClone(saved?.targets || []);
@@ -37,24 +40,33 @@ function monitoringFormConfig() {
 
 async function renderHealth(state) {
   latestHealth = state || {state: "IDLE"};
-  document.getElementById("health-time").textContent = latestHealth.checked ? new Date(latestHealth.checked * 1000).toLocaleString() : "-";
+  if (!editingRule) {
+    return;
+  }
+  const selectedHealth = latestHealth.rule_id === editingRule ? latestHealth : latestHealth.rules?.[editingRule] || {state: "IDLE"};
+  document.getElementById("health-time").textContent = selectedHealth.checked ? new Date(selectedHealth.checked * 1000).toLocaleString() : "-";
   const labels = {IDLE: "Not checked", QUEUED: "Waiting to start", CHECKING: "Checking", HEALTHY: "Available", DEGRADED: "Availability problems", ERROR: "Check failed", PAUSED: "Check paused"};
-  document.getElementById("health-state").textContent = labels[latestHealth.state] || "Not checked";
-  document.getElementById("health-check").disabled = healthBusy || ["QUEUED", "CHECKING"].includes(latestHealth.state) || !config?.monitor?.targets?.length;
-  const signature = JSON.stringify([latestHealth.state, latestHealth.checked, latestHealth.revision]);
+  document.getElementById("health-state").textContent = labels[selectedHealth.state] || "Not checked";
+  document.getElementById("health-check").disabled = healthBusy || ["QUEUED", "CHECKING"].includes(selectedHealth.state) || !config?.rules?.find((rule) => rule.id === editingRule && rule.enabled)?.monitor?.targets?.length || settingsDirty;
+  const signature = JSON.stringify([editingRule, selectedHealth.state, selectedHealth.checked, selectedHealth.revision]);
 
-  if (healthDetailsBusy || signature === healthDetailsSignature || document.getElementById("panel-diagnostics").hidden) {
+  if (healthDetailsBusy || signature === healthDetailsSignature || document.getElementById("rule-checks").closest("[hidden]")) {
     return;
   }
 
   healthDetailsBusy = true;
+  const checkedRuleID = editingRule;
 
   try {
     const details = await parent.EXTENSIONS.action(moduleID, "health-status");
+    if (checkedRuleID !== editingRule) {
+      return;
+    }
+    const selected = details.rule_id === editingRule ? details : details.rules?.[editingRule] || {};
     const root = document.getElementById("health-results");
     root.replaceChildren();
 
-    for (const row of details.results || []) {
+    for (const row of selected.results || []) {
       const card = document.createElement("p");
       card.appendChild(document.createTextNode(row.target.host + ":" + row.target.port + " · "));
       const status = document.createElement("span");
@@ -95,7 +107,7 @@ document.getElementById("health-check").addEventListener("click", async () => {
   document.getElementById("health-check").disabled = true;
 
   try {
-    await parent.EXTENSIONS.call(moduleID, "health-check", {revision: config.revision});
+    await parent.EXTENSIONS.call(moduleID, "health-check", {revision: config.revision, rule_id: editingRule});
     healthDetailsSignature = "";
     document.getElementById("health-state").textContent = "Waiting to start";
   } catch (error) {
@@ -105,44 +117,19 @@ document.getElementById("health-check").addEventListener("click", async () => {
   }
 });
 
-document.getElementById("tab-diagnostics").addEventListener("click", () => renderHealth(latestHealth));
-
 for (const id of ["monitor-enabled", "monitor-interval", "monitor-targets-input"]) {
-  document.getElementById(id).addEventListener("input", () => setDirty(true));
-}
-
-document.getElementById("monitor-save").addEventListener("click", () => {
-  document.getElementById("settings").requestSubmit();
-});
-
-function setupRuleChecks(rule) {
-  const service = moduleCatalog.lists.find((entry) => rule.lists?.includes(entry.id));
-  const host = rule.domains?.[0] || targetSuggestions[service?.name]?.[0];
-  if (host) {
-    let targets;
+  document.getElementById(id).addEventListener("input", () => {
+    const rule = draftRules.find((entry) => entry.id === editingRule);
+    if (!rule) {
+      return;
+    }
     try {
-      targets = monitoringFormConfig().targets;
+      rule.monitor = monitoringFormConfig();
+      document.getElementById("monitor-result").textContent = "";
     } catch (error) {
-      targets = structuredClone(monitoringTargets);
+      document.getElementById("monitor-result").textContent = error.message;
     }
-    if (!targets.some((target) => target.host === host) && targets.length < 4) {
-      targets.push({host, port: 443, protocol: "https", path: "/"});
-      monitoringTargets = targets;
-      showMonitoringTargets();
-      setDirty(true);
-    }
-  }
-  const slot = document.getElementById("rule-checks-slot");
-  slot.hidden = false;
-  slot.appendChild(document.getElementById("monitor-settings"));
-  document.getElementById("monitor-settings").open = true;
-  document.getElementById("monitor-targets-input").focus();
-}
-
-function returnChecksToDiagnostics() {
-  document.getElementById("monitor-settings-home").appendChild(document.getElementById("monitor-settings"));
-  const slot = document.getElementById("rule-checks-slot");
-  if (slot) {
-    slot.hidden = true;
-  }
+    setDirty(true);
+    document.getElementById("health-check").disabled = true;
+  });
 }

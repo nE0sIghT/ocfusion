@@ -12,6 +12,7 @@ import (
 )
 
 type DestinationRule struct {
+	Monitor  MonitorConfig  `json:"monitor"`
 	Action   string         `json:"action,omitempty"`
 	Target   string         `json:"target,omitempty"`
 	Failure  string         `json:"failure,omitempty"`
@@ -81,6 +82,14 @@ func validateRules(c *Config) error {
 		if err := validateRuleAction(rule); err != nil {
 			return err
 		}
+		monitor := Config{Monitor: rule.Monitor}
+		if monitor.Monitor.Interval == 0 {
+			monitor.Monitor.Interval = 15
+		}
+		if err := validateMonitor(&monitor); err != nil {
+			return err
+		}
+		rule.Monitor = monitor.Monitor
 		seen[rule.ID] = true
 		next, err := tunedConfig(*c, rule.Settings)
 		if err != nil {
@@ -148,6 +157,7 @@ func packetConfiguration(c Config) Config {
 	c.Rules = append([]DestinationRule{}, c.Rules...)
 	for i := range c.Rules {
 		c.Rules[i].Name = ""
+		c.Rules[i].Monitor = MonitorConfig{}
 	}
 	return c
 }

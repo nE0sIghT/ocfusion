@@ -124,6 +124,10 @@ function initializeRules(saved) {
 
 function destinationRulesConfig() {
   rememberStrategyScope();
+  const checkedRule = draftRules.find((entry) => entry.id === editingRule);
+  if (checkedRule) {
+    checkedRule.monitor = monitoringFormConfig();
+  }
   if (draftRules.some((rule) => rule.enabled && !(rule.lists?.length || rule.domains?.length || rule.networks?.length))) {
     throw new Error("Choose at least one destination");
   }
@@ -360,9 +364,6 @@ function renderRuleEditor(root, rule) {
       setDirty(true);
     }, index + offset < 0 || index + offset >= draftRules.length));
   }
-  const checks = ruleButton("Set up checks", () => setupRuleChecks(rule));
-  checks.dataset.ruleAction = "checks";
-  actions.appendChild(checks);
   actions.appendChild(ruleButton("Remove", () => {
     draftRules.splice(index, 1);
     if (strategyScope === rule.id) {
@@ -374,11 +375,10 @@ function renderRuleEditor(root, rule) {
     setDirty(true);
   }));
   card.appendChild(actions);
-  const checksSlot = document.createElement("section");
-  checksSlot.id = "rule-checks-slot";
-  checksSlot.hidden = true;
-  card.appendChild(checksSlot);
   root.appendChild(card);
+  card.appendChild(document.getElementById("rule-checks"));
+  loadMonitoringForm(rule.monitor);
+  renderHealth(latestHealth);
 }
 
 function effectiveRuleStatus(rule, dirty = false) {
@@ -460,7 +460,7 @@ function renderRuleDiagnostics() {
 }
 
 function renderRules() {
-  document.getElementById("monitor-settings-home").appendChild(document.getElementById("monitor-settings"));
+  document.getElementById("checks-storage").appendChild(document.getElementById("rule-checks"));
   const strategy = document.getElementById("panel-strategies");
   strategy.hidden = true;
   document.getElementById("strategy-storage").appendChild(strategy);

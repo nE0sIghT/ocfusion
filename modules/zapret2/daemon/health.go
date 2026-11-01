@@ -27,11 +27,13 @@ type HealthResult struct {
 }
 
 type HealthState struct {
-	State    string         `json:"state"`
-	Revision uint64         `json:"revision"`
-	Checked  int64          `json:"checked"`
-	Next     int64          `json:"next_check"`
-	Results  []HealthResult `json:"results"`
+	RuleID   string                 `json:"rule_id,omitempty"`
+	Rules    map[string]HealthState `json:"rules,omitempty"`
+	State    string                 `json:"state"`
+	Revision uint64                 `json:"revision"`
+	Checked  int64                  `json:"checked"`
+	Next     int64                  `json:"next_check"`
+	Results  []HealthResult         `json:"results"`
 }
 
 func validateMonitor(c *Config) error {
@@ -54,6 +56,15 @@ func validateMonitor(c *Config) error {
 func healthStatus() HealthState {
 	var state HealthState
 	data, err := os.ReadFile(scanPath("health.json"))
+	if err != nil || len(data) > 65536 || json.Unmarshal(data, &state) != nil {
+		state.State = "IDLE"
+	}
+	return state
+}
+
+func ruleHealthStatus(id string) HealthState {
+	var state HealthState
+	data, err := os.ReadFile(scanPath("health-rule-" + id + ".json"))
 	if err != nil || len(data) > 8192 || json.Unmarshal(data, &state) != nil {
 		state.State = "IDLE"
 	}
@@ -62,6 +73,20 @@ func healthStatus() HealthState {
 
 func publicHealthStatus() HealthState {
 	state := healthStatus()
+	state.Rules = map[string]HealthState{}
+	if c, err := loadConfig(); err == nil {
+		for _, rule := range c.Rules {
+			entry := ruleHealthStatus(rule.ID)
+			if state.RuleID == rule.ID && (state.State == "CHECKING" || state.State == "PAUSED") {
+				entry = state
+				entry.Rules = nil
+			}
+			for i := range entry.Results {
+				entry.Results[i].Target.Path = ""
+			}
+			state.Rules[rule.ID] = entry
+		}
+	}
 	for i := range state.Results {
 		state.Results[i].Target.Path = ""
 	}
@@ -130,12 +155,22 @@ func configuredProbePreset(c Config, target ScanTarget, address string) (Preset,
 func requestHealth(data []byte) error {
 	var request struct {
 		Revision uint64 `json:"revision"`
+		RuleID   string `json:"rule_id"`
 	}
 	if decodeScan(data, &request) != nil {
 		return errors.New("invalid monitoring request")
 	}
 	c, err := loadConfig()
-	if err != nil || c.Revision != request.Revision || len(c.Monitor.Targets) == 0 {
+	if err != nil || c.Revision != request.Revision {
+		return errors.New("save monitoring targets before testing")
+	}
+	found := false
+	for _, rule := range c.Rules {
+		if rule.ID == request.RuleID && rule.Enabled && len(rule.Monitor.Targets) > 0 {
+			found = true
+		}
+	}
+	if !found {
 		return errors.New("save monitoring targets before testing")
 	}
 	service, err := os.Stat(scanPath("service.json"))
@@ -146,16 +181,28 @@ func requestHealth(data []byte) error {
 }
 
 func healthDue(c Config, processingActive bool) bool {
-	path := scanPath("health-request.json")
-	if data, err := os.ReadFile(path); err == nil {
-		os.Remove(path)
+	var requested string
+	if data, err := os.ReadFile(scanPath("health-request.json")); err == nil {
+		os.Remove(scanPath("health-request.json"))
 		var request struct {
 			Revision uint64 `json:"revision"`
+			RuleID   string `json:"rule_id"`
 		}
-		return decodeScan(data, &request) == nil && request.Revision == c.Revision && len(c.Monitor.Targets) > 0
+		if decodeScan(data, &request) == nil && request.Revision == c.Revision {
+			requested = request.RuleID
+		}
 	}
-	state := healthStatus()
-	return c.Enabled && processingActive && c.Monitor.Enabled && len(c.Monitor.Targets) > 0 && (state.Revision != c.Revision || time.Now().Unix() >= state.Next)
+	for _, rule := range c.Rules {
+		if !rule.Enabled || len(rule.Monitor.Targets) == 0 {
+			continue
+		}
+		state := ruleHealthStatus(rule.ID)
+		scheduled := c.Enabled && processingActive && rule.Monitor.Enabled && (state.Revision != c.Revision || time.Now().Unix() >= state.Next)
+		if rule.ID == requested || (requested == "" && scheduled) {
+			return writeJSON(scanPath("health-selection.json"), rule.ID) == nil
+		}
+	}
+	return false
 }
 
 func healthCancelled(c Config) bool {
@@ -168,7 +215,26 @@ func healthCancelled(c Config) bool {
 
 func performHealth(ctx context.Context, c Config, bypass string) (failure error) {
 	previous := healthStatus()
-	state := HealthState{State: "CHECKING", Revision: c.Revision, Checked: time.Now().Unix(), Results: []HealthResult{}}
+	ruleID := ""
+	if data, err := os.ReadFile(scanPath("health-selection.json")); err == nil {
+		os.Remove(scanPath("health-selection.json"))
+		json.Unmarshal(data, &ruleID)
+	}
+	if ruleID != "" {
+		found := false
+		for _, rule := range c.Rules {
+			if rule.ID == ruleID && rule.Enabled {
+				c.Monitor = rule.Monitor
+				previous = ruleHealthStatus(ruleID)
+				found = true
+				break
+			}
+		}
+		if !found {
+			return errors.New("invalid monitoring request")
+		}
+	}
+	state := HealthState{RuleID: ruleID, State: "CHECKING", Revision: c.Revision, Checked: time.Now().Unix(), Results: []HealthResult{}}
 	writeJSON(scanPath("health.json"), state)
 	defer func() {
 		cleanupErr := cleanupAt(scanResources(), "ocfusion:zapret2-scan")
@@ -183,6 +249,9 @@ func performHealth(ctx context.Context, c Config, bypass string) (failure error)
 			state.State = "ERROR"
 		}
 		writeJSON(scanPath("health.json"), state)
+		if ruleID != "" {
+			writeJSON(scanPath("health-rule-"+ruleID+".json"), state)
+		}
 		failure = errors.Join(failure, cleanupErr)
 	}()
 	if err := cleanupAt(scanResources(), "ocfusion:zapret2-scan"); err != nil {
@@ -194,6 +263,18 @@ func performHealth(ctx context.Context, c Config, bypass string) (failure error)
 			return ctx.Err()
 		}
 		row := HealthResult{Target: target, Observation: TargetProbe{Target: i, Stage: resolved[i].Error}}
+		if row.Observation.Stage == "" && ruleID != "" {
+			matched := ""
+			for _, selected := range processingConfigs(c) {
+				if selectorMatches(selected, target, resolved[i].Address) {
+					matched = selected.SelectorPrefix
+					break
+				}
+			}
+			if matched != "rule-"+ruleID+"-" {
+				row.Observation.Stage = "rule-selection"
+			}
+		}
 		if row.Observation.Stage == "" {
 			preset, name := configuredProbePreset(c, target, resolved[i].Address)
 			row.Strategy, row.Processed = name, preset.ID != "baseline"
@@ -245,7 +326,7 @@ func performHealth(ctx context.Context, c Config, bypass string) (failure error)
 			row.Failures = 1
 			if previous.Revision == c.Revision {
 				for _, old := range previous.Results {
-					if old.Target == target {
+					if old.Target == target && previous.RuleID == ruleID {
 						row.Failures += old.Failures
 					}
 				}
@@ -267,9 +348,22 @@ func performHealth(ctx context.Context, c Config, bypass string) (failure error)
 }
 
 func healthSummary() HealthState {
-	state := healthStatus()
-	if _, err := os.Stat(scanPath("health-request.json")); err == nil {
-		state.State = "QUEUED"
+	state := publicHealthStatus()
+	for id, entry := range state.Rules {
+		entry.Results = nil
+		state.Rules[id] = entry
+	}
+	if data, err := os.ReadFile(scanPath("health-request.json")); err == nil {
+		var request struct {
+			RuleID   string `json:"rule_id"`
+			Revision uint64 `json:"revision"`
+		}
+		if json.Unmarshal(data, &request) == nil {
+			if entry, ok := state.Rules[request.RuleID]; ok {
+				entry.State = "QUEUED"
+				state.Rules[request.RuleID] = entry
+			}
+		}
 	}
 	state.Results = nil
 	return state

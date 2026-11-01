@@ -370,6 +370,8 @@ window.OCF_MODULE_TRANSLATIONS = {
   "No saved finder results": "Нет сохранённых результатов подбора",
   "Use for this rule": "Использовать для этого правила",
   "Rule operation": "Работа правил",
+  "Target does not match this rule": "Адрес не соответствует этому правилу",
+  "Rule checks": "Проверки правила",
   "Availability checks": "Проверки доступности",
   "Technical details": "Технические сведения",
   "Use for rule": "Использовать для правила",

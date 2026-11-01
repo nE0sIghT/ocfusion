@@ -5,6 +5,7 @@ let discoveryTargets = [];
 
 const discoveryStages = {
   dns: "DNS lookup failed",
+  "rule-selection": "Target does not match this rule",
   vpn: "VPN unavailable",
   address: "No public IPv4 address",
   route: "Direct WAN route unavailable",

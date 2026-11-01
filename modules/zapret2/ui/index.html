@@ -596,58 +596,6 @@
           <div id="diagnostic-rules">
           </div>
         </section>
-        <section class="ocf-diagnostic-section">
-          <h3>
-            Availability checks
-          </h3>
-          <div id="monitor-settings-home">
-            <details id="monitor-settings">
-              <summary>
-                Check settings
-              </summary>
-              <label>
-                <input id="monitor-enabled" type="checkbox" />
-                Enable scheduled checks
-              </label>
-              <label class="ext-field">
-                <span>
-                  Check interval in minutes
-                </span>
-                <input id="monitor-interval" type="number" min="5" max="1440" value="15" />
-              </label>
-              <label class="ext-field">
-                <span>
-                  Test addresses
-                </span>
-                <textarea id="monitor-targets-input" rows="3" placeholder="https://example.com/">
-                </textarea>
-              </label>
-              <p id="monitor-target-count">
-              </p>
-              <button id="monitor-save" type="button">
-                Save checks
-              </button>
-              <p id="monitor-result" role="status">
-              </p>
-            </details>
-          </div>
-          <p id="health-state" role="status">
-          </p>
-          <p>
-            <span>
-              Last check
-            </span>
-            :
-            <span id="health-time">
-              -
-            </span>
-          </p>
-          <button id="health-check" type="button" class="ext-secondary">
-            Check now
-          </button>
-          <div id="health-results">
-          </div>
-        </section>
         <details id="technical-details">
           <summary>
             Technical details
@@ -710,6 +658,54 @@
           </details>
         </details>
       </section>
+      <div id="checks-storage" hidden>
+        <section id="rule-checks" class="ocf-diagnostic-section">
+          <h3>
+            Rule checks
+          </h3>
+          <div>
+            <div id="monitor-settings">
+              <label>
+                <input id="monitor-enabled" type="checkbox" />
+                Enable scheduled checks
+              </label>
+              <label class="ext-field">
+                <span>
+                  Check interval in minutes
+                </span>
+                <input id="monitor-interval" type="number" min="5" max="1440" value="15" />
+              </label>
+              <label class="ext-field">
+                <span>
+                  Test addresses
+                </span>
+                <textarea id="monitor-targets-input" rows="3" placeholder="https://example.com/">
+                </textarea>
+              </label>
+              <p id="monitor-target-count">
+              </p>
+              <p id="monitor-result" role="status">
+              </p>
+            </div>
+          </div>
+          <p id="health-state" role="status">
+          </p>
+          <p>
+            <span>
+              Last check
+            </span>
+            :
+            <span id="health-time">
+              -
+            </span>
+          </p>
+          <button id="health-check" type="button" class="ext-secondary">
+            Check now
+          </button>
+          <div id="health-results">
+          </div>
+        </section>
+      </div>
     </main>
     <script src="layout.js">
     </script>

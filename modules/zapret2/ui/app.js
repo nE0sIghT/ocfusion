@@ -122,7 +122,6 @@ async function load() {
     writeApplications(config.applications || [], false);
     updateStrategyFields();
     initializeRules(config.rules);
-    loadMonitoringForm(config.monitor);
 
     renderedScan = "";
     renderScan(scan);
@@ -153,7 +152,6 @@ document.getElementById("settings").addEventListener("submit", async (event) => 
   pending = true;
   fields.disabled = true;
   updateProcessingControl();
-  document.getElementById("monitor-save").disabled = true;
   document.getElementById("monitor-result").textContent = "";
   result.textContent = "";
 
@@ -167,7 +165,7 @@ document.getElementById("settings").addEventListener("submit", async (event) => 
       networks: [],
       domains: [],
       rules,
-      monitor: monitoringFormConfig(),
+      monitor: {enabled: false, interval_minutes: 15, targets: []},
     };
     await parent.EXTENSIONS.configure(moduleID, next);
     pending = false;
@@ -178,7 +176,6 @@ document.getElementById("settings").addEventListener("submit", async (event) => 
   } finally {
     pending = false;
     fields.disabled = false;
-    document.getElementById("monitor-save").disabled = false;
     updateProcessingControl();
     renderServiceLists();
   }
