@@ -21,393 +21,371 @@
           Loading...
         </span>
       </div>
-      <p>
-        Choose how to connect to selected services.
-      </p>
+      <div class="ocf-module-control">
+        <span id="processing-state">
+        </span>
+        <button id="toggle-processing" type="button" disabled>
+          Resume processing
+        </button>
+        <input id="enabled" type="checkbox" hidden />
+      </div>
+      <p id="processing-result" role="status"></p>
       <nav class="ocf-tabs" role="tablist" aria-label="Module sections">
-        <button id="tab-management" type="button" role="tab" class="tabClicked" aria-selected="true" aria-controls="panel-management">
+        <button id="tab-management" type="button" role="tab" class="ocf-tab" aria-selected="true" aria-controls="panel-management">
           Rules
         </button>
-        <button id="tab-strategies" type="button" role="tab" class="tab" aria-selected="false" aria-controls="panel-strategies" tabindex="-1">
-          Strategies
+        <button id="tab-finder" type="button" role="tab" class="ocf-tab" aria-selected="false" aria-controls="panel-finder" tabindex="-1">
+          Find strategy
         </button>
-        <button id="tab-finder" type="button" role="tab" class="tab" aria-selected="false" aria-controls="panel-finder" tabindex="-1">
-          Strategy finder
-        </button>
-        <button id="tab-diagnostics" type="button" role="tab" class="tab" aria-selected="false" aria-controls="panel-diagnostics" tabindex="-1">
-          Status
+        <button id="tab-diagnostics" type="button" role="tab" class="ocf-tab" aria-selected="false" aria-controls="panel-diagnostics" tabindex="-1">
+          Diagnostics
         </button>
       </nav>
       <form id="settings">
         <fieldset id="fields" disabled>
           <section id="panel-management" role="tabpanel" aria-labelledby="tab-management">
-            <label>
-              <input id="enabled" type="checkbox" />
-              Enable rules
-            </label>
-            <p id="rules-empty">Add a rule to select a service and connection method.</p>
-            <button id="rule-add" type="button">Add rule</button>
-            <div id="destination-rules"></div>
-            <details id="default-policy"><summary>Other destinations</summary>
-            <p>
-              Use the default strategy for these destinations.
+            <p id="rules-empty">
+              Add a rule to select a service and connection method.
             </p>
-
-            <h3>Service lists</h3>
-            <p>Choose services to include their domains and subnets. Saved lists update automatically every 24 hours.</p>
-            <div class="ocf-service-toolbar">
-              <label for="service-picker">Service</label>
-              <select id="service-picker"><option value="">Select a service</option></select>
-              <button id="service-add" type="button">Add</button>
-              <button id="service-refresh" type="button" class="ext-secondary" disabled>Update saved lists</button>
+            <button id="rule-add" type="button">
+              Add rule
+            </button>
+            <div id="destination-rules">
             </div>
-            <p id="service-result" role="status"></p>
-            <div id="service-lists"></div>
-            <details id="manual-destinations">
-              <summary>Custom addresses</summary>
-            <table class="FormTable ocf-config-table">
-              <tr>
-                <th>
-                  <label for="networks">
-                    IP addresses and subnets
-                  </label>
-                </th>
-                <td>
-                  <textarea id="networks" rows="4">
-                  </textarea>
-                  <p>
-                    One IPv4/IPv6 address or subnet per line.
-                  </p>
-                </td>
-              </tr>
-              <tr>
-                <th>
-                  <label for="domains">
-                    Domains
-                  </label>
-                </th>
-                <td>
-                  <textarea id="domains" rows="4">
-                  </textarea>
-                  <p>
-                    One domain per line.
-                  </p>
-                </td>
-              </tr>
-            </table>
-            </details>
-
-            </details>
+            <p id="unmatched-note" class="ext-muted">
+              Traffic outside these rules follows ASUS settings.
+            </p>
           </section>
-
-          <section id="panel-strategies" role="tabpanel" aria-labelledby="tab-strategies" hidden>
-            <label class="ext-field"><span>Apply strategy to</span><select id="strategy-scope"></select></label>
-        <details id="confirmed-history">
-          <summary>Confirmed strategies</summary>
-          <button id="history-refresh" type="button" class="ext-secondary">Refresh history</button>
-          <div id="history-results"></div>
-        </details>
-            <h2>Ready strategies</h2>
-            <table class="FormTable ocf-config-table">
-              <tr>
-                <th>
-                  <label for="preset">
-                    Preset
-                  </label>
-                </th>
-                <td>
-                  <select id="preset">
-                    <option value="">
-                      Custom settings
-                    </option>
-                  </select>
-                  <p id="preset-description">
-                    Choose a starting point, then apply or adjust its settings.
-                  </p>
-                </td>
-              </tr>
-            </table>
-            <dl class="ocf-strategy-summary">
-              <div>
-                <dt>
-                  TCP
-                </dt>
-                <dd id="summary-tcp">
-                  -
-                </dd>
-              </div>
-              <div>
-                <dt>
-                  UDP
-                </dt>
-                <dd id="summary-udp">
-                  -
-                </dd>
-              </div>
-              <div><dt>Applications</dt><dd id="summary-applications">Off</dd></div>
-            </dl>
-            <p id="application-ip-notice" class="ext-managed-notice" hidden>Application profiles need destination IPs. Add server IPs or select service lists containing subnets.</p>
-            <details id="custom-strategy">
-              <summary>
-                Customize strategy
-              </summary>
-              <h2>
-                TCP connections
-              </h2>
-              <table class="FormTable ocf-config-table">
-                <tr>
-                  <th>
-                    <label for="tcp_strategy">
-                      Strategy
-                    </label>
-                  </th>
-                  <td>
-                    <select id="tcp_strategy">
-                      <option value="off">
-                        Off
-                      </option>
-                      <option value="split">
-                        Split packets
-                      </option>
-                      <option value="disorder">
-                        Split and reorder packets
-                      </option>
-                      <option value="fake">
-                        Fake packets
-                      </option>
-                      <option value="fake-split">
-                        Fake packets and split
-                      </option>
-                      <option value="fake-disorder">
-                        Fake packets and reorder
-                      </option>
-                      <option value="fakedsplit">
-                        Interleave fake and real segments
-                      </option>
-                      <option value="fakeddisorder">
-                        Interleave and reorder segments
-                      </option>
-                      <option value="hostfakesplit">
-                        Split around a fake hostname
-                      </option>
-                    </select>
-                  </td>
-                </tr>
-                <tr>
-                  <th>
-                    <label for="tcp_ports">
-                      TCP ports
-                    </label>
-                  </th>
-                  <td>
-                    <input id="tcp_ports" type="text" />
-                    <p>
-                      Comma-separated port numbers. Up to 15 ports.
-                    </p>
-                  </td>
-                </tr>
-                <tr>
-                  <th>
-                    <label for="split_positions">
-                      Split positions
-                    </label>
-                  </th>
-                  <td>
-                    <input id="split_positions" type="text" maxlength="128" />
-                    <p>
-                      Byte positions or markers, separated by commas: 2, host, midsld+1. Interleaving strategies accept one position.
-                    </p>
-                  </td>
-                </tr>
-              </table>
-              <h2>
-                UDP connections
-              </h2>
-              <table class="FormTable ocf-config-table">
-                <tr>
-                  <th>
-                    <label for="udp_strategy">
-                      Strategy
-                    </label>
-                  </th>
-                  <td>
-                    <select id="udp_strategy">
-                      <option value="off">
-                        Off
-                      </option>
-                      <option value="fake-quic">
-                        QUIC fake packets
-                      </option>
-                    </select>
-                  </td>
-                </tr>
-                <tr>
-                  <th>
-                    <label for="udp_ports">
-                      UDP ports
-                    </label>
-                  </th>
-                  <td>
-                    <input id="udp_ports" type="text" />
-                  </td>
-                </tr>
-              </table>
-              <h3>Application profiles</h3>
-              <p>Application profiles use destination IPs and subnets. Ports may be individual numbers, ranges such as 50000-65535, or * for all ports.</p>
-              <div id="application-profiles"></div>
+          <div id="strategy-storage" hidden>
+            <section id="panel-strategies" hidden>
               <h3>
-                Packet settings
+                Bypass settings
               </h3>
-              <table class="FormTable ocf-config-table">
+              <table class="ocf-config-table">
                 <tr>
                   <th>
-                    <label for="sequence_overlap">
-                      TCP sequence overlap
+                    <label for="preset">
+                      Preset
                     </label>
                   </th>
                   <td>
-                    <input id="sequence_overlap" type="number" min="0" max="4096" />
-                    <p>
-                      Extra bytes before a split segment. Zero disables overlap.
-                    </p>
-                  </td>
-                </tr>
-                <tr>
-                  <th>
-                    <label for="fake_fooling">
-                      Fake TCP packet protection
-                    </label>
-                  </th>
-                  <td>
-                    <select id="fake_fooling">
-                      <option value="ttl">
-                        TTL only
-                      </option>
-                      <option value="badseq">
-                        TTL and out-of-window sequence
-                      </option>
-                      <option value="md5">
-                        TTL and TCP MD5 option
-                      </option>
-                      <option value="badsum">
-                        TTL and invalid checksum
+                    <select id="preset">
+                      <option value="">
+                        Custom settings
                       </option>
                     </select>
-                    <p>
-                      Helps the destination reject fake data. Applies only to fake TCP packets.
-                    </p>
-                  </td>
-                </tr>
-                <tr>
-                  <th>
-                    <label for="fake_sni">
-                      Fake hostname
-                    </label>
-                  </th>
-                  <td>
-                    <input id="fake_sni" type="text" maxlength="253" />
-                    <p>
-                      Optional hostname for fake TLS or hostname-splitting strategies. Empty uses the strategy default.
-                    </p>
-                  </td>
-                </tr>
-                <tr>
-                  <th>
-                    <label for="fake_ttl">
-                      Fake packet TTL
-                    </label>
-                  </th>
-                  <td>
-                    <input id="fake_ttl" type="number" min="1" max="255" />
-                    <p>
-                      Also used as fallback when automatic TTL cannot be determined.
-                    </p>
-                  </td>
-                </tr>
-                <tr>
-                  <th>
-                    <label for="auto_ttl">
-                      Automatic TTL
-                    </label>
-                  </th>
-                  <td>
-                    <label>
-                      <input id="auto_ttl" type="checkbox" />
-                      Estimate from server replies
-                    </label>
-                  </td>
-                </tr>
-                <tr>
-                  <th>
-                    <label for="auto_ttl_delta">
-                      TTL distance adjustment
-                    </label>
-                  </th>
-                  <td>
-                    <input id="auto_ttl_delta" type="number" min="-20" max="20" />
-                    <p>
-                      Negative values expire fake packets before the estimated destination.
-                    </p>
-                  </td>
-                </tr>
-                <tr>
-                  <th>
-                    <label for="auto_ttl_min">
-                      Minimum automatic TTL
-                    </label>
-                  </th>
-                  <td>
-                    <input id="auto_ttl_min" type="number" min="1" max="255" />
-                  </td>
-                </tr>
-                <tr>
-                  <th>
-                    <label for="auto_ttl_max">
-                      Maximum automatic TTL
-                    </label>
-                  </th>
-                  <td>
-                    <input id="auto_ttl_max" type="number" min="1" max="255" />
-                  </td>
-                </tr>
-                <tr>
-                  <th>
-                    <label for="fake_repeats">
-                      Fake packet repeats
-                    </label>
-                  </th>
-                  <td>
-                    <input id="fake_repeats" type="number" min="1" max="20" />
-                    <p>
-                      Applies to standalone TCP fakes and QUIC fakes.
-                    </p>
-                  </td>
-                </tr>
-                <tr>
-                  <th>
-                    <label for="packet_limit">
-                      Initial packets inspected
-                    </label>
-                  </th>
-                  <td>
-                    <input id="packet_limit" type="number" min="4" max="64" />
-                    <p>
-                      Per direction, per connection. Increase for larger handshakes; higher values add processing overhead.
+                    <p id="preset-description">
+                      Choose a preset or adjust the settings.
                     </p>
                   </td>
                 </tr>
               </table>
-            </details>
-          </section>
-          <div class="apply_gen ocf-save-bar">
+              <details id="confirmed-history">
+                <summary>
+                  Saved finder results
+                </summary>
+                <button id="history-refresh" type="button" class="ext-secondary">
+                  Refresh history
+                </button>
+                <div id="history-results">
+                </div>
+              </details>
+              <dl class="ocf-strategy-summary">
+                <div>
+                  <dt>
+                    TCP
+                  </dt>
+                  <dd id="summary-tcp">
+                    -
+                  </dd>
+                </div>
+                <div>
+                  <dt>
+                    UDP
+                  </dt>
+                  <dd id="summary-udp">
+                    -
+                  </dd>
+                </div>
+                <div>
+                  <dt>
+                    Applications
+                  </dt>
+                  <dd id="summary-applications">
+                    Off
+                  </dd>
+                </div>
+              </dl>
+              <p id="application-ip-notice" class="ext-managed-notice" hidden>
+                Application profiles need destination IPs. Add server IPs or select service lists containing subnets.
+              </p>
+              <details id="custom-strategy">
+                <summary>
+                  Advanced settings
+                </summary>
+                <h2>
+                  TCP connections
+                </h2>
+                <table class="ocf-config-table">
+                  <tr>
+                    <th>
+                      <label for="tcp_strategy">
+                        Strategy
+                      </label>
+                    </th>
+                    <td>
+                      <select id="tcp_strategy">
+                        <option value="off">
+                          Off
+                        </option>
+                        <option value="split">
+                          Split packets
+                        </option>
+                        <option value="disorder">
+                          Split and reorder packets
+                        </option>
+                        <option value="fake">
+                          Fake packets
+                        </option>
+                        <option value="fake-split">
+                          Fake packets and split
+                        </option>
+                        <option value="fake-disorder">
+                          Fake packets and reorder
+                        </option>
+                        <option value="fakedsplit">
+                          Interleave fake and real segments
+                        </option>
+                        <option value="fakeddisorder">
+                          Interleave and reorder segments
+                        </option>
+                        <option value="hostfakesplit">
+                          Split around a fake hostname
+                        </option>
+                      </select>
+                    </td>
+                  </tr>
+                  <tr>
+                    <th>
+                      <label for="tcp_ports">
+                        TCP ports
+                      </label>
+                    </th>
+                    <td>
+                      <input id="tcp_ports" type="text" />
+                      <p>
+                        Comma-separated port numbers. Up to 15 ports.
+                      </p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <th>
+                      <label for="split_positions">
+                        Split positions
+                      </label>
+                    </th>
+                    <td>
+                      <input id="split_positions" type="text" maxlength="128" />
+                      <p>
+                        Byte positions or markers, separated by commas: 2, host, midsld+1. Interleaving strategies accept one position.
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+                <h2>
+                  UDP connections
+                </h2>
+                <table class="ocf-config-table">
+                  <tr>
+                    <th>
+                      <label for="udp_strategy">
+                        Strategy
+                      </label>
+                    </th>
+                    <td>
+                      <select id="udp_strategy">
+                        <option value="off">
+                          Off
+                        </option>
+                        <option value="fake-quic">
+                          QUIC fake packets
+                        </option>
+                      </select>
+                    </td>
+                  </tr>
+                  <tr>
+                    <th>
+                      <label for="udp_ports">
+                        UDP ports
+                      </label>
+                    </th>
+                    <td>
+                      <input id="udp_ports" type="text" />
+                    </td>
+                  </tr>
+                </table>
+                <h3>
+                  Application profiles
+                </h3>
+                <p>
+                  Application profiles use destination IPs and subnets. Ports may be individual numbers, ranges such as 50000-65535, or * for all ports.
+                </p>
+                <div id="application-profiles">
+                </div>
+                <h3>
+                  Packet settings
+                </h3>
+                <table class="ocf-config-table">
+                  <tr>
+                    <th>
+                      <label for="sequence_overlap">
+                        TCP sequence overlap
+                      </label>
+                    </th>
+                    <td>
+                      <input id="sequence_overlap" type="number" min="0" max="4096" />
+                      <p>
+                        Extra bytes before a split segment. Zero disables overlap.
+                      </p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <th>
+                      <label for="fake_fooling">
+                        Fake TCP packet protection
+                      </label>
+                    </th>
+                    <td>
+                      <select id="fake_fooling">
+                        <option value="ttl">
+                          TTL only
+                        </option>
+                        <option value="badseq">
+                          TTL and out-of-window sequence
+                        </option>
+                        <option value="md5">
+                          TTL and TCP MD5 option
+                        </option>
+                        <option value="badsum">
+                          TTL and invalid checksum
+                        </option>
+                      </select>
+                      <p>
+                        Helps the destination reject fake data. Applies only to fake TCP packets.
+                      </p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <th>
+                      <label for="fake_sni">
+                        Fake hostname
+                      </label>
+                    </th>
+                    <td>
+                      <input id="fake_sni" type="text" maxlength="253" />
+                      <p>
+                        Optional hostname for fake TLS or hostname-splitting strategies. Empty uses the strategy default.
+                      </p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <th>
+                      <label for="fake_ttl">
+                        Fake packet TTL
+                      </label>
+                    </th>
+                    <td>
+                      <input id="fake_ttl" type="number" min="1" max="255" />
+                      <p>
+                        Also used as fallback when automatic TTL cannot be determined.
+                      </p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <th>
+                      <label for="auto_ttl">
+                        Automatic TTL
+                      </label>
+                    </th>
+                    <td>
+                      <label>
+                        <input id="auto_ttl" type="checkbox" />
+                        Estimate from server replies
+                      </label>
+                    </td>
+                  </tr>
+                  <tr>
+                    <th>
+                      <label for="auto_ttl_delta">
+                        TTL distance adjustment
+                      </label>
+                    </th>
+                    <td>
+                      <input id="auto_ttl_delta" type="number" min="-20" max="20" />
+                      <p>
+                        Negative values expire fake packets before the estimated destination.
+                      </p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <th>
+                      <label for="auto_ttl_min">
+                        Minimum automatic TTL
+                      </label>
+                    </th>
+                    <td>
+                      <input id="auto_ttl_min" type="number" min="1" max="255" />
+                    </td>
+                  </tr>
+                  <tr>
+                    <th>
+                      <label for="auto_ttl_max">
+                        Maximum automatic TTL
+                      </label>
+                    </th>
+                    <td>
+                      <input id="auto_ttl_max" type="number" min="1" max="255" />
+                    </td>
+                  </tr>
+                  <tr>
+                    <th>
+                      <label for="fake_repeats">
+                        Fake packet repeats
+                      </label>
+                    </th>
+                    <td>
+                      <input id="fake_repeats" type="number" min="1" max="20" />
+                      <p>
+                        Applies to standalone TCP fakes and QUIC fakes.
+                      </p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <th>
+                      <label for="packet_limit">
+                        Initial packets inspected
+                      </label>
+                    </th>
+                    <td>
+                      <input id="packet_limit" type="number" min="4" max="64" />
+                      <p>
+                        Per direction, per connection. Increase for larger handshakes; higher values add processing overhead.
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+              </details>
+            </section>
+          </div>
+          <div id="save-bar" class="apply_gen ocf-save-bar" hidden>
             <span id="unsaved" role="status" hidden>
               Unsaved changes
             </span>
             <button type="submit">
-              Apply
+              Save changes
             </button>
             <button id="reload" type="button" class="ext-secondary">
-              Reload
+              Cancel changes
             </button>
             <p id="result" role="status">
             </p>
@@ -421,12 +399,16 @@
         <p>
           Choose a service to test.
         </p>
-        <label class="ext-field"><span>Apply result to</span><select id="scan-scope"></select></label>
-        <table class="FormTable ocf-config-table">
+        <p id="scan-context" class="ocf-context" hidden>
+        </p>
+        <h3>
+          1. What to test
+        </h3>
+        <table class="ocf-config-table">
           <tr>
             <th>
               <label for="scan-target">
-                Suggested targets
+                Service or site
               </label>
             </th>
             <td>
@@ -449,148 +431,283 @@
           </tr>
           <tr>
             <th>
-              <label for="scan-port">
-                Service port
+              <label for="scan-protocol">
+                Test protocol
               </label>
             </th>
             <td>
-              <input id="scan-port" type="number" min="1" max="65535" value="443" />
-            </td>
-          </tr>
-          <tr>
-            <th>
-              <label for="scan-protocol">Test protocol</label>
-            </th>
-            <td>
               <select id="scan-protocol">
-                <option value="https">HTTPS / TCP</option>
-                <option value="https12">HTTPS / TLS 1.2</option>
-                <option value="http">HTTP / TCP</option>
-                <option value="http3">HTTP/3 / QUIC</option>
-                <option value="stun">STUN / calls</option>
+                <option value="https">
+                  HTTPS / TCP
+                </option>
+                <option value="https12">
+                  HTTPS / TLS 1.2
+                </option>
+                <option value="http">
+                  HTTP / TCP
+                </option>
+                <option value="http3">
+                  HTTP/3 / QUIC
+                </option>
+                <option value="stun">
+                  STUN / calls
+                </option>
               </select>
             </td>
           </tr>
-          <tr id="scan-path-row">
-            <th>
-              <label for="scan-path">Download path</label>
-            </th>
-            <td>
-              <input id="scan-path" type="text" maxlength="512" value="/" />
-            </td>
-          </tr>
         </table>
-        <button id="scan-add-target" type="button" class="ext-secondary">Add target</button>
-        <div id="scan-targets"></div>
-        <p>Up to four test targets.</p>
+        <details id="scan-advanced">
+          <summary>
+            Advanced test settings
+          </summary>
+          <table class="ocf-config-table">
+            <tr>
+              <th>
+                <label for="scan-port">
+                  Service port
+                </label>
+              </th>
+              <td>
+                <input id="scan-port" type="number" min="1" max="65535" value="443" />
+              </td>
+            </tr>
+            <tr id="scan-path-row">
+              <th>
+                <label for="scan-path">
+                  Download path
+                </label>
+              </th>
+              <td>
+                <input id="scan-path" type="text" maxlength="512" value="/" />
+              </td>
+            </tr>
+          </table>
+        </details>
+        <button id="scan-add-target" type="button" class="ext-secondary">
+          Add address
+        </button>
+        <div id="scan-targets">
+        </div>
+        <p>
+          Up to four test targets.
+        </p>
         <div class="apply_gen">
           <button id="scan-start" type="button">
-            Start test
+            Start search
           </button>
-          <button id="scan-cancel" type="button" class="ext-secondary" disabled>
+          <button id="scan-cancel" type="button" class="ext-secondary" disabled hidden>
             Cancel
           </button>
         </div>
         <p id="scan-state" role="status">
         </p>
-        <div class="ext-table-scroll">
-          <table class="FormTable">
-            <thead>
-              <tr>
-                <th>
-                  Preset
-                </th>
-                <th>
-                  Successful attempts
-                </th>
-                <th>
-                  Test duration
-                </th>
-                <th>
-                  Transfer and details
-                </th>
-                <th>
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody id="scan-results">
-            </tbody>
-          </table>
-        </div>
-        <p>
-          Select a result, then apply it to the chosen rule.
-        </p>
-
+        <section id="scan-result-section" hidden>
+          <h3>
+            2. Choose a result
+          </h3>
+          <div class="ext-table-scroll">
+            <table class="ocf-finder-table">
+              <thead>
+                <tr>
+                  <th>
+                    Preset
+                  </th>
+                  <th>
+                    Successful attempts
+                  </th>
+                  <th>
+                    Test duration
+                  </th>
+                  <th>
+                    Details
+                  </th>
+                  <th>
+                    Select result
+                  </th>
+                </tr>
+              </thead>
+              <tbody id="scan-results">
+              </tbody>
+            </table>
+          </div>
+          <div id="scan-selected-actions" hidden>
+            <label class="ext-field">
+              <span>
+                Use for rule
+              </span>
+              <select id="scan-scope">
+              </select>
+            </label>
+            <div class="ocf-rule-actions">
+              <button id="scan-use" type="button">
+                Use in rule
+              </button>
+              <button id="scan-confirm" type="button" class="ext-secondary">
+                Check again
+              </button>
+            </div>
+            <details id="scan-improve">
+              <summary>
+                Improve result
+              </summary>
+              <p>
+                Try variations of the selected strategy.
+              </p>
+              <button id="scan-refine" type="button" class="ext-secondary">
+                Refine settings
+              </button>
+              <button id="scan-simplify" type="button" class="ext-secondary">
+                Simplify settings
+              </button>
+            </details>
+          </div>
+        </section>
         <details>
-          <summary>About this test</summary>
-          <p>Checks cover selected endpoints, not every feature of a service.</p>
-          <p>A short response does not measure download performance.</p>
+          <summary>
+            About this test
+          </summary>
+          <p>
+            Checks cover selected endpoints, not every feature of a service.
+          </p>
+          <p>
+            A short response does not measure download performance.
+          </p>
         </details>
       </section>
       <section id="panel-diagnostics" role="tabpanel" aria-labelledby="tab-diagnostics" hidden>
-        <h2>Availability</h2>
-            <details id="monitor-settings">
-              <summary>Check settings</summary>
-              <label><input id="monitor-enabled" type="checkbox" /> Enable scheduled checks</label>
-              <label class="ext-field"><span>Check interval in minutes</span><input id="monitor-interval" type="number" min="5" max="1440" value="15" /></label>
-              <label class="ext-field"><span>Test addresses</span><textarea id="monitor-targets-input" rows="3" placeholder="https://example.com/"></textarea></label>
-              <p id="monitor-target-count"></p>
-              <p>Checks do not change your settings.</p>
-              <button id="monitor-save" type="button">Save checks</button>
-              <p id="monitor-result" role="status"></p>
-            </details>
-        <p id="health-state" role="status"></p>
-        <p><span>Last check</span>: <span id="health-time">-</span></p>
-        <button id="health-check" type="button" class="ext-secondary">Check now</button>
-        <div id="health-results"></div>
         <div class="ext-card-heading">
-          <h2>Diagnostics</h2>
-          <button id="copy-report" type="button" class="ext-secondary">Copy report</button>
+          <h2>
+            Diagnostics
+          </h2>
+          <button id="copy-report" type="button" class="ext-secondary">
+            Copy report
+          </button>
         </div>
-        <p id="report-result" role="status"></p>
-        <textarea id="diagnostic-report" rows="8" aria-label="Diagnostic report" readonly hidden></textarea>
-        <dl class="ocf-diagnostics">
-          <div>
-            <dt>
-              Module version
-            </dt>
-            <dd id="diagnostic-version">
-              -
-            </dd>
-          </div>
-          <div>
-            <dt>
-              Engine version
-            </dt>
-            <dd id="diagnostic-engine">
-              -
-            </dd>
-          </div>
-          <div>
-            <dt>
-              Saved IP addresses and subnets
-            </dt>
-            <dd id="diagnostic-networks">
-              -
-            </dd>
-          </div>
-          <div>
-            <dt>
-              Saved domains
-            </dt>
-            <dd id="diagnostic-domains">
-              -
-            </dd>
-          </div>
-        </dl>
-        <details>
-          <summary>
-            Processing scope
-          </summary>
-          <p>
-            Rules apply to WAN traffic. Existing VPN assignments are preserved.
+        <p id="report-result" role="status">
+        </p>
+        <textarea id="diagnostic-report" rows="8" aria-label="Diagnostic report" readonly hidden>
+        </textarea>
+        <section class="ocf-diagnostic-section">
+          <h3>
+            Rule operation
+          </h3>
+          <p id="diagnostic-problem" role="status" hidden>
           </p>
+          <div id="diagnostic-rules">
+          </div>
+        </section>
+        <section class="ocf-diagnostic-section">
+          <h3>
+            Availability checks
+          </h3>
+          <div id="monitor-settings-home">
+            <details id="monitor-settings">
+              <summary>
+                Check settings
+              </summary>
+              <label>
+                <input id="monitor-enabled" type="checkbox" />
+                Enable scheduled checks
+              </label>
+              <label class="ext-field">
+                <span>
+                  Check interval in minutes
+                </span>
+                <input id="monitor-interval" type="number" min="5" max="1440" value="15" />
+              </label>
+              <label class="ext-field">
+                <span>
+                  Test addresses
+                </span>
+                <textarea id="monitor-targets-input" rows="3" placeholder="https://example.com/">
+                </textarea>
+              </label>
+              <p id="monitor-target-count">
+              </p>
+              <button id="monitor-save" type="button">
+                Save checks
+              </button>
+              <p id="monitor-result" role="status">
+              </p>
+            </details>
+          </div>
+          <p id="health-state" role="status">
+          </p>
+          <p>
+            <span>
+              Last check
+            </span>
+            :
+            <span id="health-time">
+              -
+            </span>
+          </p>
+          <button id="health-check" type="button" class="ext-secondary">
+            Check now
+          </button>
+          <div id="health-results">
+          </div>
+        </section>
+        <details id="technical-details">
+          <summary>
+            Technical details
+          </summary>
+          <details id="list-details">
+            <summary>
+              Service lists
+            </summary>
+            <button id="service-refresh" type="button" class="ext-secondary" disabled>
+              Update saved lists
+            </button>
+            <p id="service-result" role="status">
+            </p>
+            <div id="service-lists">
+            </div>
+          </details>
+          <pre id="queue-details">
+          </pre>
+          <dl class="ocf-diagnostics">
+            <div>
+              <dt>
+                Module version
+              </dt>
+              <dd id="diagnostic-version">
+                -
+              </dd>
+            </div>
+            <div>
+              <dt>
+                Engine version
+              </dt>
+              <dd id="diagnostic-engine">
+                -
+              </dd>
+            </div>
+            <div>
+              <dt>
+                Saved IP addresses and subnets
+              </dt>
+              <dd id="diagnostic-networks">
+                -
+              </dd>
+            </div>
+            <div>
+              <dt>
+                Saved domains
+              </dt>
+              <dd id="diagnostic-domains">
+                -
+              </dd>
+            </div>
+          </dl>
+          <details>
+            <summary>
+              Processing scope
+            </summary>
+            <p>
+              Rules apply to WAN traffic. Existing VPN assignments are preserved.
+            </p>
+          </details>
         </details>
       </section>
     </main>
@@ -598,11 +715,16 @@
     </script>
     <script src="targets.js">
     </script>
-    <script src="lists.js"></script>
-    <script src="applications.js"></script>
-    <script src="discovery.js"></script>
-    <script src="rules.js"></script>
-    <script src="monitoring.js"></script>
+    <script src="lists.js">
+    </script>
+    <script src="applications.js">
+    </script>
+    <script src="discovery.js">
+    </script>
+    <script src="rules.js">
+    </script>
+    <script src="monitoring.js">
+    </script>
     <script src="app.js">
     </script>
     <script src="translations.js">

@@ -183,7 +183,8 @@ function updateApplicationSummary() {
     summary.textContent = "Off";
   }
 
-  const manualIPs = document.getElementById("networks").value.trim() !== "";
-  const serviceIPs = currentServiceStatuses.some((status) => selectedServiceLists.includes(status.id) && status.networks > 0);
+  const activeRule = draftRules.find((rule) => rule.id === strategyScope);
+  const manualIPs = Boolean(activeRule?.networks?.length);
+  const serviceIPs = currentServiceStatuses.some((status) => activeRule?.lists?.includes(status.id) && status.networks > 0);
   document.getElementById("application-ip-notice").hidden = count === 0 || manualIPs || serviceIPs;
 }

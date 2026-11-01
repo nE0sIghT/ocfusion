@@ -65,8 +65,8 @@ func ruleConfig(base Config, rule DestinationRule) Config {
 }
 
 func validateRules(c *Config) error {
-	if len(c.Rules) > 6 {
-		return errors.New("at most six destination rules")
+	if len(c.Rules) > 7 || (len(c.Rules) == 7 && len(c.Networks)+len(c.Domains)+len(c.Lists) > 0) {
+		return errors.New("at most seven destination rules")
 	}
 	seen := map[string]bool{}
 	for i := range c.Rules {

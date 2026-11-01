@@ -756,16 +756,28 @@ call success. Verify these with the actual client and selected destinations.
 
 ### Ordered destination rules
 
-Configuration `rules` accepts up to six objects with stable `id`, user-visible
+Configuration `rules` accepts up to seven objects with stable `id`, user-visible
 `name`, `enabled`, `domains`, `networks`, `lists`, `action` and `settings`.
 `action` defaults to `dpi`; `normal` bypasses packet processing, while `vpn`
 adds a discovered `target` and `failure` (`block`, the default, or `wan`). Settings accept
 only the module's bounded strategy/port fields; routing, lifecycle and selector
 fields cannot be injected into a strategy. Manual selectors retain normal
 validation and the complete platform configuration remains limited to 16 KiB.
-The Rules page edits destinations and connection method together. DPI strategy
-selection and finder results have an explicit rule/default destination. Edits
-remain drafts until Apply.
+The module UI has Rules, Strategy finder and Diagnostics sections. Each rule
+editor contains its destinations, connection method and contextual DPI settings.
+Finder results can update an existing DPI rule or create a new one; refinement
+and repeated tests require an explicitly selected result. Edits remain drafts
+until Save changes. The header pause/resume control applies to all rules and
+preserves their configuration independently of the platform module lifecycle.
+The module uses OCFusion's shared dark controls, orange actions and table
+palette consistently across stock ASUS themes. Rule check setup opens the
+shared check form inline without changing tabs; its schedule and target limit
+remain module-wide.
+
+Existing top-level destination selection is displayed as a final ordinary rule
+with its original strategy. An explicit save writes it into `rules` and clears
+top-level destinations, preserving processing order. The combined limit is seven
+rules including any nonempty top-level selection.
 
 Enabled rules run in array order before default selection. Domains and IPs
 within one rule are OR selectors. The first matching rule owns that destination;

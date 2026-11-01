@@ -70,7 +70,11 @@
 }
 @media (max-width: 520px) {
   .ocf-tabs button {
-    flex: 1 1 40%;
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 8px 6px;
+    font-size: 13px;
+    white-space: nowrap;
   }
 }
 
@@ -204,12 +208,6 @@
   align-items: center;
   gap: 8px;
 }
-#default-policy {
-  margin-top: 24px;
-}
-#default-policy > summary {
-  padding: 12px 0;
-}
 .ocf-result-actions {
   margin-top: 8px;
 }
@@ -226,4 +224,154 @@
 #monitor-targets-input {
   width: 100%;
   box-sizing: border-box;
+}
+
+.ocf-module-control {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 12px 0;
+}
+.ocf-module-control button,
+.ocf-rule-table button,
+.ocf-rule-actions button {
+  float: none;
+  width: auto;
+  min-width: 100px;
+  white-space: nowrap;
+  word-break: normal;
+  overflow-wrap: normal;
+  margin: 0;
+}
+.ocf-rule-table {
+  table-layout: auto;
+  border-collapse: collapse;
+}
+.ocf-rule-table th,
+.ocf-rule-table td {
+  padding: 12px 8px;
+  text-align: left;
+  vertical-align: middle;
+}
+.ocf-rule-table th:first-child,
+.ocf-rule-table td:first-child {
+  width: 40px;
+}
+.ocf-rule-table th:last-child,
+.ocf-rule-table td:last-child {
+  width: 105px;
+  min-width: 105px;
+  white-space: nowrap;
+}
+.ocf-rule-table td:nth-child(3) {
+  max-width: 200px;
+}
+.ocf-rule-editor {
+  border-top: 0;
+  margin-top: 0;
+}
+.ocf-rule-editor > h2 {
+  margin-top: 0;
+}
+#panel-strategies {
+  border-top: 1px solid var(--ext-line);
+  padding-top: 12px;
+}
+.ocf-diagnostic-section {
+  padding: 12px 0 20px;
+  border-bottom: 1px solid var(--ext-line);
+}
+.ocf-diagnostic-rule {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) 1fr 1fr;
+  gap: 12px;
+  padding: 12px 0;
+}
+#scan-result-section,
+#technical-details {
+  margin-top: 24px;
+}
+#scan-selected-actions {
+  padding: 16px 0;
+}
+#scan-improve button {
+  margin: 8px 8px 8px 0;
+}
+#scan-results tr[data-selected="true"] {
+  background: var(--ext-panel);
+  outline: 1px solid var(--ext-accent);
+}
+.ocf-context {
+  font-weight: bold;
+  border-left: 3px solid var(--ext-accent);
+  padding-left: 12px;
+}
+#diagnostic-problem {
+  color: var(--ext-accent);
+}
+@media (max-width: 640px) {
+  .ocf-rule-table thead {
+    display: none;
+  }
+  .ocf-rule-table,
+  .ocf-rule-table tbody,
+  .ocf-rule-table tr {
+    display: block;
+    width: 100%;
+  }
+  .ocf-rule-table tr {
+    padding: 12px 0;
+    border-bottom: 1px solid var(--ext-line);
+  }
+  .ocf-rule-table td,
+  .ocf-rule-table td:first-child,
+  .ocf-rule-table td:last-child,
+  .ocf-rule-table td:nth-child(2),
+  .ocf-rule-table td:nth-child(3) {
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    width: auto;
+    max-width: none;
+    min-width: 0;
+    border: 0;
+    padding: 6px 8px;
+  }
+  .ocf-rule-table td small {
+    flex-basis: 100%;
+    text-align: right;
+  }
+  .ocf-rule-table td::before {
+    content: attr(data-label);
+    color: var(--ext-muted);
+    flex: 0 0 128px;
+    font-weight: normal;
+    overflow-wrap: normal;
+    word-break: normal;
+  }
+  .ocf-diagnostic-rule {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+}
+
+.ocf-rule-table th:not(:first-child):not(:last-child) {
+  width: auto;
+}
+
+.ocf-finder-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.ocf-finder-table th,
+.ocf-finder-table td {
+  padding: 12px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+.ocf-finder-table th:first-child {
+  width: 38%;
 }

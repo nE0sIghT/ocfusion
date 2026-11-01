@@ -33,14 +33,31 @@ function rememberStrategyScope() {
 
   if (rule) {
     rule.settings = settings;
-  } else {
-    draftBaseStrategy = settings;
   }
 }
 
 let vpnTargets = [];
 let editingRule = "";
 let latestRouteStates = [];
+let savedRuleRows = [];
+let runtimeRuleIDs = {};
+let latestModuleState = "DISABLED";
+
+function translated(text) {
+  return window.OCF_I18N ? window.OCF_I18N.translate(text, window.OCF_I18N.language) : text;
+}
+
+function openRule(id) {
+  rememberStrategyScope();
+  editingRule = id;
+  const rule = draftRules.find((entry) => entry.id === id);
+  if (rule && (!rule.action || rule.action === "dpi")) {
+    showStrategyScope(id);
+  }
+  selectTab("management");
+  renderRules();
+}
+
 
 function connectionMethod(rule) {
   if (rule.action === "vpn") {
@@ -50,27 +67,23 @@ function connectionMethod(rule) {
 }
 
 function renderStrategyScopes() {
-  for (const id of ["strategy-scope", "scan-scope"]) {
-    const select = document.getElementById(id);
-    const selected = id === "strategy-scope" ? strategyScope : select.value;
-    select.replaceChildren();
-    const base = document.createElement("option");
-    base.value = "";
-    base.textContent = "Default strategy";
-    select.appendChild(base);
-
-    for (const rule of draftRules) {
-      if (rule.action && rule.action !== "dpi") {
-        continue;
-      }
-      const option = document.createElement("option");
-      option.value = rule.id;
-      option.textContent = rule.name;
-      select.appendChild(option);
+  const select = document.getElementById("scan-scope");
+  const selected = select.value;
+  select.replaceChildren();
+  const empty = document.createElement("option");
+  empty.value = "";
+  empty.textContent = "New rule";
+  select.appendChild(empty);
+  for (const rule of draftRules) {
+    if (rule.action && rule.action !== "dpi") {
+      continue;
     }
-
-    select.value = [...select.options].some((option) => option.value === selected) ? selected : "";
+    const option = document.createElement("option");
+    option.value = rule.id;
+    option.textContent = rule.name;
+    select.appendChild(option);
   }
+  select.value = [...select.options].some((option) => option.value === selected) ? selected : "";
 }
 
 function showStrategyScope(id) {
@@ -79,6 +92,7 @@ function showStrategyScope(id) {
   const dirty = settingsDirty;
   fillStrategySettings({name: "Custom strategy settings", protocol: "combined", settings});
   document.getElementById("split_positions").value = settings.split_positions || String(settings.split_position || 2);
+  document.getElementById("preset-description").hidden = true;
   setDirty(dirty);
   renderStrategyScopes();
 }
@@ -88,6 +102,16 @@ function initializeRules(saved) {
   editingRule = "";
   draftBaseStrategy = readStrategyForm();
   draftRules = structuredClone(saved || []);
+  runtimeRuleIDs = {};
+  if (config.lists?.length || config.domains?.length || config.networks?.length) {
+    let id = "main";
+    while (draftRules.some((rule) => rule.id === id)) {
+      id += "-x";
+    }
+    draftRules.push({id, name: translated("Main rule"), enabled: true, action: "dpi", lists: [...(config.lists || [])], domains: [...(config.domains || [])], networks: [...(config.networks || [])], settings: structuredClone(draftBaseStrategy)});
+    runtimeRuleIDs[id] = "default";
+  }
+  savedRuleRows = structuredClone(draftRules);
 
   for (const rule of draftRules) {
     rule.settings = {...structuredClone(draftBaseStrategy), ...rule.settings};
@@ -100,10 +124,16 @@ function initializeRules(saved) {
 
 function destinationRulesConfig() {
   rememberStrategyScope();
+  if (draftRules.some((rule) => rule.enabled && !(rule.lists?.length || rule.domains?.length || rule.networks?.length))) {
+    throw new Error("Choose at least one destination");
+  }
   if (draftRules.some((rule) => rule.action === "vpn" && !rule.target)) {
     throw new Error("Select a VPN");
   }
-  return structuredClone(draftRules);
+  return draftRules.map((rule) => ({
+    ...structuredClone(rule),
+    settings: Object.fromEntries(Object.entries(rule.settings || {}).filter(([key, value]) => JSON.stringify(value) !== JSON.stringify(draftBaseStrategy[key]))),
+  }));
 }
 
 async function refreshVPNTargets() {
@@ -161,6 +191,10 @@ function addRuleField(card, rule, key, title, multiline) {
   const input = document.createElement(multiline ? "textarea" : "input");
   input.value = multiline ? (rule[key] || []).join("\n") : rule[key];
   input.dataset.ruleField = key;
+  if (key === "name") {
+    input.required = true;
+    input.maxLength = 64;
+  }
   if (multiline) {
     input.rows = 3;
   }
@@ -188,11 +222,20 @@ function ruleButton(label, action, disabled = false) {
 function findForRule(rule) {
   rememberStrategyScope();
   document.getElementById("scan-scope").value = rule.id;
+  const context = document.getElementById("scan-context");
+  context.textContent = rule.name;
+  context.hidden = false;
+  discoveryTargets = [];
+  renderDiscoveryTargets();
   const suggested = moduleCatalog?.lists?.find((service) => rule.lists?.includes(service.id));
   const host = rule.domains?.[0];
   if (host) {
-    discoveryTargets = [{host, port: 443, protocol: "https", path: "/"}];
-    renderDiscoveryTargets();
+    document.getElementById("scan-host").value = host;
+    document.getElementById("scan-target").value = "";
+    document.getElementById("scan-protocol").value = "https";
+    document.getElementById("scan-port").value = "443";
+    document.getElementById("scan-path").value = "/";
+    document.getElementById("scan-path-row").hidden = false;
   } else if (suggested) {
     const group = [...document.getElementById("scan-target").querySelectorAll("optgroup")].find((entry) => entry.label === suggested.name);
     const option = group?.querySelector("option");
@@ -210,18 +253,16 @@ function renderRuleEditor(root, rule) {
   card.dataset.ruleId = rule.id;
   const heading = document.createElement("h2");
   heading.textContent = "Edit rule";
-  card.appendChild(heading);
+  const title = document.createElement("div");
+  title.className = "ext-card-heading";
+  title.appendChild(heading);
+  title.appendChild(ruleButton("Back to rules", () => {
+    rememberStrategyScope();
+    editingRule = "";
+    renderRules();
+  }));
+  card.appendChild(title);
   addRuleField(card, rule, "name", "Rule name", false);
-  const enabled = document.createElement("input");
-  enabled.type = "checkbox";
-  enabled.checked = rule.enabled;
-  enabled.addEventListener("change", () => {
-    rule.enabled = enabled.checked;
-    updateRuleRows();
-    setDirty(true);
-  });
-  fieldLabel(card, "Enable rule", enabled);
-
   const services = document.createElement("div");
   services.className = "ocf-service-choices";
   const legend = document.createElement("h3");
@@ -244,7 +285,7 @@ function renderRuleEditor(root, rule) {
   const summary = document.createElement("summary");
   summary.textContent = "Custom addresses";
   custom.appendChild(summary);
-  custom.open = Boolean(rule.domains?.length || rule.networks?.length);
+  custom.open = false;
   addRuleField(custom, rule, "domains", "Domains", true);
   addRuleField(custom, rule, "networks", "IP addresses and subnets", true);
   card.appendChild(custom);
@@ -267,9 +308,7 @@ function renderRuleEditor(root, rule) {
     } else {
       rule.failure = "block";
     }
-    if (strategyScope === rule.id && rule.action !== "dpi") {
-      showStrategyScope("");
-    }
+    showStrategyScope(rule.action === "dpi" ? rule.id : "");
     renderRules();
     renderStrategyScopes();
     setDirty(true);
@@ -301,24 +340,14 @@ function renderRuleEditor(root, rule) {
       setDirty(true);
     });
     fieldLabel(card, "If VPN is unavailable", failure);
-    const note = document.createElement("p");
-    note.className = "ext-muted";
-    note.textContent = "Applies to WAN traffic. Domains use periodically refreshed IP addresses; shared IPs may include other sites.";
-    card.appendChild(note);
-    const ipv6 = document.createElement("p");
-    ipv6.className = "ext-muted";
-    ipv6.textContent = "IPv6 to selected addresses is blocked while using an IPv4 VPN.";
-    card.appendChild(ipv6);
   } else if (rule.action !== "normal") {
     const actions = document.createElement("div");
     actions.className = "ocf-rule-actions";
-    actions.appendChild(ruleButton("Choose strategy", () => {
-      rememberStrategyScope();
-      showStrategyScope(rule.id);
-      selectTab("strategies");
-    }));
     actions.appendChild(ruleButton("Find a strategy", () => findForRule(rule)));
     card.appendChild(actions);
+    const strategy = document.getElementById("panel-strategies");
+    strategy.hidden = false;
+    card.appendChild(strategy);
   }
 
   const actions = document.createElement("div");
@@ -344,12 +373,41 @@ function renderRuleEditor(root, rule) {
     renderStrategyScopes();
     setDirty(true);
   }));
-  actions.appendChild(ruleButton("Done", () => {
-    editingRule = "";
-    renderRules();
-  }));
   card.appendChild(actions);
+  const checksSlot = document.createElement("section");
+  checksSlot.id = "rule-checks-slot";
+  checksSlot.hidden = true;
+  card.appendChild(checksSlot);
   root.appendChild(card);
+}
+
+function effectiveRuleStatus(rule, dirty = false) {
+  if (!document.getElementById("enabled").checked) {
+    return "Processing paused";
+  }
+  if (dirty) {
+    return "Unsaved changes";
+  }
+  if (!rule.enabled) {
+    return "Disabled";
+  }
+  if (!rule.domains?.length && !rule.networks?.length && rule.lists?.some((id) => !currentServiceStatuses.find((entry) => entry.id === id)?.updated)) {
+    return "Waiting for service lists";
+  }
+  const status = latestRouteStates.find((entry) => entry.id === (runtimeRuleIDs[rule.id] || rule.id));
+  if (status?.pending && !status.addresses) {
+    return status.failed ? "DNS lookup failed" : "Resolving domains";
+  }
+  if (latestModuleState === "ERROR") {
+    return "Could not apply rules";
+  }
+  if (status) {
+    return {VPN: "Through VPN", WAN: "Through WAN", BLOCKED: "Blocked", DPI: "DPI bypass", NORMAL: "Without processing"}[status.state] || "Waiting to apply";
+  }
+  if (["RUNNING", "EMPTY"].includes(latestModuleState) && rule.action !== "vpn") {
+    return rule.action === "normal" ? "Without processing" : "Running";
+  }
+  return "Waiting to apply";
 }
 
 function updateRuleRows(states) {
@@ -361,78 +419,105 @@ function updateRuleRows(states) {
     if (!row) {
       continue;
     }
-    row.children[0].textContent = rule.name;
+    row.children[1].textContent = rule.name;
     const targets = [...(rule.lists || []).map((id) => moduleCatalog.lists.find((service) => service.id === id)?.name || id), ...(rule.domains || []), ...(rule.networks || [])];
-    row.children[1].textContent = targets.slice(0, 2).join(", ") + (targets.length > 2 ? " (+" + (targets.length - 2) + ")" : "") || "No destinations";
-    row.children[2].textContent = connectionMethod(rule);
-    const status = latestRouteStates.find((entry) => entry.id === rule.id);
-    const labels = {VPN: "VPN", WAN: "WAN", BLOCKED: "Blocked", DPI: "DPI bypass", NORMAL: "Without processing"};
-    row.children[3].textContent = !rule.enabled || !document.getElementById("enabled").checked ? "Disabled" : settingsDirty ? "Unsaved changes" : status?.pending && !status.addresses ? (status.failed ? "DNS lookup failed" : "Resolving domains") : labels[status?.state] || "Not checked";
-    if (status?.pending && status.addresses && rule.enabled && !settingsDirty) {
-      const pending = document.createElement("small");
-      pending.textContent = status.failed ? "DNS lookup failed" : "Resolving domains";
-      row.children[3].appendChild(pending);
+    row.children[2].textContent = targets.slice(0, 2).join(", ") + (targets.length > 2 ? " (+" + (targets.length - 2) + ")" : "") || "No destinations";
+    row.children[3].textContent = connectionMethod(rule);
+    if (rule.action === "vpn") {
+      const fallback = document.createElement("small");
+      fallback.textContent = rule.failure === "wan" ? "Fallback: WAN" : "On disconnect: block";
+      row.children[3].appendChild(fallback);
     }
+    row.children[4].textContent = effectiveRuleStatus(rule, settingsDirty);
+    const status = latestRouteStates.find((entry) => entry.id === rule.id);
     if (status?.stale && rule.enabled && !settingsDirty) {
       const cached = document.createElement("small");
       cached.textContent = "Using saved IP addresses";
-      row.children[3].appendChild(cached);
+      row.children[4].appendChild(cached);
     }
   }
+  renderRuleDiagnostics();
+}
+
+function renderRuleDiagnostics() {
+  const root = document.getElementById("diagnostic-rules");
+  root.replaceChildren();
+  for (const rule of savedRuleRows) {
+    const row = document.createElement("div");
+    row.className = "ocf-diagnostic-rule";
+    const title = document.createElement("strong");
+    title.textContent = rule.name;
+    const method = document.createElement("span");
+    method.textContent = connectionMethod(rule);
+    const status = document.createElement("span");
+    status.textContent = effectiveRuleStatus(rule);
+    row.append(title, method, status);
+    root.appendChild(row);
+  }
+  const problem = document.getElementById("diagnostic-problem");
+  problem.hidden = latestModuleState !== "ERROR";
+  problem.textContent = "Could not apply rules";
 }
 
 function renderRules() {
+  document.getElementById("monitor-settings-home").appendChild(document.getElementById("monitor-settings"));
+  const strategy = document.getElementById("panel-strategies");
+  strategy.hidden = true;
+  document.getElementById("strategy-storage").appendChild(strategy);
   const root = document.getElementById("destination-rules");
   root.replaceChildren();
-  document.getElementById("rules-empty").hidden = draftRules.length > 0;
-  const table = document.createElement("table");
-  table.className = "FormTable ocf-rule-table";
-  const head = table.createTHead().insertRow();
-  for (const label of ["Rule", "Destinations", "Connection", "Status", ""]) {
-    const cell = document.createElement("th");
-    cell.textContent = label;
-    head.appendChild(cell);
-  }
-  const body = table.createTBody();
-  for (const rule of draftRules) {
-    const row = body.insertRow();
-    row.dataset.ruleRow = rule.id;
-    for (let index = 0; index < 4; index++) {
-      row.insertCell();
-    }
-    row.insertCell().appendChild(ruleButton("Edit", () => {
-      editingRule = rule.id;
-      renderRules();
-    }));
-  }
-  table.hidden = draftRules.length === 0;
-  const scroll = document.createElement("div");
-  scroll.className = "ext-table-scroll";
-  scroll.appendChild(table);
-  root.appendChild(scroll);
   const rule = draftRules.find((entry) => entry.id === editingRule);
+  document.getElementById("rules-empty").hidden = draftRules.length > 0 || Boolean(rule);
+  document.getElementById("rule-add").hidden = Boolean(rule);
+  document.getElementById("unmatched-note").hidden = Boolean(rule);
   if (rule) {
     renderRuleEditor(root, rule);
+  } else if (draftRules.length) {
+    const table = document.createElement("table");
+    table.className = "ocf-rule-table";
+    const head = table.createTHead().insertRow();
+    for (const label of ["Enabled", "Rule", "Destinations", "Connection", "Status", "Actions"]) {
+      const cell = document.createElement("th");
+      cell.textContent = label;
+      head.appendChild(cell);
+    }
+    const body = table.createTBody();
+    for (const entry of draftRules) {
+      const row = body.insertRow();
+      row.dataset.ruleRow = entry.id;
+      const toggle = document.createElement("input");
+      toggle.type = "checkbox";
+      toggle.checked = entry.enabled;
+      toggle.setAttribute("aria-label", entry.name);
+      toggle.addEventListener("change", () => {
+        entry.enabled = toggle.checked;
+        setDirty(true);
+        updateRuleRows();
+      });
+      row.insertCell().appendChild(toggle);
+      for (let index = 0; index < 4; index++) {
+        row.insertCell();
+      }
+      row.insertCell().appendChild(ruleButton("Edit", () => openRule(entry.id)));
+      for (const [index, label] of ["Enabled", "Rule", "Destinations", "Connection", "Status", "Actions"].entries()) {
+        row.children[index].dataset.label = translated(label);
+      }
+    }
+    root.appendChild(table);
   }
   updateRuleRows();
-  document.getElementById("rule-add").disabled = draftRules.length >= 6;
+  document.getElementById("rule-add").disabled = draftRules.length >= 7;
 }
 
 document.getElementById("rule-add").addEventListener("click", () => {
-  if (draftRules.length >= 6) {
+  if (draftRules.length >= 7) {
     return;
   }
   rememberStrategyScope();
   const name = window.OCF_I18N ? window.OCF_I18N.translate("New rule", window.OCF_I18N.language) : "New rule";
   const rule = {id: "rule-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7), name, enabled: true, action: "dpi", domains: [], networks: [], lists: [], settings: structuredClone(draftBaseStrategy)};
   draftRules.push(rule);
-  editingRule = rule.id;
-  renderRules();
   renderStrategyScopes();
+  openRule(rule.id);
   setDirty(true);
-});
-
-document.getElementById("strategy-scope").addEventListener("change", (event) => {
-  rememberStrategyScope();
-  showStrategyScope(event.target.value);
 });

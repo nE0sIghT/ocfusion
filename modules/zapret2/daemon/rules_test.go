@@ -172,3 +172,24 @@ func TestMonitoringAndLabelsDoNotChangePacketIdentity(t *testing.T) {
 		t.Fatal("strategy change was ignored")
 	}
 }
+
+func TestSevenRulesAndLegacySelectionShareProviderLimit(t *testing.T) {
+	c := defaultConfig()
+	for _, id := range []string{"one", "two", "three", "four", "five", "six", "seven"} {
+		c.Rules = append(c.Rules, DestinationRule{ID: id, Name: id, Enabled: true, Action: "dpi", Domains: []string{"example.com"}, Settings: map[string]any{}})
+	}
+	data, _ := json.Marshal(c)
+	if _, err := parseConfig(data); err != nil {
+		t.Fatal("seven explicit rules rejected", err)
+	}
+	c.Domains = []string{"legacy.example.com"}
+	data, _ = json.Marshal(c)
+	if _, err := parseConfig(data); err == nil {
+		t.Fatal("eight provider policies accepted")
+	}
+	c.Rules = c.Rules[:6]
+	data, _ = json.Marshal(c)
+	if _, err := parseConfig(data); err != nil {
+		t.Fatal("six rules plus legacy selection rejected", err)
+	}
+}

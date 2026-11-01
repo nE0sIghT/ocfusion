@@ -401,3 +401,16 @@ body.bg {
 .ext-header-fallback > a:first-child {
   margin-left: 0;
 }
+
+.ext-shell button:hover,
+.ext-shell button:focus,
+.ext-shell button:active {
+  font: inherit;
+  color: #fff;
+}
+.ext-shell button:not(:disabled):hover {
+  filter: brightness(1.18);
+}
+.ext-shell button:not(:disabled):active {
+  filter: brightness(0.92);
+}

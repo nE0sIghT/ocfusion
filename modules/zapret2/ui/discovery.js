@@ -59,7 +59,7 @@ function scanTargetDescription(state, index) {
 function appendProbeDetails(cell, entry, state) {
   const details = document.createElement("details");
   const summary = document.createElement("summary");
-  summary.textContent = entry.protocol === "stun" ? "STUN response" : (entry.bytes || 0) + " B / 65536 B";
+  summary.textContent = "Details";
   details.appendChild(summary);
 
   for (const detail of entry.details || []) {
@@ -93,13 +93,23 @@ async function startDiscovery(extra) {
     return;
   }
 
+  const targets = [...discoveryTargets];
+  const current = currentDiscoveryTarget();
+  if (current.host && !targets.some((target) => JSON.stringify(target) === JSON.stringify(current))) {
+    targets.push(current);
+  }
+  if (extra.mode === "search" && (!targets.length || targets.length > 4)) {
+    document.getElementById("scan-state").textContent = "Choose up to four test targets";
+    return;
+  }
+
   scanBusy = true;
   renderScan(scan || {state: "IDLE"});
 
   try {
     const state = await parent.EXTENSIONS.call(moduleID, "scan-start", {
       revision: config.revision,
-      targets: discoveryTargets.length ? discoveryTargets : [currentDiscoveryTarget()],
+      targets: targets.slice(0, 4),
       ...extra,
     });
     renderScan(state);
@@ -111,61 +121,76 @@ async function startDiscovery(extra) {
   }
 }
 
+let selectedResultID = "";
+let selectedResultScan = "";
+
+function updateResultActions() {
+  const entry = scan?.results?.find((item) => item.preset === selectedResultID);
+  const running = ["QUEUED", "RUNNING"].includes(scan?.state);
+  const disabled = pending || running || scanBusy || scan?.state !== "COMPLETE" || scan?.revision !== config?.revision;
+  document.getElementById("scan-selected-actions").hidden = !entry;
+  for (const id of ["scan-use", "scan-confirm", "scan-refine", "scan-simplify", "scan-scope"]) {
+    document.getElementById(id).disabled = disabled || !entry || (id === "scan-use" && !entry.success);
+  }
+  for (const row of document.querySelectorAll("#scan-results tr")) {
+    row.dataset.selected = String(row.dataset.result === selectedResultID);
+  }
+}
+
 function appendDiscoveryActions(cell, entry, state, running) {
   if (entry.preset === "baseline" || entry.preset.endsWith(":baseline")) {
     return;
   }
-
-  const actions = [
-    {label: "Select", mode: "use"},
-    {label: "Confirm", mode: "confirm"},
-    {label: "Refine", mode: "refine"},
-    {label: "Simplify", mode: "lighten"},
-  ];
-
-  for (const action of actions) {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "ext-secondary";
-    button.textContent = action.label;
-    button.disabled = pending || running || scanBusy || state.state !== "COMPLETE" || state.revision !== config?.revision;
-    button.addEventListener("click", async () => {
-      if (action.mode !== "use") {
-        await startDiscovery({mode: action.mode, from: entry.preset, parent: state.id});
-        return;
-      }
-
-      button.disabled = true;
-
-      try {
-        const candidate = await parent.EXTENSIONS.call(moduleID, "scan-settings", {id: entry.preset, parent: state.id});
-        rememberStrategyScope();
-        showStrategyScope(document.getElementById("scan-scope").value);
-        fillStrategySettings(candidate);
-        selectTab("strategies");
-        document.getElementById("preset").scrollIntoView({block: "center", behavior: "smooth"});
-      } catch (error) {
-        document.getElementById("scan-state").textContent = error.message;
-      } finally {
-        button.disabled = false;
-      }
-    });
-    if (action.mode === "use") {
-      cell.appendChild(button);
-    } else {
-      let more = cell.querySelector("details");
-      if (!more) {
-        more = document.createElement("details");
-        more.className = "ocf-result-actions";
-        const summary = document.createElement("summary");
-        summary.textContent = "More tests";
-        more.appendChild(summary);
-        cell.appendChild(more);
-      }
-      more.appendChild(button);
-    }
-  }
+  const label = document.createElement("label");
+  const input = document.createElement("input");
+  input.type = "radio";
+  input.name = "scan-result";
+  input.value = entry.preset;
+  input.checked = selectedResultID === entry.preset;
+  input.disabled = running || scanBusy || state.state !== "COMPLETE" || state.revision !== config?.revision;
+  input.setAttribute("aria-label", entry.name || presetName(entry.preset));
+  input.addEventListener("change", () => {
+    selectedResultID = entry.preset;
+    updateResultActions();
+  });
+  label.appendChild(input);
+  cell.appendChild(label);
 }
+
+for (const [id, mode] of [["scan-confirm", "confirm"], ["scan-refine", "refine"], ["scan-simplify", "lighten"]]) {
+  document.getElementById(id).addEventListener("click", () => {
+    if (selectedResultID && scan?.id) {
+      startDiscovery({mode, from: selectedResultID, parent: scan.id});
+    }
+  });
+}
+
+document.getElementById("scan-use").addEventListener("click", async () => {
+  if (!scan?.id || !selectedResultID || pending || scanBusy) {
+    return;
+  }
+  const button = document.getElementById("scan-use");
+  button.disabled = true;
+  try {
+    const candidate = await parent.EXTENSIONS.call(moduleID, "scan-settings", {id: selectedResultID, parent: scan.id});
+    let rule = draftRules.find((entry) => entry.id === document.getElementById("scan-scope").value);
+    if (!rule) {
+      if (draftRules.length >= 7) {
+        throw new Error("at most seven destination rules");
+      }
+      rule = {id: "rule-" + Date.now().toString(36), name: scan.targets?.[0]?.host?.slice(0, 64) || translated("New rule"), enabled: true, action: "dpi", domains: (scan.targets || []).map((target) => target.host), networks: [], lists: [], settings: structuredClone(draftBaseStrategy)};
+      draftRules.push(rule);
+    }
+    openRule(rule.id);
+    fillStrategySettings(candidate);
+    rememberStrategyScope();
+    setDirty(true);
+  } catch (error) {
+    document.getElementById("scan-state").textContent = error.message;
+  } finally {
+    updateResultActions();
+  }
+});
 
 function renderScan(state) {
   if (!state) {
@@ -173,6 +198,10 @@ function renderScan(state) {
   }
 
   scan = state;
+  if (selectedResultScan !== state.id) {
+    selectedResultID = "";
+    selectedResultScan = state.id;
+  }
   const running = ["QUEUED", "RUNNING"].includes(state.state);
 
   for (const id of ["scan-start", "scan-host", "scan-target", "scan-port", "scan-protocol", "scan-path", "scan-add-target"]) {
@@ -184,6 +213,8 @@ function renderScan(state) {
   }
 
   document.getElementById("scan-cancel").disabled = !running || scanBusy;
+  document.getElementById("scan-cancel").hidden = !running;
+  document.getElementById("scan-result-section").hidden = !state.results?.length;
   const signature = JSON.stringify([state, config?.revision, pending, scanBusy]);
 
   if (signature === renderedScan) {
@@ -214,6 +245,7 @@ function renderScan(state) {
 
   for (const entry of state.results || []) {
     const row = document.createElement("tr");
+    row.dataset.result = entry.preset;
     const name = document.createElement("td");
     const title = document.createElement("span");
     const titleParts = (entry.name || presetName(entry.preset)).split(" - ");
@@ -236,7 +268,7 @@ function renderScan(state) {
     if (entry.confirmed || entry.remembered) {
       const badge = document.createElement("span");
       badge.className = "ext-badge";
-      badge.textContent = entry.confirmed ? "Confirmed" : "Previously confirmed";
+      badge.textContent = entry.history_saved || entry.remembered ? "Saved result" : "Checked again";
       name.appendChild(badge);
     }
     if (entry.confirmed && !entry.history_saved) {
@@ -260,6 +292,7 @@ function renderScan(state) {
     row.appendChild(actions);
     table.appendChild(row);
   }
+  updateResultActions();
 }
 
 document.getElementById("scan-add-target").addEventListener("click", () => {
@@ -270,7 +303,11 @@ document.getElementById("scan-add-target").addEventListener("click", () => {
     return;
   }
 
-  discoveryTargets.push(target);
+  if (!discoveryTargets.some((entry) => JSON.stringify(entry) === JSON.stringify(target))) {
+    discoveryTargets.push(target);
+  }
+  document.getElementById("scan-host").value = "";
+  document.getElementById("scan-target").value = "";
   renderDiscoveryTargets();
 });
 
@@ -319,7 +356,8 @@ async function refreshHistory() {
     root.replaceChildren();
 
     for (const entry of entries) {
-      const card = document.createElement("p");
+      const card = document.createElement("div");
+      card.className = "ocf-service-list";
       const name = document.createElement("span");
       name.textContent = entry.name;
       card.appendChild(name);
@@ -328,7 +366,7 @@ async function refreshHistory() {
       const use = document.createElement("button");
       use.type = "button";
       use.className = "ext-secondary";
-      use.textContent = "Use settings";
+      use.textContent = "Use for this rule";
       use.addEventListener("click", async () => {
         if (!config || pending) {
           return;
@@ -339,7 +377,8 @@ async function refreshHistory() {
         try {
           const preset = await parent.EXTENSIONS.call(moduleID, "history-settings", {id: entry.id, revision: config.revision});
           fillStrategySettings(preset);
-          selectTab("strategies");
+          rememberStrategyScope();
+          setDirty(true);
         } catch (error) {
           document.getElementById("scan-state").textContent = error.message;
         } finally {
@@ -350,7 +389,7 @@ async function refreshHistory() {
       const recheck = document.createElement("button");
       recheck.type = "button";
       recheck.className = "ext-secondary";
-      recheck.textContent = "Recheck";
+      recheck.textContent = "Check again";
       recheck.addEventListener("click", () => {
         document.getElementById("scan-scope").value = strategyScope;
         selectTab("finder");
@@ -361,7 +400,7 @@ async function refreshHistory() {
     }
 
     if (entries.length === 0) {
-      root.textContent = "No confirmed strategies";
+      root.textContent = "No saved finder results";
     }
   } catch (error) {
     document.getElementById("history-results").textContent = error.message;

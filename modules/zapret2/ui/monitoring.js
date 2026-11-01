@@ -132,7 +132,17 @@ function setupRuleChecks(rule) {
       setDirty(true);
     }
   }
-  selectTab("diagnostics");
+  const slot = document.getElementById("rule-checks-slot");
+  slot.hidden = false;
+  slot.appendChild(document.getElementById("monitor-settings"));
   document.getElementById("monitor-settings").open = true;
   document.getElementById("monitor-targets-input").focus();
+}
+
+function returnChecksToDiagnostics() {
+  document.getElementById("monitor-settings-home").appendChild(document.getElementById("monitor-settings"));
+  const slot = document.getElementById("rule-checks-slot");
+  if (slot) {
+    slot.hidden = true;
+  }
 }

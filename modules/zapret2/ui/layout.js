@@ -9,29 +9,23 @@ for (const option of document.querySelectorAll("#tcp_strategy option, #udp_strat
 }
 
 function selectTab(id) {
+  if (id === "diagnostics") {
+    returnChecksToDiagnostics();
+  }
   for (const tab of tabs) {
     const active = tab.id === "tab-" + id;
-    tab.className = active ? "tabClicked" : "tab";
     tab.setAttribute("aria-selected", String(active));
     tab.tabIndex = active ? 0 : -1;
     document.getElementById(tab.getAttribute("aria-controls")).hidden = !active;
   }
 
-  document.getElementById("settings").hidden = !["management", "strategies"].includes(id);
+  document.getElementById("settings").hidden = id !== "management";
 }
 
 function setDirty(dirty) {
   settingsDirty = dirty;
   document.getElementById("unsaved").hidden = !dirty;
-}
-
-function confirmDiscard() {
-  if (!settingsDirty) {
-    return true;
-  }
-
-  const text = "Discard unsaved changes?";
-  return confirm(window.OCF_I18N ? window.OCF_I18N.translate(text, window.OCF_I18N.language) : text);
+  document.getElementById("save-bar").hidden = !dirty;
 }
 
 for (const tab of tabs) {

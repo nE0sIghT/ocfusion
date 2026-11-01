@@ -27,7 +27,31 @@ async function main() {
   const server = http.createServer((request, response) => {
     const url = new URL(request.url, "http://localhost");
 
+    if (process.env.OCF_STOCK_STYLE_DIR && ["/form_style.css", "/index_style.css"].includes(url.pathname)) {
+      response.setHeader("Content-Type", "text/css");
+      response.end(fs.readFileSync(path.join(process.env.OCF_STOCK_STYLE_DIR, path.basename(url.pathname))));
+      return;
+    }
+
+    if (url.pathname === "/form_style.css") {
+      const theme = new URL(request.headers.referer || "http://localhost/").searchParams.get("theme");
+      const accent = theme === "standard" ? "#246b8e" : "#9a1735";
+      const panel = theme === "standard" ? "#253b46" : "#26121a";
+      response.setHeader("Content-Type", "text/css");
+      // Synthetic stock-style fixtures reproduce the conflicting form header
+      // and distinct theme palettes without redistributing ASUS assets.
+      response.end(`.FormTable thead th {color:#000}
+        .FormTable_table th {color:#000;background:${panel}}
+        .button_gen {background:${accent};color:#fff;border:0;padding:7px 12px;min-width:100px}
+        .input_option,.input_32_table {background:${panel};color:#f0f0f0;border:1px solid ${accent};padding:6px;height:25px}
+        button:hover {color:red;font:italic 20px serif}
+        .tab,.tabClicked {color:#fff;background:${panel};padding:8px}
+        .tabClicked {background:${accent}}`);
+      return;
+    }
+
     if (url.pathname === "/") {
+      const theme = url.searchParams.get("theme") === "standard" ? "standard" : "rog";
       const language = url.searchParams.get("language") === "ru" ? "ru" : "en";
       response.end(`<!doctype html><script>
         window.OCF_I18N = {language: "${language}"};
@@ -76,7 +100,7 @@ async function main() {
             }
 
             if (operation === "scan-start") {
-              window.scan = {id: "test", state: "RUNNING", revision: window.saved.revision, results: []};
+              window.scan = {id: "test", state: "RUNNING", revision: window.saved.revision, targets:request.targets, results: []};
             } else {
               window.scan.state = "CANCELLED";
             }
@@ -91,7 +115,7 @@ async function main() {
           },
           status: async () => ({data: {state: window.moduleState, lists: window.listStatuses, scan: window.scan || {state: "IDLE"}}})
         };
-      </script><iframe style="width:1100px;height:1400px" src="/module/index.html"></iframe>`);
+      </script><iframe style="width:1100px;height:1400px" src="/module/index.html?theme=${theme}"></iframe>`);
       return;
     }
 
@@ -105,208 +129,246 @@ async function main() {
     await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
     browser = await chromium.launch({headless: true, args: ["--no-sandbox"]});
 
-    for (const language of ["en", "ru"]) {
+    for (const [language, theme] of (process.env.OCF_STOCK_STYLE_DIR ? [["en", "rog"], ["ru", "rog"]] : [["en", "rog"], ["ru", "rog"], ["en", "standard"], ["ru", "standard"]])) {
       const page = await browser.newPage();
       const errors = [];
       page.on("pageerror", (error) => errors.push(error.message));
-      await page.goto("http://127.0.0.1:" + server.address().port + "/?language=" + language);
+      await page.goto("http://127.0.0.1:" + server.address().port + "/?language=" + language + "&theme=" + theme);
+      await page.evaluate(() => {
+        window.saved = {...window.saved, enabled:true, lists:["youtube"], domains:["legacy.example.com"], networks:["203.0.113.0/24"], rules:[{id:"telegram",name:"Telegram VPN",enabled:true,action:"vpn",target:"native:2:012345abcdef",failure:"wan",lists:["telegram"],domains:[],networks:[],settings:{}}]};
+        window.moduleState = "RUNNING";
+      });
       const frame = page.frameLocator("iframe");
       await frame.locator("#fields:not([disabled])").waitFor();
-      assert.equal(await frame.locator("#enabled").isChecked(), false);
-      assert.equal(await frame.locator("#udp_strategy").inputValue(), "off");
-      assert.equal(await frame.locator("[role=tabpanel]:visible").count(), 1);
-      assert.equal(await frame.locator("#custom-strategy").getAttribute("open"), null);
+      await frame.locator("body").evaluate(async () => {
+        await load();
+        await updateStatus();
+      });
+      assert.equal(await frame.locator('[role="tab"]').count(), 3);
+      assert.equal(await frame.locator("#tab-strategies").count(), 0);
+      assert.equal(await frame.locator("#default-policy").count(), 0);
+      assert.equal(await frame.locator("#enabled").isVisible(), false);
+      assert.equal(await frame.locator("#destination-rules tbody tr").count(), 2);
+      assert.equal(await frame.locator("#save-bar").isVisible(), false);
+      assert.equal(await frame.locator("[data-rule-row=telegram]").innerText().then((text) => text.includes("Test VPN")), true);
+      assert.equal(await frame.locator("[data-rule-row=main] td").nth(2).innerText().then((text) => text.includes("YouTube")), true);
+      const editBox = await frame.locator("[data-rule-row=telegram] button").boundingBox();
+      assert(editBox.width >= 100 && editBox.height < 70, JSON.stringify(editBox));
+      assert.equal(await frame.locator(".ocf-rule-table").evaluate((element) => element.classList.contains("FormTable_table")), false);
+      assert.equal(await frame.locator(".ocf-rule-table th").first().evaluate((element) => getComputedStyle(element).color), "rgb(221, 221, 221)");
+      assert.equal(await frame.locator("#toggle-processing").evaluate((element) => getComputedStyle(element).backgroundColor), "rgba(0, 0, 0, 0)");
+      const buttonStyle = await frame.locator("#toggle-processing").evaluate((element) => {
+        const style = getComputedStyle(element);
+        return {font: style.font, color: style.color, background: style.backgroundImage};
+      });
+      assert(buttonStyle.background.includes("gradient"));
+      await frame.locator("#toggle-processing").hover();
+      assert.deepEqual(await frame.locator("#toggle-processing").evaluate((element) => {
+        const style = getComputedStyle(element);
+        return {font: style.font, color: style.color, background: style.backgroundImage};
+      }), buttonStyle);
+      assert.equal(await frame.locator("#toggle-processing").evaluate((element) => getComputedStyle(element).filter), "brightness(1.18)");
+      await frame.locator("#tab-management").hover();
+      assert.equal(await frame.locator("#tab-management").evaluate((element) => getComputedStyle(element).filter), "brightness(1.18)");
       await frame.locator("#tab-management").focus();
       await frame.locator("#tab-management").press("End");
       assert.equal(await frame.locator("#panel-diagnostics").isVisible(), true);
       assert.equal(await frame.locator("#settings").isVisible(), false);
       await frame.locator("#tab-diagnostics").press("Home");
-      await frame.locator("#default-policy > summary").click();
-      await frame.locator("#service-picker").selectOption("telegram");
-      await frame.locator("#service-add").click();
-      assert.equal(await frame.locator("#service-lists > div").count(), 1);
-      assert.equal((await page.evaluate(() => window.changes)).length, 0);
-      await frame.locator("#manual-destinations summary").click();
-      await frame.locator("#networks").fill("203.0.113.10\n2001:db8::/32");
-      await frame.locator("#domains").fill("example.com");
-      await frame.locator("#enabled").check();
-      await frame.locator("#tab-strategies").click();
-      await frame.locator("#custom-strategy > summary").click();
-      assert.equal(await frame.locator("#fake_ttl").evaluate((element) => element.closest("tr").hidden), true);
-      await frame.locator("#tcp_strategy").selectOption("fake-split");
-      assert.equal(await frame.locator("#fake_ttl").evaluate((element) => element.closest("tr").hidden), false);
-      await frame.locator("#split_positions").fill("host, midsld+1");
 
-      await frame.locator("#application-mtproto-enabled").check();
-      await frame.locator("#application-mtproto-ports").evaluate((element) => { element.value = "80,443,5222,50000-65535"; });
-      await frame.locator("#auto_ttl").check();
-      await frame.locator("#fake_sni").fill("example.net");
-      await frame.locator("#fake_fooling").selectOption("badseq");
-      await frame.locator("#packet_limit").fill("24");
-      await frame.locator("#settings button[type=submit]").click();
-      assert.equal(await frame.locator("#settings button[type=submit]").isDisabled(), true);
-      await frame.locator("#fields:not([disabled])").waitFor();
-      const saved = await page.evaluate(() => window.saved);
-      assert.deepEqual(saved.networks, ["203.0.113.10", "2001:db8::/32"]);
-      assert.deepEqual(saved.domains, ["example.com"]);
-      assert.deepEqual(saved.tcp_ports, [80, 443]);
-      assert.deepEqual(saved.lists, ["telegram"]);
-      assert.equal(saved.applications[0].id, "mtproto");
-      assert.equal(saved.applications[0].ports, "80,443,5222,50000-65535");
-      assert.equal(saved.revision, 1);
-      assert.equal(saved.enabled, true);
-      assert.equal(saved.tcp_strategy, "fake-split");
-      assert.equal(saved.split_positions, "host, midsld+1");
-      assert.equal(saved.fake_fooling, "badseq");
-      assert.equal(saved.fake_sni, "example.net");
-      assert.equal(saved.auto_ttl, true);
-      assert.equal(saved.auto_ttl_delta, -1);
-      assert.equal(saved.packet_limit, 24);
-      assert.equal(await frame.locator("#unsaved").isVisible(), false);
+      await frame.locator("[data-rule-row=telegram] button").click();
+      assert.equal(await frame.locator(".ocf-rule-table").count(), 0);
+      assert.equal(await frame.locator("#panel-strategies").isVisible(), false);
+      assert.equal(await frame.locator("#rule-vpn-target").inputValue(), "native:2:012345abcdef");
+      assert.equal(await frame.locator('[data-rule-field="failure"]').inputValue(), "wan");
+      assert.equal(await frame.locator("#rule-vpn-target").evaluate((element) => getComputedStyle(element).backgroundColor), "rgb(16, 16, 16)");
+      assert.equal(await frame.locator('.ocf-rule-editor summary').filter({hasText: language === "ru" ? "О маршрутизации" : "About VPN routing"}).count(), 0);
+      assert(await frame.locator('[data-rule-field="name"]').evaluate((element) => {
+        const field = element.closest(".ext-field").getBoundingClientRect();
+        const control = element.getBoundingClientRect();
+        return control.left >= field.left && control.right <= field.right + 0.5;
+      }), "Rule name must fit inside its field including stock margins");
+      assert(await frame.locator("#rule-vpn-target").evaluate((element) => {
+        const style = getComputedStyle(element);
+        return element.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom) >= parseFloat(style.fontSize);
+      }));
+      const checks = frame.locator('[data-rule-action="checks"]');
+      assert.equal(await checks.isVisible(), true);
+      await checks.click();
+      assert.equal(await frame.locator("#panel-management").isVisible(), true);
+      assert.equal(await frame.locator("#panel-diagnostics").isVisible(), false);
+      assert.equal(await frame.locator("#rule-checks-slot #monitor-settings").isVisible(), true);
+      assert((await frame.locator("#monitor-targets-input").inputValue()).includes("t.me"));
+
+      await frame.locator('[data-rule-field="name"]').fill("Draft VPN name");
+      await page.waitForTimeout(3200);
+      assert.equal(await frame.locator('[data-rule-field="name"]').inputValue(), "Draft VPN name");
+      page.on("dialog", (dialog) => dialog.accept());
+      await frame.locator("#reload").click();
+      await frame.locator("[data-rule-row=telegram] button").waitFor();
+      assert.equal(await frame.locator("[data-rule-row=telegram] td").nth(1).innerText(), "Telegram VPN");
+
+      await frame.locator("[data-rule-row=main] button").click();
+      assert.equal(await frame.locator("#panel-strategies").isVisible(), true);
+      assert.equal(await frame.locator("#custom-strategy").getAttribute("open"), null);
+      if (process.env.OCF_UI_SCREENSHOT_DIR) {
+        await frame.locator("body").screenshot({path:path.join(process.env.OCF_UI_SCREENSHOT_DIR, "zapret-editor-" + theme + "-" + language + ".png")});
+      }
       await frame.locator("#preset").selectOption("hostname");
-      assert.equal(await frame.locator("#unsaved").isVisible(), true);
-      assert.equal(await frame.locator("#split_positions").inputValue(), "1,midsld");
-      assert.equal(await frame.locator("#application-mtproto-enabled").isChecked(), true);
-      assert.equal((await page.evaluate(() => window.changes)).length, 1);
-      await frame.locator("#tab-finder").click();
-      await frame.locator("#scan-target").selectOption("youtube.com");
-      assert.equal(await frame.locator("#scan-host").inputValue(), "youtube.com");
-      assert.equal((await page.evaluate(() => window.changes)).length, 1);
-      assert.equal(await frame.locator("#settings").isVisible(), false);
-      await frame.locator("#scan-host").fill("example.com");
+      await frame.locator("#custom-strategy > summary").click();
+      await frame.locator("#udp_strategy").selectOption("fake-quic");
+      await frame.locator("#settings button[type=submit]").click();
+      await frame.locator("#fields:not([disabled])").waitFor();
+      let saved = await page.evaluate(() => window.saved);
+      assert.deepEqual(saved.lists, []);
+      assert.deepEqual(saved.domains, []);
+      assert.deepEqual(saved.networks, []);
+      assert.equal(saved.rules.length, 2);
+      let mainRule = saved.rules.find((entry) => entry.id === "main");
+      assert.deepEqual(mainRule.lists, ["youtube"]);
+      assert.deepEqual(mainRule.domains, ["legacy.example.com"]);
+      assert.deepEqual(mainRule.networks, ["203.0.113.0/24"]);
+      assert.equal(mainRule.settings.split_positions, "1,midsld");
+      assert.equal(mainRule.settings.udp_strategy, "fake-quic");
+      assert.equal(saved.rules[0].failure, "wan");
+      assert.equal(saved.rules[0].target, "native:2:012345abcdef");
+      assert.equal(await frame.locator("#save-bar").isVisible(), false);
+
+      await frame.locator('[data-rule-row="telegram"] input[type=checkbox]').uncheck();
+      await frame.locator("#settings button[type=submit]").click();
+      await frame.locator("#fields:not([disabled])").waitFor();
+      saved = await page.evaluate(() => window.saved);
+      assert.equal(saved.enabled, true);
+      assert.equal(saved.rules[0].enabled, false);
+      assert.deepEqual(saved.rules[0].lists, ["telegram"]);
+      const beforePause = structuredClone(saved.rules);
+      await frame.locator("[data-rule-row=main] button").click();
+      await frame.locator('[data-rule-field="name"]').fill("Unsaved main name");
+      await frame.locator("#toggle-processing").click();
+      await frame.locator("#toggle-processing:not([disabled])").waitFor();
+      assert.equal(await page.evaluate(() => window.saved.enabled), false);
+      assert.deepEqual(await page.evaluate(() => window.saved.rules), beforePause);
+      await frame.locator("#toggle-processing").click();
+      await frame.locator("#toggle-processing:not([disabled])").waitFor();
+      assert.equal(await page.evaluate(() => window.saved.enabled), true);
+      assert.deepEqual(await page.evaluate(() => window.saved.rules), beforePause);
+      assert.equal(await frame.locator('[data-rule-field="name"]').inputValue(), "Unsaved main name");
+      await frame.locator("#reload").click();
+      await frame.locator("[data-rule-row=main] button").waitFor();
+
+      await frame.locator("[data-rule-row=main] button").click();
+      await frame.locator(".ocf-rule-editor button").filter({hasText: language === "ru" ? "Подобрать стратегию" : "Find a strategy"}).click();
+      assert.equal(await frame.locator("#panel-finder").isVisible(), true);
+      assert.equal(await frame.locator("#scan-scope").inputValue(), "main");
+      assert.equal(await frame.locator("#scan-selected-actions").isVisible(), false);
+      assert.equal(await frame.locator("#scan-host").inputValue(), "legacy.example.com");
+      await frame.locator("#scan-host").fill("changed.example.com");
       await frame.locator("#scan-start").click();
       await frame.locator("#scan-cancel:not([disabled])").waitFor();
-      assert.deepEqual(await page.evaluate(() => window.lastCall), {operation: "scan-start", request: {revision: 1, mode:"search", targets:[{host:"example.com", port:443, protocol:"https", path:"/"}]}});
-      await page.evaluate(() => {
-        window.scan = {id: "test", state: "COMPLETE", revision: 1, results: [{preset: "baseline", success: 0, attempts: 2}, {preset: "hostname", success: 2, attempts: 2, milliseconds: 125}]};
-      });
-      await frame.locator("#scan-results button").first().waitFor();
-      assert((await frame.locator("#scan-results").innerText()).includes("2/2"));
-      assert((await frame.locator("#scan-results").innerText()).includes("125 ms"));
-      await frame.locator("#scan-results button").first().click();
-      assert.equal(await frame.locator("#tcp_strategy").inputValue(), "split");
-      assert.equal((await page.evaluate(() => window.changes)).length, 1);
-      assert.equal(await frame.locator("#tab-strategies").getAttribute("aria-selected"), "true");
-      await frame.locator("#tab-finder").click();
-      await frame.locator("#scan-results details.ocf-result-actions > summary").click();
-      await frame.locator("#scan-results button").nth(2).click();
-      await frame.locator("#scan-cancel:not([disabled])").waitFor();
+      assert.equal((await page.evaluate(() => window.lastCall)).operation, "scan-start");
+      assert.equal((await page.evaluate(() => window.lastCall)).request.targets[0].host, "changed.example.com");
+      const showResult = async (id) => {
+        await page.evaluate((scanID) => {
+          window.scan = {id:scanID,state:"COMPLETE",revision:window.saved.revision,targets:[{host:"example.com",port:443,protocol:"https"}],results:[{preset:"baseline",success:0,attempts:2,protocol:"tcp"},{preset:"hostname",success:2,attempts:2,milliseconds:125,protocol:"tcp"}]};
+        }, id);
+        await frame.locator("body").evaluate(() => updateStatus());
+        await frame.locator('#scan-results input[type="radio"]').check();
+      };
+      await showResult("first");
+      assert.equal(await frame.locator("#scan-results button").count(), 0);
+      assert.equal(await frame.locator("#scan-selected-actions").isVisible(), true);
+      assert.equal(await frame.locator("#scan-improve").getAttribute("open"), null);
+      if (process.env.OCF_UI_SCREENSHOT_DIR) {
+        await frame.locator("body").screenshot({path:path.join(process.env.OCF_UI_SCREENSHOT_DIR, "zapret-finder-" + theme + "-" + language + ".png")});
+      }
+      await frame.locator("#scan-confirm").click();
+      assert.equal((await page.evaluate(() => window.lastCall)).request.mode, "confirm");
+      await showResult("confirmed");
+      await frame.locator("#scan-improve > summary").click();
+      await frame.locator("#scan-refine").click();
       assert.equal((await page.evaluate(() => window.lastCall)).request.mode, "refine");
-      assert.equal((await page.evaluate(() => window.lastCall)).request.parent, "test");
-      await frame.locator("#scan-cancel").click();
-      await page.waitForTimeout(3200);
-      await frame.locator("#scan-protocol:not([disabled])").waitFor();
-      await frame.locator("#scan-protocol").selectOption("http3");
-      await frame.locator("#scan-add-target").click();
-      await frame.locator("#scan-protocol").selectOption("stun");
-      await frame.locator("#scan-host").fill("stun.example.net");
-      await frame.locator("#scan-add-target").click();
-      assert.equal(await frame.locator("#scan-targets > div").count(), 2);
-      assert.equal(await frame.locator("#scan-path-row").isVisible(), false);
-      await frame.locator("#scan-start").click();
-      await frame.locator("#scan-cancel:not([disabled])").waitFor();
-      const multiRequest = (await page.evaluate(() => window.lastCall)).request;
-      assert.equal(multiRequest.targets.length, 2);
-      assert.equal(multiRequest.targets[0].protocol, "http3");
-      assert.equal(multiRequest.targets[1].protocol, "stun");
-      assert.equal(multiRequest.targets[1].port, 19302);
-      assert.equal((await page.evaluate(() => window.changes)).length, 1);
-      await frame.locator("#tab-management").click();
-      const body = await frame.locator("body").innerText();
-      assert(body.includes(language === "ru" ? "IP-адреса и подсети" : "IP addresses and subnets"));
-      assert(body.includes(language === "ru" ? "Остальные назначения" : "Other destinations"));
-      await frame.locator("#service-lists summary").click();
-      await frame.locator("#service-refresh").click();
-      await frame.locator("#service-refresh:not([disabled])").waitFor();
-      await page.waitForTimeout(3200);
-      assert.equal(await frame.locator("#service-lists details").getAttribute("open"), "");
-      const serviceText = await frame.locator("#service-lists").innerText();
-      assert(serviceText.includes(language === "ru" ? "Используется сохранённая копия" : "Using the saved copy"));
-      await frame.locator("#service-lists button").click();
-      assert.equal(await frame.locator("#service-lists > div").count(), 0);
-      assert.deepEqual(await page.evaluate(() => window.saved.lists), ["telegram"]);
-      assert.equal(await frame.locator("#domains").inputValue(), "example.com");
-      await frame.locator("#tab-management").click();
-      await frame.locator("#rule-add").click();
-      const rule = frame.locator("#destination-rules [data-rule-id]").first();
-      await rule.locator("details > summary").click();
-      await rule.locator('[data-rule-field="name"]').fill("Video rule");
-      await rule.locator('[data-rule-field="domains"]').fill("video.example.com");
-      await rule.locator('[data-service="telegram"]').check();
-      await rule.locator("button").nth(0).click();
-      assert.equal(await frame.locator("#tab-strategies").getAttribute("aria-selected"), "true");
-      await frame.locator("#tcp_strategy").selectOption("disorder");
-      await frame.locator("#strategy-scope").selectOption("");
-      assert.equal(await frame.locator("#tcp_strategy").inputValue(), "split");
+      await showResult("refined");
+      await frame.locator("#scan-simplify").click();
+      assert.equal((await page.evaluate(() => window.lastCall)).request.mode, "lighten");
+      await showResult("final");
+      const changesBeforeUse = await page.evaluate(() => window.changes.length);
+      await frame.locator("#scan-use").click();
+      assert.equal(await frame.locator("#panel-management").isVisible(), true);
+      assert.equal(await frame.locator('.ocf-rule-editor').getAttribute("data-rule-id"), "main");
+      assert.equal(await page.evaluate(() => window.changes.length), changesBeforeUse);
+      await frame.locator("#settings button[type=submit]").click();
+      await frame.locator("#fields:not([disabled])").waitFor();
+      saved = await page.evaluate(() => window.saved);
+      assert.equal(saved.rules.find((entry) => entry.id === "main").settings.udp_strategy, "fake-quic");
+
       await frame.locator("#tab-diagnostics").click();
-      await frame.locator("#monitor-settings > summary").click();
-      await frame.locator("#monitor-targets-input").fill("http3://example.com/\nstun://stun.example.net:19302");
+      assert.equal(await frame.locator("#technical-details").getAttribute("open"), null);
+      assert.equal(await frame.locator("#diagnostic-rules > div").count(), 2);
+      if (process.env.OCF_UI_SCREENSHOT_DIR) {
+        await frame.locator("body").screenshot({path:path.join(process.env.OCF_UI_SCREENSHOT_DIR, "zapret-diagnostics-" + theme + "-" + language + ".png")});
+      }
+      if (await frame.locator("#monitor-settings").getAttribute("open") === null) {
+        await frame.locator("#monitor-settings > summary").click();
+      }
+      await frame.locator("#monitor-targets-input").fill("https://example.com/\nstun://stun.example.net:19302");
       await frame.locator("#monitor-enabled").check();
       await frame.locator("#monitor-save").click();
       await frame.locator("#monitor-save:not([disabled])").waitFor();
-      const withRule = await page.evaluate(() => window.saved);
-      assert.equal(withRule.tcp_strategy, "split");
-      assert.equal(withRule.rules.length, 1);
-      assert.equal(withRule.rules[0].settings.tcp_strategy, "disorder");
-      assert.deepEqual(withRule.rules[0].domains, ["video.example.com"]);
-      assert.deepEqual(withRule.rules[0].lists, ["telegram"]);
-      assert.equal(withRule.monitor.enabled, true);
-      assert.equal(withRule.monitor.targets.length, 2);
-      await frame.locator("#tab-diagnostics").click();
-      await frame.locator("#health-check:not([disabled])").waitFor();
-      await frame.locator("#health-check").click();
-      assert.equal((await page.evaluate(() => window.lastCall)).operation, "health-check");
-      await frame.locator("#tab-finder").click();
-      await page.evaluate(() => {
-        window.scan = {id:"final", state:"COMPLETE", revision:window.saved.revision, results:[{preset:"hostname", success:1, attempts:1, milliseconds:20}]};
-      });
-      await page.waitForTimeout(3200);
-      await frame.locator("#scan-results details.ocf-result-actions > summary").click();
-      await frame.locator("#scan-results button").nth(1).click();
-      assert.equal((await page.evaluate(() => window.lastCall)).request.mode, "confirm");
-      await page.evaluate(() => {
-        window.historyEntries = [{id:"remembered", name:"Hostname split", protocol:"tcp", updated:1793000000, success:3, attempts:3, targets:[{host:"example.com",port:443,protocol:"https"}]}];
-        window.scan = {id:"confirmed", state:"COMPLETE", revision:window.saved.revision, results:[{preset:"hostname", success:3, attempts:3, confirmed:true, history_saved:true, milliseconds:20}]};
-      });
-      await frame.locator("#tab-strategies").click();
-      await frame.locator("#confirmed-history summary").click();
-      await frame.locator("#history-results button").nth(1).waitFor();
-      await frame.locator("#history-results button").nth(1).click();
-      assert.equal((await page.evaluate(() => window.lastCall)).request.mode, "history");
-      assert.equal((await page.evaluate(() => window.lastCall)).request.from, "remembered");
-      assert.equal((await page.evaluate(() => window.changes)).length, 2);
-      await frame.locator("#tab-management").click();
-      await frame.locator("#rule-add").click();
-      const vpnRule = frame.locator("#destination-rules [data-rule-id]");
-      await vpnRule.locator('[data-rule-field="name"]').fill("VPN destination");
-      await vpnRule.locator("details > summary").click();
-      await vpnRule.locator('[data-rule-field="domains"]').fill("vpn.example.com");
-      await vpnRule.locator('[data-rule-field="action"]').selectOption("vpn");
-      await frame.locator("#rule-vpn-target").selectOption("native:2:012345abcdef");
-      await vpnRule.locator('[data-rule-field="failure"]').selectOption("wan");
-      await vpnRule.locator('[data-rule-action="checks"]').click();
-      assert.equal(await frame.locator("#panel-diagnostics").isVisible(), true);
-      assert((await frame.locator("#monitor-targets-input").inputValue()).includes("vpn.example.com"));
-      await frame.locator("#tab-management").click();
-      await frame.locator("#settings button[type=submit]").click();
-      await frame.locator("#fields:not([disabled])").waitFor();
-      const vpnSaved = await page.evaluate(() => window.saved);
-      assert.equal(vpnSaved.rules[1].action, "vpn");
-      assert.equal(vpnSaved.rules[1].target, "native:2:012345abcdef");
-      assert.equal(vpnSaved.rules[1].failure, "wan");
-      assert.deepEqual(vpnSaved.rules[1].domains, ["vpn.example.com"]);
-      await frame.locator("#tab-strategies").click();
-      assert.equal(await frame.locator('#strategy-scope option').count(), 2);
-      await frame.locator("#tab-diagnostics").click();
+      assert.equal((await page.evaluate(() => window.saved)).monitor.targets.length, 2);
       await frame.locator("#copy-report").click();
       await frame.locator("#copy-report:not([disabled])").waitFor();
-      const report = JSON.parse(await frame.locator("#diagnostic-report").inputValue());
-      assert.equal(report.state, "DISABLED");
-      assert.deepEqual(errors, []);
+      assert.equal(JSON.parse(await frame.locator("#diagnostic-report").inputValue()).state, "RUNNING");
+      await frame.locator("#tab-management").click();
+      await frame.locator("[data-rule-row=main] button").click();
+      await page.evaluate(() => {
+        window.historyEntries = [{id:"remembered",name:"Hostname split",protocol:"tcp",updated:1793000000,success:3,attempts:3,targets:[{host:"example.com",port:443,protocol:"https"}]}];
+      });
+      await frame.locator("#confirmed-history > summary").click();
+      await frame.locator("#history-results button").nth(1).waitFor();
+      await frame.locator("#history-results button").nth(0).click();
+      assert.equal(await frame.locator("#panel-management").isVisible(), true);
+      await frame.locator("#history-results button").nth(1).click();
+      assert.equal((await page.evaluate(() => window.lastCall)).request.mode, "history");
+      await frame.locator("#tab-management").click();
+      await frame.locator(".ocf-rule-editor button").filter({hasText: language === "ru" ? "К списку правил" : "Back to rules"}).click();
       if (process.env.OCF_UI_SCREENSHOT_DIR) {
-        await frame.locator("#tab-management").click();
-        await frame.locator("body").screenshot({path:path.join(process.env.OCF_UI_SCREENSHOT_DIR, "zapret-rules-" + language + ".png")});
+        await frame.locator("body").screenshot({path:path.join(process.env.OCF_UI_SCREENSHOT_DIR, "zapret-wide-" + theme + "-" + language + ".png")});
       }
+      await frame.locator("#rule-add").click();
+      await frame.locator('[data-rule-field="name"]').fill("New VPN rule");
+      await frame.locator("#settings button[type=submit]").click();
+      assert.equal(await page.evaluate(() => window.saved.rules.length), 2);
+      await frame.locator('.ocf-rule-editor [data-service="telegram"]').check();
+      await frame.locator('[data-rule-field="action"]').selectOption("vpn");
+      await frame.locator("#rule-vpn-target").selectOption("native:2:012345abcdef");
+      await frame.locator('[data-rule-field="failure"]').selectOption("wan");
+      await frame.locator("#settings button[type=submit]").click();
+      await frame.locator("#fields:not([disabled])").waitFor();
+      saved = await page.evaluate(() => window.saved);
+      assert.equal(saved.rules.length, 3);
+      const created = saved.rules[2];
+      assert.equal(created.failure, "wan");
+      assert.deepEqual(created.lists, ["telegram"]);
+      await frame.locator('[data-rule-row="' + created.id + '"] button').click();
+      await frame.locator(".ocf-rule-editor button").filter({hasText: language === "ru" ? "Убрать" : "Remove"}).click();
+      assert.equal(await page.evaluate(() => window.saved.rules.length), 3);
+      await frame.locator("#settings button[type=submit]").click();
+      await frame.locator("#fields:not([disabled])").waitFor();
+      assert.equal(await page.evaluate(() => window.saved.rules.length), 2);
+      await page.locator("iframe").evaluate((element) => { element.style.width = "460px"; });
+      assert.equal(await frame.locator(".ocf-rule-table thead").isVisible(), false);
+      const narrowEdit = await frame.locator("[data-rule-row=main] button").boundingBox();
+      assert(narrowEdit.width >= 100 && narrowEdit.height < 70);
+      assert.equal(await frame.locator("body").evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 2), true);
+      const text = await frame.locator("body").innerText();
+      assert(text.includes(language === "ru" ? "Приостановить обработку" : "Pause processing"));
+      assert(!text.includes(language === "ru" ? "Остальные назначения" : "Other destinations"));
+      if (process.env.OCF_UI_SCREENSHOT_DIR) {
+        await frame.locator("body").screenshot({path:path.join(process.env.OCF_UI_SCREENSHOT_DIR, "zapret-rules-" + theme + "-" + language + ".png")});
+      }
+      await page.locator("iframe").evaluate((element) => { element.style.width = "320px"; });
+      assert.equal(await frame.locator("body").evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 2), true);
+      assert.deepEqual(errors, []);
       await page.close();
     }
   } finally {
@@ -317,7 +379,7 @@ async function main() {
     await new Promise((resolve) => server.close(resolve));
   }
 
-  console.log("PASS: zapret2 EN/RU tabs, keyboard navigation, unsaved settings, target suggestions and scanner results");
+  console.log("PASS: zapret2 EN/RU rule workflow, legacy selection preservation, contextual strategies, finder actions, diagnostics and responsive layout");
 }
 
 main().catch((error) => {

@@ -2,29 +2,12 @@
 "use strict";
 
 let serviceCatalogEntries = [];
-let selectedServiceLists = [];
 let currentServiceStatuses = [];
 let serviceRefreshBusy = false;
 
-async function loadServiceLists(saved, catalogEntries) {
-  if (serviceCatalogEntries.length === 0) {
-    serviceCatalogEntries = catalogEntries;
-    const select = document.getElementById("service-picker");
-
-    for (const service of serviceCatalogEntries) {
-      const option = document.createElement("option");
-      option.value = service.id;
-      option.textContent = service.name;
-      select.appendChild(option);
-    }
-  }
-
-  selectedServiceLists = [...(saved || [])];
+function loadServiceLists(catalogEntries) {
+  serviceCatalogEntries = catalogEntries;
   renderServiceLists();
-}
-
-function serviceListsConfig() {
-  return [...selectedServiceLists];
 }
 
 function appendServiceText(parentNode, text) {
@@ -43,11 +26,7 @@ function renderServiceLists(statuses) {
   }
 
   const root = document.getElementById("service-lists");
-  const signature = JSON.stringify([selectedServiceLists, currentServiceStatuses, config?.lists, parent.OCF_I18N?.language]);
-
-  for (const option of document.getElementById("service-picker").options) {
-    option.disabled = selectedServiceLists.includes(option.value);
-  }
+  const signature = JSON.stringify([savedServiceIDs(), currentServiceStatuses, config?.lists, parent.OCF_I18N?.language]);
 
   document.getElementById("service-refresh").disabled = serviceRefreshBusy || !savedServiceIDs().length || pending;
 
@@ -59,7 +38,7 @@ function renderServiceLists(statuses) {
   root.dataset.rendered = signature;
   root.replaceChildren();
 
-  for (const id of selectedServiceLists) {
+  for (const id of savedServiceIDs()) {
     const service = serviceCatalogEntries.find((entry) => entry.id === id);
 
     if (!service) {
@@ -67,7 +46,6 @@ function renderServiceLists(statuses) {
     }
 
     const status = currentServiceStatuses.find((entry) => entry.id === id);
-    const saved = config?.lists?.includes(id);
     const card = document.createElement("div");
     card.className = "ocf-service-list";
     card.dataset.service = id;
@@ -76,23 +54,13 @@ function renderServiceLists(statuses) {
     const name = document.createElement("strong");
     name.textContent = service.name;
     heading.appendChild(name);
-    const remove = document.createElement("button");
-    remove.type = "button";
-    remove.className = "ext-secondary";
-    remove.textContent = "Remove";
-    remove.addEventListener("click", () => {
-      selectedServiceLists = selectedServiceLists.filter((entry) => entry !== id);
-      setDirty(true);
-      renderServiceLists();
-    });
-    heading.appendChild(remove);
     card.appendChild(heading);
     const state = document.createElement("p");
     const labels = {READY: "Up to date", UPDATING: "Updating lists", NOT_LOADED: "Waiting for download", ERROR: "List update failed"};
-    const message = !saved ? "Apply to use this list" : labels[status?.state] || "Waiting for download";
+    const message = labels[status?.state] || "Waiting for download";
     appendServiceText(state, message);
 
-    if (saved && status?.state === "ERROR" && status.updated) {
+    if (status?.state === "ERROR" && status.updated) {
       state.appendChild(document.createTextNode(". "));
       appendServiceText(state, "Using the saved copy");
     }
@@ -143,17 +111,6 @@ function renderServiceLists(statuses) {
     root.appendChild(card);
   }
 }
-
-document.getElementById("service-add").addEventListener("click", () => {
-  const select = document.getElementById("service-picker");
-
-  if (select.value && !selectedServiceLists.includes(select.value)) {
-    selectedServiceLists.push(select.value);
-    select.value = "";
-    setDirty(true);
-    renderServiceLists();
-  }
-});
 
 document.getElementById("service-refresh").addEventListener("click", async () => {
   if (serviceRefreshBusy || pending || !savedServiceIDs().length) {

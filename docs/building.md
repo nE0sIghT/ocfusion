@@ -106,6 +106,12 @@ proprietary ASUS firmware assets. Optional native-header checks may use a
 separately supplied inspected state.js through `ASUS_STATE_JS_FIXTURE`; it is
 never distributed.
 
+To check zapret2 against locally extracted stock styles, set
+`OCF_STOCK_STYLE_DIR=/path/to/firmware/www` and run
+`node tests/test-zapret-ui.cjs`. The fixture reads `form_style.css` and
+`index_style.css` from that directory; they are not copied into the repository
+or distribution.
+
 ## Optional modules and standalone packages
 
 Prebuilt releases and the default runtime build include VPN integration,

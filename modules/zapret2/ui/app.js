@@ -12,10 +12,6 @@ let scan = null;
 let scanBusy = false;
 let renderedScan = "";
 
-function lines(id) {
-  return document.getElementById(id).value.split(/\r?\n/).map((value) => value.trim()).filter(Boolean);
-}
-
 function ports(id) {
   const value = document.getElementById(id).value.trim();
 
@@ -71,6 +67,7 @@ async function load() {
 
   pending = true;
   fields.disabled = true;
+  updateProcessingControl();
 
   try {
     config = await parent.EXTENSIONS.action(moduleID, "settings");
@@ -99,15 +96,9 @@ async function load() {
     }
 
     document.getElementById("preset").value = "";
-    document.getElementById("preset-description").textContent = "Choose a starting point, then apply or adjust its settings.";
+    document.getElementById("preset-description").textContent = "Choose a preset or adjust the settings.";
     document.getElementById("enabled").checked = config.enabled;
-    await loadServiceLists(config.lists, moduleCatalog.lists);
-    document.getElementById("manual-destinations").open = Boolean(config.domains?.length || config.networks?.length);
-
-    for (const key of ["networks", "domains"]) {
-      document.getElementById(key).value = (config[key] || []).join("\n");
-    }
-
+    loadServiceLists(moduleCatalog.lists);
     for (const key of ["tcp_ports", "udp_ports"]) {
       document.getElementById(key).value = (config[key] || []).join(", ");
     }
@@ -131,21 +122,23 @@ async function load() {
     writeApplications(config.applications || [], false);
     updateStrategyFields();
     initializeRules(config.rules);
-    document.getElementById("default-policy").open = !config.rules?.length && Boolean(config.domains?.length || config.networks?.length || config.lists?.length);
     loadMonitoringForm(config.monitor);
 
     renderedScan = "";
     renderScan(scan);
     setDirty(false);
-    document.getElementById("diagnostic-networks").textContent = String((config.networks || []).length);
-    document.getElementById("diagnostic-domains").textContent = String((config.domains || []).length);
+    document.getElementById("diagnostic-networks").textContent = String(new Set(savedRuleRows.flatMap((rule) => rule.networks || [])).size);
+    document.getElementById("diagnostic-domains").textContent = String(new Set(savedRuleRows.flatMap((rule) => rule.domains || [])).size);
     result.textContent = "";
+    document.getElementById("processing-result").textContent = "";
   } catch (error) {
     result.textContent = error.message;
     document.getElementById("monitor-result").textContent = error.message;
   } finally {
     pending = false;
     fields.disabled = !config;
+    document.getElementById("toggle-processing").disabled = !config;
+    updateProcessingControl();
     renderServiceLists();
   }
 }
@@ -159,6 +152,7 @@ document.getElementById("settings").addEventListener("submit", async (event) => 
 
   pending = true;
   fields.disabled = true;
+  updateProcessingControl();
   document.getElementById("monitor-save").disabled = true;
   document.getElementById("monitor-result").textContent = "";
   result.textContent = "";
@@ -169,9 +163,9 @@ document.getElementById("settings").addEventListener("submit", async (event) => 
       ...draftBaseStrategy,
       revision: config.revision + 1,
       enabled: document.getElementById("enabled").checked,
-      lists: serviceListsConfig(),
-      networks: lines("networks"),
-      domains: lines("domains"),
+      lists: [],
+      networks: [],
+      domains: [],
       rules,
       monitor: monitoringFormConfig(),
     };
@@ -185,6 +179,7 @@ document.getElementById("settings").addEventListener("submit", async (event) => 
     pending = false;
     fields.disabled = false;
     document.getElementById("monitor-save").disabled = false;
+    updateProcessingControl();
     renderServiceLists();
   }
 });
@@ -194,12 +189,16 @@ async function updateStatus() {
     const snapshot = await parent.EXTENSIONS.status(moduleID);
     const labels = {
       DISABLED: "Disabled",
-      EMPTY: "Add destinations to start processing",
+      EMPTY: "No active rules",
       WAIT_LISTS: "Waiting for service lists",
       RUNNING: "Running",
-      ERROR: "Rules unavailable",
+      ERROR: "Processing error",
     };
-    document.getElementById("state").textContent = labels[snapshot.data?.state] || "Unavailable";
+    latestModuleState = snapshot.data?.state || "UNAVAILABLE";
+    document.getElementById("state").textContent = config && !config.enabled ? "Paused" : labels[latestModuleState] || "Unavailable";
+    updateProcessingControl();
+    const queue = snapshot.data?.queue;
+    document.getElementById("queue-details").textContent = queue ? JSON.stringify(queue, null, 2) : "";
     renderScan(snapshot.data?.scan);
     renderServiceLists(snapshot.data?.lists);
     renderHealth(snapshot.data?.health);
@@ -215,13 +214,7 @@ for (const id of ["tcp_strategy", "udp_strategy", "auto_ttl"]) {
   document.getElementById(id).addEventListener("change", updateStrategyFields);
 }
 
-document.getElementById("networks").addEventListener("input", updateApplicationSummary);
-
-document.getElementById("reload").addEventListener("click", () => {
-  if (confirmDiscard()) {
-    load();
-  }
-});
+document.getElementById("reload").addEventListener("click", () => load());
 load().then(updateStatus);
 setInterval(updateStatus, 3000);
 
@@ -255,7 +248,8 @@ function fillStrategySettings(preset) {
 
   setDirty(true);
   document.getElementById("preset").value = "";
-  document.getElementById("preset-description").textContent = preset.description || preset.name;
+  document.getElementById("preset-description").textContent = preset.description || "";
+  document.getElementById("preset-description").hidden = !preset.description;
   updateStrategyFields();
 }
 
@@ -288,3 +282,33 @@ for (const id of ["tcp_strategy", "udp_strategy", "split_positions", "sequence_o
     document.getElementById("preset-description").textContent = "Custom strategy settings";
   });
 }
+
+function updateProcessingControl() {
+  const button = document.getElementById("toggle-processing");
+  button.disabled = pending || !config;
+  button.textContent = config?.enabled ? "Pause processing" : "Resume processing";
+  document.getElementById("processing-state").textContent = config?.enabled ? "Processing enabled" : "Processing paused";
+}
+
+document.getElementById("toggle-processing").addEventListener("click", async () => {
+  if (!config || pending) {
+    return;
+  }
+  pending = true;
+  fields.disabled = true;
+  updateProcessingControl();
+  try {
+    const next = {...config, revision: config.revision + 1, enabled: !config.enabled};
+    await parent.EXTENSIONS.configure(moduleID, next);
+    config = next;
+    document.getElementById("enabled").checked = config.enabled;
+    document.getElementById("processing-result").textContent = "";
+    await updateStatus();
+  } catch (error) {
+    document.getElementById("processing-result").textContent = error.message;
+  } finally {
+    pending = false;
+    fields.disabled = !config;
+    updateProcessingControl();
+  }
+});
