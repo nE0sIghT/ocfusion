@@ -53,6 +53,7 @@ module_specs += {
             'packaging/module.json.in',
             'ui/index.html',
             'ui/app.js',
+            'ui/protocols.js',
             'ui/rules.js',
             'ui/monitoring.js',
             'ui/discovery.js',

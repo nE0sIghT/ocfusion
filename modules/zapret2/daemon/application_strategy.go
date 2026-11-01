@@ -4,6 +4,7 @@ package main
 import "strconv"
 
 func applicationStrategy(c Config, profile ApplicationProfile, kind ApplicationKind) []string {
+	c = protocolConfig(c, kind.ID)
 	args := []string{"--out-range=-d" + strconv.Itoa(profile.Packets), "--payload=" + kind.Payload}
 	fake := "--lua-desync=fake:payload=all:blob=" + kind.Blob + fakeOptions(c, kind.Transport == "tcp") + ":repeats=" + strconv.Itoa(profile.Repeats)
 	if profile.Method == "fake" || profile.Method == "fake-split" || profile.Method == "fake-disorder" || profile.Method == "fake-fragment" {

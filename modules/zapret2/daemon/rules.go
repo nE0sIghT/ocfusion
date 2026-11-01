@@ -12,21 +12,22 @@ import (
 )
 
 type DestinationRule struct {
-	Monitor  MonitorConfig  `json:"monitor"`
-	Action   string         `json:"action,omitempty"`
-	Target   string         `json:"target,omitempty"`
-	Failure  string         `json:"failure,omitempty"`
-	ID       string         `json:"id"`
-	Name     string         `json:"name"`
-	Enabled  bool           `json:"enabled"`
-	Lists    []string       `json:"lists"`
-	Domains  []string       `json:"domains"`
-	Networks []string       `json:"networks"`
-	Settings map[string]any `json:"settings"`
+	Selections map[string]StrategySelection `json:"strategy_selections,omitempty"`
+	Monitor    MonitorConfig                `json:"monitor"`
+	Action     string                       `json:"action,omitempty"`
+	Target     string                       `json:"target,omitempty"`
+	Failure    string                       `json:"failure,omitempty"`
+	ID         string                       `json:"id"`
+	Name       string                       `json:"name"`
+	Enabled    bool                         `json:"enabled"`
+	Lists      []string                     `json:"lists"`
+	Domains    []string                     `json:"domains"`
+	Networks   []string                     `json:"networks"`
+	Settings   map[string]any               `json:"settings"`
 }
 
 var ruleIDPattern = regexp.MustCompile(`^[a-z][a-z0-9-]{0,23}$`)
-var tuningKeys = []string{"applications", "tcp_ports", "udp_ports", "tcp_strategy", "udp_strategy", "split_position", "split_positions", "sequence_overlap", "fake_ttl", "fake_repeats", "fake_fooling", "fake_sni", "auto_ttl", "auto_ttl_delta", "auto_ttl_min", "auto_ttl_max", "packet_limit"}
+var tuningKeys = []string{"protocol_options", "applications", "tcp_ports", "udp_ports", "tcp_strategy", "udp_strategy", "split_position", "split_positions", "sequence_overlap", "fake_ttl", "fake_repeats", "fake_fooling", "fake_sni", "auto_ttl", "auto_ttl_delta", "auto_ttl_min", "auto_ttl_max", "packet_limit"}
 
 func strategyProjection(c Config) map[string]any {
 	data, _ := json.Marshal(c)
@@ -102,6 +103,9 @@ func validateRules(c *Config) error {
 			return err
 		}
 		rule.Domains, rule.Networks, rule.Lists = normalized.Domains, normalized.Networks, normalized.Lists
+		if err := validateStrategySelections(rule, normalized); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -157,6 +161,7 @@ func packetConfiguration(c Config) Config {
 	c.Rules = append([]DestinationRule{}, c.Rules...)
 	for i := range c.Rules {
 		c.Rules[i].Name = ""
+		c.Rules[i].Selections = nil
 		c.Rules[i].Monitor = MonitorConfig{}
 	}
 	return c

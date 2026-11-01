@@ -375,3 +375,14 @@
 .ocf-finder-table th:first-child {
   width: 38%;
 }
+
+.ocf-protocol-card {
+  padding: 16px 0 24px;
+  border-bottom: 1px solid var(--ext-line);
+}
+.ocf-protocol-card > h3 {
+  margin-top: 0;
+}
+.ocf-protocol-card > details {
+  margin-top: 16px;
+}

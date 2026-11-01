@@ -130,6 +130,7 @@ function updateResultActions() {
   const running = ["QUEUED", "RUNNING"].includes(scan?.state);
   const disabled = pending || running || scanBusy || scan?.state !== "COMPLETE" || scan?.revision !== config?.revision;
   document.getElementById("scan-selected-actions").hidden = !entry;
+  document.getElementById("scan-use").textContent = entry?.protocol === "tcp" ? "Use for TCP" : entry?.protocol === "udp" ? "Use for QUIC" : entry?.protocol === "stun" ? "Use for STUN" : "Use in rule";
   for (const id of ["scan-use", "scan-confirm", "scan-refine", "scan-simplify", "scan-scope"]) {
     document.getElementById(id).disabled = disabled || !entry || (id === "scan-use" && !entry.success);
   }
@@ -183,7 +184,7 @@ document.getElementById("scan-use").addEventListener("click", async () => {
       draftRules.push(rule);
     }
     openRule(rule.id);
-    fillStrategySettings(candidate);
+    fillStrategySettings({...candidate, id: selectedResultID}, true);
     rememberStrategyScope();
     setDirty(true);
   } catch (error) {
@@ -378,7 +379,7 @@ async function refreshHistory() {
 
         try {
           const preset = await parent.EXTENSIONS.call(moduleID, "history-settings", {id: entry.id, revision: config.revision});
-          fillStrategySettings(preset);
+          fillStrategySettings({...preset, id: entry.id}, true);
           rememberStrategyScope();
           setDirty(true);
         } catch (error) {

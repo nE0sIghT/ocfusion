@@ -76,6 +76,7 @@ func fakeOptions(c Config, tcp bool) string {
 }
 
 func tcpStrategy(c Config) []string {
+	c = protocolConfig(c, "tcp")
 	args := []string{}
 	if c.TCP == "fake" || c.TCP == "fake-split" || c.TCP == "fake-disorder" {
 		repeats := ":repeats=" + strconv.Itoa(c.Repeats)
@@ -207,10 +208,12 @@ func workerProfiles(c Config, directory string) []string {
 			} else {
 				args = append(args, "--hostlist="+filepath.Join(directory, c.SelectorPrefix+"domains.txt"))
 			}
+			args = append(args, "--out-range=-n"+strconv.Itoa(protocolConfig(c, protocol).PacketLimit))
 			if protocol == "tcp" {
 				args = append(args, tcpStrategy(c)...)
 			} else {
-				args = append(args, "--payload=quic_initial", "--lua-desync=fake:blob=fake_default_quic"+fakeOptions(c, false)+":repeats="+strconv.Itoa(c.Repeats))
+				options := protocolConfig(c, "udp")
+				args = append(args, "--payload=quic_initial", "--lua-desync=fake:blob=fake_default_quic"+fakeOptions(options, false)+":repeats="+strconv.Itoa(options.Repeats))
 			}
 		}
 	}

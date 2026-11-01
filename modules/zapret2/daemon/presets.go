@@ -22,7 +22,7 @@ func presets() []Preset {
 		{"fake-md5", "Fake and reorder", "Combine TCP MD5 fake packets with reordered segments.", "tcp", map[string]any{"tcp_strategy": "fake-disorder", "split_positions": "1,midsld", "fake_fooling": "md5", "auto_ttl": true}},
 		{"interleave", "Interleaved segments", "Alternate fake and real segments with TCP sequence protection.", "tcp", map[string]any{"tcp_strategy": "fakedsplit", "split_positions": "midsld", "fake_fooling": "badseq", "auto_ttl": true}},
 		{"hostfake", "Fake hostname", "Split the handshake around a fake server name.", "tcp", map[string]any{"tcp_strategy": "hostfakesplit", "fake_fooling": "md5", "auto_ttl": true}},
-		{"quic", "QUIC fake packets", "Send repeated fake QUIC Initial packets. Not tested by the HTTPS scanner.", "udp", map[string]any{"udp_strategy": "fake-quic", "fake_repeats": 6, "auto_ttl": true}},
+		{"quic", "QUIC fake packets", "Send repeated fake QUIC Initial packets.", "udp", map[string]any{"udp_strategy": "fake-quic", "fake_repeats": 6, "auto_ttl": true}},
 	}, applicationPresets()...)
 }
 
@@ -50,13 +50,13 @@ func presetCatalog() []Preset {
 		data, _ := json.Marshal(c)
 		settings := map[string]any{}
 		_ = json.Unmarshal(data, &settings)
-		for _, key := range []string{"revision", "enabled", "networks", "domains", "lists", "applications", "tcp_ports", "udp_ports", "rules", "monitor"} {
+		for _, key := range []string{"revision", "enabled", "networks", "domains", "lists", "applications", "tcp_ports", "udp_ports", "rules", "monitor", "protocol_options"} {
 			delete(settings, key)
 		}
 		if catalog[i].Protocol == "tcp" {
 			delete(settings, "udp_strategy")
 		} else if catalog[i].Protocol == "udp" {
-			// QUIC shares fake-packet timing with TCP. Show this effect in the form.
+			// Expose only the fields that belong to QUIC.
 			for _, key := range []string{"tcp_strategy", "split_position", "split_positions", "sequence_overlap", "fake_fooling", "fake_sni", "packet_limit"} {
 				delete(settings, key)
 			}

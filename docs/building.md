@@ -112,6 +112,17 @@ To check zapret2 against locally extracted stock styles, set
 `index_style.css` from that directory; they are not copied into the repository
 or distribution.
 
+For the zapret2 browser workflow, `OCF_ZAPRET_VALIDATOR` can point to a native
+build of the module adapter. The fixture then round-trips saved browser
+configuration through the actual Go parser and verifies that selected strategy
+names and per-protocol test markers survive loading:
+
+```sh
+go -C modules/zapret2/daemon build -o ../../../build/zapret-ui-native .
+OCF_ZAPRET_VALIDATOR="$PWD/build/zapret-ui-native" node tests/test-zapret-ui.cjs
+```
+
+
 ## Optional modules and standalone packages
 
 Prebuilt releases and the default runtime build include VPN integration,

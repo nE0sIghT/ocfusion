@@ -58,18 +58,19 @@
           </section>
           <div id="strategy-storage" hidden>
             <section id="panel-strategies" hidden>
-              <h3>
-                Bypass settings
-              </h3>
+              <h3>Bypass settings</h3>
+              <section class="ocf-protocol-card" data-protocol="tcp">
+                <h3>TCP (HTTP / HTTPS)</h3>
               <table class="ocf-config-table">
                 <tr>
                   <th>
                     <label for="preset">
-                      Preset
+                      Strategy
                     </label>
                   </th>
                   <td>
                     <select id="preset">
+                      <option value="off">Off</option>
                       <option value="">
                         Custom settings
                       </option>
@@ -80,52 +81,8 @@
                   </td>
                 </tr>
               </table>
-              <details id="confirmed-history">
-                <summary>
-                  Saved finder results
-                </summary>
-                <button id="history-refresh" type="button" class="ext-secondary">
-                  Refresh history
-                </button>
-                <div id="history-results">
-                </div>
-              </details>
-              <dl class="ocf-strategy-summary">
-                <div>
-                  <dt>
-                    TCP
-                  </dt>
-                  <dd id="summary-tcp">
-                    -
-                  </dd>
-                </div>
-                <div>
-                  <dt>
-                    UDP
-                  </dt>
-                  <dd id="summary-udp">
-                    -
-                  </dd>
-                </div>
-                <div>
-                  <dt>
-                    Applications
-                  </dt>
-                  <dd id="summary-applications">
-                    Off
-                  </dd>
-                </div>
-              </dl>
-              <p id="application-ip-notice" class="ext-managed-notice" hidden>
-                Application profiles need destination IPs. Add server IPs or select service lists containing subnets.
-              </p>
-              <details id="custom-strategy">
-                <summary>
-                  Advanced settings
-                </summary>
-                <h2>
-                  TCP connections
-                </h2>
+                <p id="summary-tcp" class="ext-muted"></p>
+                <details id="custom-strategy"><summary>Advanced settings</summary>
                 <table class="ocf-config-table">
                   <tr>
                     <th>
@@ -142,25 +99,25 @@
                           Split packets
                         </option>
                         <option value="disorder">
-                          Split and reorder packets
+                          Reordered segments
                         </option>
                         <option value="fake">
                           Fake packets
                         </option>
                         <option value="fake-split">
-                          Fake packets and split
+                          Fake and split
                         </option>
                         <option value="fake-disorder">
-                          Fake packets and reorder
+                          Fake and reorder
                         </option>
                         <option value="fakedsplit">
-                          Interleave fake and real segments
+                          Interleaved segments
                         </option>
                         <option value="fakeddisorder">
                           Interleave and reorder segments
                         </option>
                         <option value="hostfakesplit">
-                          Split around a fake hostname
+                          Fake hostname
                         </option>
                       </select>
                     </td>
@@ -192,49 +149,6 @@
                     </td>
                   </tr>
                 </table>
-                <h2>
-                  UDP connections
-                </h2>
-                <table class="ocf-config-table">
-                  <tr>
-                    <th>
-                      <label for="udp_strategy">
-                        Strategy
-                      </label>
-                    </th>
-                    <td>
-                      <select id="udp_strategy">
-                        <option value="off">
-                          Off
-                        </option>
-                        <option value="fake-quic">
-                          QUIC fake packets
-                        </option>
-                      </select>
-                    </td>
-                  </tr>
-                  <tr>
-                    <th>
-                      <label for="udp_ports">
-                        UDP ports
-                      </label>
-                    </th>
-                    <td>
-                      <input id="udp_ports" type="text" />
-                    </td>
-                  </tr>
-                </table>
-                <h3>
-                  Application profiles
-                </h3>
-                <p>
-                  Application profiles use destination IPs and subnets. Ports may be individual numbers, ranges such as 50000-65535, or * for all ports.
-                </p>
-                <div id="application-profiles">
-                </div>
-                <h3>
-                  Packet settings
-                </h3>
                 <table class="ocf-config-table">
                   <tr>
                     <th>
@@ -356,7 +270,7 @@
                     <td>
                       <input id="fake_repeats" type="number" min="1" max="20" />
                       <p>
-                        Applies to standalone TCP fakes and QUIC fakes.
+                        Applies to this protocol only.
                       </p>
                     </td>
                   </tr>
@@ -374,6 +288,81 @@
                     </td>
                   </tr>
                 </table>
+                </details>
+              </section>
+              <section class="ocf-protocol-card" data-protocol="udp">
+                <h3>QUIC (HTTP/3)</h3>
+                <label class="ext-field">
+                  <span>Strategy</span>
+                  <select id="quic-preset"><option value="">Custom settings</option><option value="off">Off</option></select>
+                </label>
+                <p id="summary-udp" class="ext-muted"></p>
+                <details id="quic-advanced"><summary>Advanced settings</summary>
+                <table class="ocf-config-table">
+                  <tr>
+                    <th>
+                      <label for="udp_strategy">
+                        Strategy
+                      </label>
+                    </th>
+                    <td>
+                      <select id="udp_strategy">
+                        <option value="off">
+                          Off
+                        </option>
+                        <option value="fake-quic">
+                          QUIC fake packets
+                        </option>
+                      </select>
+                    </td>
+                  </tr>
+                  <tr>
+                    <th>
+                      <label for="udp_ports">
+                        QUIC ports
+                      </label>
+                    </th>
+                    <td>
+                      <input id="udp_ports" type="text" />
+                    </td>
+                  </tr>
+                </table>
+                  <table id="quic-packet-options" class="ocf-config-table"></table>
+                </details>
+              </section>
+              <section class="ocf-protocol-card" data-protocol="applications">
+                <h3>Other protocols</h3>
+                <label class="ext-field">
+                  <span>Strategy</span>
+                  <select id="application-preset"><option value="">Choose a preset</option><option value="off">Off</option></select>
+                </label>
+                <div id="summary-applications"></div>
+                <p id="application-ip-notice" class="ext-managed-notice" hidden>
+                  Application profiles need destination IPs. Add server IPs or select service lists containing subnets.
+                </p>
+                <details id="application-settings"><summary>Protocol settings</summary>
+                <p>
+                  Application profiles use destination IPs and subnets. Ports may be individual numbers, ranges such as 50000-65535, or * for all ports.
+                </p>
+                <div id="application-profiles">
+                </div>
+                </details>
+              </section>
+              <details id="combined-strategies"><summary>Multi-protocol presets</summary>
+                <label class="ext-field">
+                  <span>Strategy</span>
+                  <select id="combined-preset"><option value="">Choose a preset</option></select>
+                </label>
+              </details>
+              <details id="confirmed-history">
+                <summary>
+                  Saved finder results
+                </summary>
+                <button id="history-refresh" type="button" class="ext-secondary">
+                  Refresh history
+                </button>
+                <div id="history-results">
+                </div>
               </details>
             </section>
           </div>
@@ -720,6 +709,8 @@
     <script src="rules.js">
     </script>
     <script src="monitoring.js">
+    </script>
+    <script src="protocols.js">
     </script>
     <script src="app.js">
     </script>

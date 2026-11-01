@@ -8,6 +8,21 @@ const path = require("path");
 const {chromium} = require(process.env.PLAYWRIGHT_MODULE || "playwright");
 const root = path.resolve(__dirname, "..");
 
+function normalizeWithBackend(settings) {
+  if (!process.env.OCF_ZAPRET_VALIDATOR) {
+    return settings;
+  }
+  const directory = fs.mkdtempSync(path.join(require("os").tmpdir(), "ocf-zapret-ui-"));
+  try {
+    const filename = path.join(directory, "config.json");
+    fs.writeFileSync(filename, JSON.stringify(settings));
+    const output = require("child_process").execFileSync(process.env.OCF_ZAPRET_VALIDATOR, ["settings"], {input: JSON.stringify({config_path: filename}), encoding: "utf8"});
+    return JSON.parse(output);
+  } finally {
+    fs.rmSync(directory, {recursive: true, force: true});
+  }
+}
+
 async function main() {
   const assets = {
     "/module/index.html": "modules/zapret2/ui/index.html",
@@ -17,6 +32,7 @@ async function main() {
     "/module/rules.js": "modules/zapret2/ui/rules.js",
     "/module/monitoring.js": "modules/zapret2/ui/monitoring.js",
     "/module/app.js": "modules/zapret2/ui/app.js",
+    "/module/protocols.js": "modules/zapret2/ui/protocols.js",
     "/module/targets.js": "modules/zapret2/ui/targets.js",
     "/module/layout.js": "modules/zapret2/ui/layout.js",
     "/module/layout.css": "modules/zapret2/ui/layout.css",
@@ -78,7 +94,7 @@ async function main() {
             }
 
             if (operation === "presets") {
-              return [{id: "hostname", name: "Hostname split", description: "Split within the server name.", protocol: "tcp", settings: {tcp_strategy: "split", split_positions: "1,midsld", sequence_overlap: 0, auto_ttl: false}}];
+              return [{id: "hostname", name: "Hostname split", description: "Split within the server name.", protocol: "tcp", settings: {tcp_strategy: "split", split_positions: "1,midsld", sequence_overlap: 0, auto_ttl: false}}, {id:"disorder", name:"Reordered segments", protocol:"tcp", settings:{tcp_strategy:"disorder",split_positions:"1,midsld"}}, {id:"mtproto-split",name:"Telegram MTProto - split",protocol:"application",settings:{applications:[{id:"mtproto",method:"split",ports:"*",packets:3,position:2,repeats:3,fragment:8,padding:2}]}}];
             }
 
             return {...window.saved};
@@ -95,7 +111,14 @@ async function main() {
               return {ok:true};
             }
 
-            if (operation === "scan-settings" || operation === "history-settings") {
+            if (operation === "scan-settings") {
+              if (request.id === "quic") {
+                return {id:"quic",name:"QUIC fake packets",protocol:"udp",settings:{udp_strategy:"fake-quic",fake_ttl:6,fake_repeats:11,auto_ttl:false,auto_ttl_delta:-1,auto_ttl_min:3,auto_ttl_max:20}};
+              }
+              return {id:"disorder",name:"Reordered segments",protocol:"tcp",settings:{tcp_strategy:"disorder",split_position:2,split_positions:"1,midsld",sequence_overlap:0,fake_ttl:9,fake_repeats:7,auto_ttl:true,auto_ttl_delta:-1,auto_ttl_min:3,auto_ttl_max:20,packet_limit:12,fake_fooling:"md5",fake_sni:""}};
+            }
+
+            if (operation === "history-settings") {
               return {name:"Hostname split", protocol:"tcp", settings:{tcp_strategy:"split",split_positions:"1,midsld"}};
             }
 
@@ -212,7 +235,9 @@ async function main() {
         await frame.locator("body").screenshot({path:path.join(process.env.OCF_UI_SCREENSHOT_DIR, "zapret-editor-" + theme + "-" + language + ".png")});
       }
       await frame.locator("#preset").selectOption("hostname");
+      await frame.locator("#application-preset").selectOption("mtproto-split");
       await frame.locator("#custom-strategy > summary").click();
+      await frame.locator("#quic-advanced > summary").click();
       await frame.locator("#udp_strategy").selectOption("fake-quic");
       await frame.locator("#settings button[type=submit]").click();
       await frame.locator("#fields:not([disabled])").waitFor();
@@ -266,7 +291,7 @@ async function main() {
       assert.equal((await page.evaluate(() => window.lastCall)).request.targets[0].host, "changed.example.com");
       const showResult = async (id) => {
         await page.evaluate((scanID) => {
-          window.scan = {id:scanID,state:"COMPLETE",revision:window.saved.revision,targets:[{host:"example.com",port:443,protocol:"https"}],results:[{preset:"baseline",success:0,attempts:2,protocol:"tcp"},{preset:"hostname",success:2,attempts:2,milliseconds:125,protocol:"tcp"}]};
+          window.scan = {id:scanID,state:"COMPLETE",revision:window.saved.revision,targets:[{host:"example.com",port:443,protocol:"https"}],results:[{preset:"baseline",success:0,attempts:2,protocol:"tcp"},{preset:"disorder",success:2,attempts:2,milliseconds:125,protocol:"tcp"}]};
         }, id);
         await frame.locator("body").evaluate(() => updateStatus());
         await frame.locator('#scan-results input[type="radio"]').check();
@@ -289,14 +314,63 @@ async function main() {
       assert.equal((await page.evaluate(() => window.lastCall)).request.mode, "lighten");
       await showResult("final");
       const changesBeforeUse = await page.evaluate(() => window.changes.length);
+      assert.equal(await frame.locator("#scan-use").innerText(), language === "ru" ? "Использовать для TCP" : "Use for TCP");
+      const quicBefore = await frame.locator("body").evaluate(() => readPacketOptions("udp"));
+      const appsBefore = await frame.locator("body").evaluate(() => readApplications());
+      assert.equal(appsBefore.length, 1);
       await frame.locator("#scan-use").click();
       assert.equal(await frame.locator("#panel-management").isVisible(), true);
       assert.equal(await frame.locator('.ocf-rule-editor').getAttribute("data-rule-id"), "main");
       assert.equal(await page.evaluate(() => window.changes.length), changesBeforeUse);
+      assert.equal(await frame.locator("#preset").inputValue(), "disorder");
+      assert.equal(await frame.locator("#preset option:checked").innerText(), language === "ru" ? "Перестановка сегментов" : "Reordered segments");
+      assert((await frame.locator("#summary-tcp").innerText()).includes(language === "ru" ? "Проверено подбором" : "Tested by finder"));
+      assert((await frame.locator("#summary-udp").innerText()).includes(language === "ru" ? "Не проверено" : "Not tested"));
+      assert.deepEqual(await frame.locator("body").evaluate(() => readPacketOptions("udp")), quicBefore);
+      assert.deepEqual(await frame.locator("body").evaluate(() => readApplications()), appsBefore);
+      if (await frame.locator("#custom-strategy").getAttribute("open") === null) {
+        await frame.locator("#custom-strategy > summary").click();
+      }
+      await frame.locator("#split_positions").fill("2,midsld");
+      assert.equal(await frame.locator("#preset").inputValue(), "");
+      assert(!(await frame.locator("#summary-tcp").innerText()).includes(language === "ru" ? "Проверено подбором" : "Tested by finder"));
+      await frame.locator("#split_positions").fill("1,midsld");
+      assert.equal(await frame.locator("#preset").inputValue(), "disorder");
       await frame.locator("#settings button[type=submit]").click();
       await frame.locator("#fields:not([disabled])").waitFor();
       saved = await page.evaluate(() => window.saved);
       assert.equal(saved.rules.find((entry) => entry.id === "main").settings.udp_strategy, "fake-quic");
+      const normalized = normalizeWithBackend(saved);
+      const selectedTCP = normalized.rules.find((entry) => entry.id === "main").strategy_selections.tcp;
+      assert.equal(selectedTCP.name, "Reordered segments");
+      assert.equal(selectedTCP.checked, true);
+      await page.evaluate((settings) => { window.saved = settings; }, normalized);
+      await frame.locator("body").evaluate(() => load());
+      await frame.locator("#fields:not([disabled])").waitFor();
+      await frame.locator("[data-rule-row=main] button").click();
+      assert.equal(await frame.locator("#preset").inputValue(), "disorder");
+      assert((await frame.locator("#summary-tcp").innerText()).includes(language === "ru" ? "Проверено подбором" : "Tested by finder"));
+      assert.deepEqual(await frame.locator("body").evaluate(() => readPacketOptions("udp")), quicBefore);
+      const tcpBeforeQUIC = await frame.locator("body").evaluate(() => readPacketOptions("tcp"));
+      await frame.locator(".ocf-rule-editor button").filter({hasText: language === "ru" ? "Подобрать стратегию" : "Find a strategy"}).click();
+      await page.evaluate(() => {
+        window.scan = {id:"quic-check",state:"COMPLETE",revision:window.saved.revision,targets:[{host:"example.com",port:443,protocol:"http3"}],results:[{preset:"baseline",success:0,attempts:2,protocol:"udp"},{preset:"quic",success:2,attempts:2,milliseconds:100,protocol:"udp"}]};
+      });
+      await frame.locator("body").evaluate(() => updateStatus());
+      await frame.locator('#scan-results input[type="radio"]').check();
+      assert.equal(await frame.locator("#scan-use").innerText(), language === "ru" ? "Использовать для QUIC" : "Use for QUIC");
+      await frame.locator("#scan-use").click();
+      assert.equal(await frame.locator("#preset").inputValue(), "disorder");
+      assert.equal(await frame.locator("#quic-preset option:checked").innerText(), language === "ru" ? "Подставные пакеты QUIC" : "QUIC fake packets");
+      assert.deepEqual(await frame.locator("body").evaluate(() => readPacketOptions("tcp")), tcpBeforeQUIC);
+      assert((await frame.locator("#summary-tcp").innerText()).includes(language === "ru" ? "Проверено подбором" : "Tested by finder"));
+      await frame.locator("#settings button[type=submit]").click();
+      await frame.locator("#fields:not([disabled])").waitFor();
+      const both = normalizeWithBackend(await page.evaluate(() => window.saved));
+      assert.equal(both.rules.find((entry) => entry.id === "main").strategy_selections.tcp.checked, true);
+      assert.equal(both.rules.find((entry) => entry.id === "main").strategy_selections.udp.checked, true);
+      await frame.locator("[data-rule-row=main] button").click();
+      await frame.locator(".ocf-rule-editor button").filter({hasText: language === "ru" ? "К списку правил" : "Back to rules"}).click();
 
       await frame.locator("#tab-diagnostics").click();
       assert.equal(await frame.locator("#technical-details").getAttribute("open"), null);

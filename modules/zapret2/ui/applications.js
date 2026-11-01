@@ -5,10 +5,10 @@ let applicationKinds = [];
 
 const applicationMethods = {
   split: "Split packets",
-  disorder: "Split and reorder packets",
+  disorder: "Reordered segments",
   fake: "Fake packets",
-  "fake-split": "Fake packets and split",
-  "fake-disorder": "Fake packets and reorder",
+  "fake-split": "Fake and split",
+  "fake-disorder": "Fake and reorder",
   fragment: "IP fragmentation",
   "fake-fragment": "Fake packets and fragmentation",
   length: "UDP padding",
@@ -168,13 +168,16 @@ function updateApplicationSummary() {
     document.getElementById("application-" + kind.id + "-padding-note").hidden = method !== "length";
 
     if (enabled) {
-      if (count > 0) {
-        summary.appendChild(document.createTextNode(", "));
-      }
-
+      const row = document.createElement("p");
       const name = document.createElement("span");
       name.textContent = kind.name;
-      summary.appendChild(name);
+      const selection = currentStrategySelection(kind.id);
+      const label = document.createElement("span");
+      label.textContent = selection?.name || applicationMethods[method];
+      const status = document.createElement("span");
+      status.textContent = selection?.checked ? "Tested by finder" : "Not tested";
+      row.append(name, document.createTextNode(": "), label, document.createTextNode(" · "), status);
+      summary.appendChild(row);
       count++;
     }
   }

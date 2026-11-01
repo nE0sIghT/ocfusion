@@ -773,6 +773,26 @@ The module uses OCFusion's shared dark controls, orange actions and table
 palette consistently across stock ASUS themes. Each rule editor contains its
 own check targets, schedule and results.
 
+TCP (HTTP/HTTPS), QUIC (HTTP/3) and application protocols have separate controls.
+A finder result changes only its tested protocol, including its packet options.
+Names are retained in the rule's `strategy_selections`; changing the effective
+parameters clears that selection's tested identity without affecting other
+protocols. These bounded display records are excluded from packet configuration
+identity and do not restart the worker. Their checksum tracks parameter equality,
+not authentication. Combined presets are explicit multi-protocol actions.
+
+`settings.protocol_options` holds sparse packet-option overrides keyed by `tcp`,
+`udp` or a supported application ID. Allowed options are `fake_ttl`,
+`fake_repeats`, `fake_fooling`, `auto_ttl`, `auto_ttl_delta`, `auto_ttl_min`,
+`auto_ttl_max` and `packet_limit`, with the same bounds as their existing flat
+counterparts. Missing options inherit the flat values, preserving existing
+configurations. A rule's map replaces the base map. TCP and QUIC profiles enforce
+their own outgoing packet ranges; the shared queue captures enough packets for
+the largest configured profile. Application profiles retain their data-packet
+ranges and independent fake-packet options. All settings and display records
+remain subject to the complete configuration's existing 16 KiB limit.
+
+
 Existing top-level destination selection is displayed as a final ordinary rule
 with its original strategy. An explicit save writes it into `rules` and clears
 top-level destinations, preserving processing order. The combined limit is seven

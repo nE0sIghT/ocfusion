@@ -169,7 +169,15 @@ func processingPacketLimit(c Config) int {
 		return limit
 	}
 	limit := c.PacketLimit
+	for _, scope := range []string{"tcp", "udp"} {
+		if value := protocolConfig(c, scope).PacketLimit; value > limit {
+			limit = value
+		}
+	}
 	for _, profile := range c.Applications {
+		if value := protocolConfig(c, profile.ID).PacketLimit; value > limit {
+			limit = value
+		}
 		// Include TCP setup/ACK packets before the selected number of data packets.
 		if profile.Packets+3 > limit {
 			limit = profile.Packets + 3

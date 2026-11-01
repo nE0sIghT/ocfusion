@@ -107,6 +107,7 @@ func canonicalScanPreset(preset Preset) Preset {
 		return preset
 	}
 	c := presetConfig(defaultConfig(), preset)
+	c = protocolConfig(c, preset.Protocol)
 	settings := map[string]any{
 		"fake_ttl": c.TTL, "auto_ttl": c.AutoTTL, "auto_ttl_delta": c.AutoDelta,
 		"auto_ttl_min": c.AutoMin, "auto_ttl_max": c.AutoMax,

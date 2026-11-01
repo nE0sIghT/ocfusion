@@ -8,11 +8,12 @@ let strategyScope = "";
 function readStrategyForm() {
   return {
     applications: readApplications(),
+    protocol_options: collectProtocolOptions(),
     tcp_ports: ports("tcp_ports"),
     udp_ports: ports("udp_ports"),
     tcp_strategy: document.getElementById("tcp_strategy").value,
     udp_strategy: document.getElementById("udp_strategy").value,
-    split_position: config?.split_position || 2,
+    split_position: strategySplitPosition,
     split_positions: document.getElementById("split_positions").value.trim(),
     sequence_overlap: Number(document.getElementById("sequence_overlap").value),
     fake_fooling: document.getElementById("fake_fooling").value,
@@ -33,6 +34,7 @@ function rememberStrategyScope() {
 
   if (rule) {
     rule.settings = settings;
+    rule.strategy_selections = Object.fromEntries(strategyScopes().map((scope) => [scope, currentStrategySelection(scope)]).filter(([, selection]) => selection));
   }
 }
 
@@ -90,8 +92,7 @@ function showStrategyScope(id) {
   strategyScope = id;
   const settings = draftRules.find((rule) => rule.id === id)?.settings || draftBaseStrategy;
   const dirty = settingsDirty;
-  fillStrategySettings({name: "Custom strategy settings", protocol: "combined", settings});
-  document.getElementById("split_positions").value = settings.split_positions || String(settings.split_position || 2);
+  writeStrategySettings(settings, draftRules.find((rule) => rule.id === id)?.strategy_selections || {});
   document.getElementById("preset-description").hidden = true;
   setDirty(dirty);
   renderStrategyScopes();
@@ -101,6 +102,10 @@ function initializeRules(saved) {
   strategyScope = "";
   editingRule = "";
   draftBaseStrategy = readStrategyForm();
+  draftBaseStrategy.protocol_options = structuredClone(config.protocol_options || {});
+  for (const key of packetOptionKeys) {
+    draftBaseStrategy[key] = config[key] ?? packetOptionDefaults[key];
+  }
   draftRules = structuredClone(saved || []);
   runtimeRuleIDs = {};
   if (config.lists?.length || config.domains?.length || config.networks?.length) {
@@ -114,7 +119,8 @@ function initializeRules(saved) {
   savedRuleRows = structuredClone(draftRules);
 
   for (const rule of draftRules) {
-    rule.settings = {...structuredClone(draftBaseStrategy), ...rule.settings};
+    const overrides = rule.settings || {};
+    rule.settings = {...structuredClone(draftBaseStrategy), ...overrides, protocol_options: structuredClone(overrides.protocol_options ?? draftBaseStrategy.protocol_options)};
   }
 
   renderRules();

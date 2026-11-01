@@ -30,12 +30,10 @@ function ports(id) {
 
 function updateStrategyFields() {
   const tcp = document.getElementById("tcp_strategy").value;
-  const udp = document.getElementById("udp_strategy").value;
   const tcpFakes = ["fake", "fake-split", "fake-disorder", "fakedsplit", "fakeddisorder", "hostfakesplit"].includes(tcp);
   const standaloneFakes = ["fake", "fake-split", "fake-disorder"].includes(tcp);
   const split = !["off", "fake", "hostfakesplit"].includes(tcp);
-  const applicationFakes = applicationKinds.filter((kind) => applicationInput(kind, "enabled").checked && applicationInput(kind, "method").value.includes("fake"));
-  const fakes = tcpFakes || udp !== "off" || applicationFakes.length > 0;
+  const fakes = tcpFakes;
   const automatic = document.getElementById("auto_ttl").checked;
 
   for (const id of ["split_positions", "sequence_overlap"]) {
@@ -50,14 +48,13 @@ function updateStrategyFields() {
     document.getElementById(id).closest("tr").hidden = !fakes || !automatic;
   }
 
-  document.getElementById("fake_fooling").closest("tr").hidden = !tcpFakes && !applicationFakes.some((kind) => kind.transport === "tcp");
+  document.getElementById("fake_fooling").closest("tr").hidden = !tcpFakes;
   document.getElementById("fake_sni").closest("tr").hidden = !standaloneFakes && tcp !== "hostfakesplit";
-  document.getElementById("fake_repeats").closest("tr").hidden = !standaloneFakes && udp === "off";
+  document.getElementById("fake_repeats").closest("tr").hidden = !standaloneFakes;
 
-  for (const protocol of ["tcp", "udp"]) {
-    const select = document.getElementById(protocol + "_strategy");
-    document.getElementById("summary-" + protocol).textContent = select.selectedOptions[0].dataset.label;
-  }
+  updateProtocolOptionVisibility();
+  refreshProtocolSelections();
+  updateApplicationSummary();
 }
 
 async function load() {
@@ -76,23 +73,8 @@ async function load() {
       moduleCatalog = await parent.EXTENSIONS.action(moduleID, "catalog");
       catalog = moduleCatalog.presets;
       buildApplicationEditors(moduleCatalog.applications);
-      const select = document.getElementById("preset");
-
-      const groups = {};
-
-      for (const preset of catalog) {
-        if (!groups[preset.protocol]) {
-          const group = document.createElement("optgroup");
-          group.label = {tcp: "HTTP / TLS", udp: "QUIC", application: "Applications", combined: "Web and applications"}[preset.protocol];
-          groups[preset.protocol] = group;
-          select.appendChild(group);
-        }
-
-        const option = document.createElement("option");
-        option.value = preset.id;
-        option.textContent = preset.name;
-        groups[preset.protocol].appendChild(option);
-      }
+      buildProtocolEditors();
+      populateProtocolPresets();
     }
 
     document.getElementById("preset").value = "";
@@ -119,8 +101,7 @@ async function load() {
 
     document.getElementById("split_positions").value = config.split_positions || String(config.split_position || 2);
     document.getElementById("auto_ttl").checked = config.auto_ttl || false;
-    writeApplications(config.applications || [], false);
-    updateStrategyFields();
+    writeStrategySettings({...defaults, ...config});
     initializeRules(config.rules);
 
     renderedScan = "";
@@ -223,31 +204,11 @@ function selectPreset(id) {
   }
 
   fillStrategySettings(preset);
-  document.getElementById("preset").value = id;
 }
 
-function fillStrategySettings(preset) {
-  for (const [key, value] of Object.entries(preset.settings)) {
-    const element = document.getElementById(key);
-
-    if (element) {
-      if (element.type === "checkbox") {
-        element.checked = value;
-      } else {
-        element.value = value;
-      }
-    }
-  }
-
-  if (preset.settings.applications) {
-    writeApplications(preset.settings.applications, ["application", "stun"].includes(preset.protocol));
-  }
-
+function fillStrategySettings(preset, checked = false) {
+  applyProtocolPreset(preset, checked);
   setDirty(true);
-  document.getElementById("preset").value = "";
-  document.getElementById("preset-description").textContent = preset.description || "";
-  document.getElementById("preset-description").hidden = !preset.description;
-  updateStrategyFields();
 }
 
 function presetName(id) {
@@ -258,27 +219,12 @@ function presetName(id) {
   return catalog.find((item) => item.id === id)?.name || id;
 }
 
-document.getElementById("preset").addEventListener("change", (event) => {
-  try {
-    selectPreset(event.target.value);
-  } catch (error) {
-    document.getElementById("preset-description").textContent = error.message;
+document.getElementById("panel-strategies").addEventListener("input", (event) => {
+  if (event.target.matches("#preset, #quic-preset, #application-preset, #combined-preset")) {
+    return;
   }
-});
-
-document.getElementById("application-profiles").addEventListener("input", () => {
-  document.getElementById("preset").value = "";
-  document.getElementById("preset-description").textContent = "Custom strategy settings";
-  updateApplicationSummary();
   updateStrategyFields();
 });
-
-for (const id of ["tcp_strategy", "udp_strategy", "split_positions", "sequence_overlap", "fake_fooling", "fake_sni", "fake_ttl", "fake_repeats", "auto_ttl", "auto_ttl_delta", "auto_ttl_min", "auto_ttl_max", "packet_limit"]) {
-  document.getElementById(id).addEventListener("input", () => {
-    document.getElementById("preset").value = "";
-    document.getElementById("preset-description").textContent = "Custom strategy settings";
-  });
-}
 
 function updateProcessingControl() {
   const button = document.getElementById("toggle-processing");
